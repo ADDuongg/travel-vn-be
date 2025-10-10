@@ -19,7 +19,13 @@ async function bootstrap() {
     .addBearerAuth()
     .addTag('cats')
     .build();
-
+  app.enableCors({
+    origin: ['http://localhost:5174'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Authorization, X-Requested-With',
+    credentials: true,
+    maxAge: 86400,
+  });
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
   app.useStaticAssets(join(__dirname, '..', 'public'), {

@@ -16,6 +16,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UploadModule } from './upload/upload.module';
 import { EventsModule } from './socket/socket.module';
+import { TestApiModule } from './test_api/test_api.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { EventsModule } from './socket/socket.module';
         uri: configService.get<string>('DB_URI'),
       }),
     }),
+    TestApiModule,
   ],
   controllers: [AppController],
   providers: [AppService],
