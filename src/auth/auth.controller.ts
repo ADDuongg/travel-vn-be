@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Post,
+  Req,
   Request,
   UnauthorizedException,
   UseGuards,
@@ -12,12 +13,13 @@ import { AuthService } from './auth.service';
 import { ZodValidationPipe } from 'src/pipe/zod-validation.pipe';
 import { LoginDtoSchema } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
-
+  @ApiBearerAuth('bearer')
   @Post('login')
   @ApiBody({
     schema: {
@@ -35,6 +37,7 @@ export class AuthController {
       dto.username,
       dto.password,
     );
+
     if (!user) throw new UnauthorizedException();
     return this.authService.login(user);
   }
@@ -46,5 +49,14 @@ export class AuthController {
   async register(@Body() registerDto: RegisterDto) {
     const user = await this.authService.register(registerDto);
     return user;
+  }
+  @ApiBearerAuth('bearer')
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-all')
+  async logoutAll(@Req() req) {
+    const userId = req.user.userId;
+    console.log('Logout all for userId:', req.user);
+
+    return this.authService.logoutAll(userId);
   }
 }

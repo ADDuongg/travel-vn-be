@@ -40,7 +40,7 @@ export class UserService {
   }
 
   async findOne(username: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ username }).lean();
+    return this.userModel.findOne({ username });
   }
 
   update(id: string, updateUserDto: UpdateUserDto) {

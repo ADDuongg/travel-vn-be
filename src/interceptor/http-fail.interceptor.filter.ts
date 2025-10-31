@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
-@Catch() //  bắt tất cả exception kể cả 500 nếu không khi lỗi 500 sẽ không custome được
+@Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -18,10 +18,27 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
-      message = exception.message;
+      const res = exception.getResponse();
+
+      if (typeof res === 'object' && res !== null) {
+        if (Array.isArray((res as any).message)) {
+          message = (res as any).message.join(', ');
+        } else {
+          message = (res as any).message || exception.message;
+        }
+      } else {
+        message = exception.message;
+      }
     } else if (exception?.message) {
       message = exception.message;
     }
+
+    console.error('🔥 Exception caught:', {
+      status,
+      message,
+      stack: exception.stack,
+      response: exception.response,
+    });
 
     response.status(status).json({
       statusCode: status,
