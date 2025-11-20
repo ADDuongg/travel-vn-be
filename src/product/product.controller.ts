@@ -21,9 +21,12 @@ import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import * as fs from 'fs';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 const destination = './public/uploads/products';
 
+/* cái này để cho có Authorisation trong header nhé để test swagger còn dùng cookie thì phải sửa ở JwtStrategy thêm hàm check cookie */
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/product')
 export class ProductController {
@@ -64,7 +67,7 @@ export class ProductController {
     });
   }
 
-  @Roles('admin')
+  @Roles(['admin', 'user'])
   @Get()
   findAll() {
     return this.productService.findAll();

@@ -26,8 +26,8 @@ export class AuthController {
       type: 'object',
       required: ['username', 'password'],
       properties: {
-        username: { type: 'string', example: 'duong.nguyen' },
-        password: { type: 'string', format: 'password', example: 'Aa123456!' },
+        username: { type: 'string', example: 'duong' },
+        password: { type: 'string', format: 'password', example: '123123123' },
       },
     },
   })
@@ -42,7 +42,8 @@ export class AuthController {
     return this.authService.login(user);
   }
   @Post('refresh')
-  async refresh(@Body('refresh_token') refreshToken: string) {
+  async refresh(@Req() req) {
+    const refreshToken = req.cookies.refreshToken; // refresh nên để trong cookie
     return this.authService.refresh(refreshToken);
   }
   @Post('register')

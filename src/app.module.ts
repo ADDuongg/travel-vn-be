@@ -17,6 +17,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { UploadModule } from './upload/upload.module';
 import { EventsModule } from './socket/socket.module';
 import { TestApiModule } from './test_api/test_api.module';
+import { SharedModule } from './shared/shared.module';
+import { EnvModule } from './env/env.module';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { TestApiModule } from './test_api/test_api.module';
     AuthModule,
     UploadModule,
     EventsModule,
+    EnvModule,
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -38,6 +41,7 @@ import { TestApiModule } from './test_api/test_api.module';
       }),
     }),
     TestApiModule,
+    SharedModule,
   ],
   controllers: [AppController],
   providers: [AppService],

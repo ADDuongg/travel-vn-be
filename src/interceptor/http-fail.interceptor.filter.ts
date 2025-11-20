@@ -15,6 +15,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = 500;
     let message = 'Internal server error';
+    console.log('Request info:', {
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+      body: request.body,
+      query: request.query,
+    });
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();

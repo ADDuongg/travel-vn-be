@@ -14,12 +14,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { RefreshToken } from './schema/refresh_token.schema';
 import { Model, Types } from 'mongoose';
 import { addDays } from 'date-fns';
+import { EnvService } from 'src/env/env.service';
 @Injectable()
 export class AuthService {
   constructor(
     private usersService: UserService,
     private jwtService: JwtService,
     private config: ConfigService,
+    private env: EnvService,
     @InjectModel(RefreshToken.name)
     private readonly refreshTokenModel: Model<RefreshToken>,
   ) {}
@@ -37,24 +39,29 @@ export class AuthService {
   }
 
   private signAccessToken(user: any) {
-    const payload = { sub: String(user._id), role: user.role, typ: 'access' };
-    const opts: JwtSignOptions = {
-      expiresIn: this.config.get('JWT_ACCESS_TTL') ?? '10m',
-      issuer: this.config.get('JWT_ISSUER') ?? 'my-app',
-      audience: this.config.get('JWT_AUDIENCE') ?? 'my-app-clients',
-      jwtid: uuidv4(),
+    const expiresIn = this.env.isProduction() ? '10m' : '1h';
+    const payload = {
+      sub: String(user._id),
+      role: user.role,
+      username: user.username,
+      typ: 'access',
     };
-    return this.jwtService.sign(payload, opts);
+    return this.jwtService.sign(payload, {
+      secret: 'your_jwt_secret',
+      expiresIn,
+      issuer: this.env.get('JWT_ISSUER', 'my-app'),
+      audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      jwtid: uuidv4(),
+    });
   }
 
   private signRefreshToken(user: any) {
     const jti = uuidv4();
-    const payload = { sub: String(user._id), typ: 'refresh' };
+    const payload = { sub: String(user._id), typ: 'refresh', jti };
     const opts: JwtSignOptions = {
       expiresIn: this.config.get('JWT_REFRESH_TTL') ?? '7d',
       issuer: this.config.get('JWT_ISSUER') ?? 'my-app',
       audience: this.config.get('JWT_AUDIENCE') ?? 'my-app-clients',
-      jwtid: jti,
       secret: this.config.get('JWT_REFRESH_SECRET'),
     };
     const token = this.jwtService.sign(payload, opts);
@@ -62,6 +69,8 @@ export class AuthService {
   }
 
   async login(user: any) {
+    console.log('user', user);
+
     const accessToken = this.signAccessToken(user);
     const { token: refreshToken, jti } = this.signRefreshToken(user);
 

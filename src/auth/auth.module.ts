@@ -12,21 +12,28 @@ import {
   RefreshToken,
   RefreshTokenSchema,
 } from './schema/refresh_token.schema';
+import { EnvService } from 'src/env/env.service';
+import { EnvModule } from 'src/env/env.module';
 
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({
-      secret: 'your_jwt_secret',
-      signOptions: { expiresIn: '60m' },
+    JwtModule.registerAsync({
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: async (env: EnvService) => ({
+        secret: env.get('JWT_SECRET', 'your_jwt_secret'),
+        signOptions: { expiresIn: '60m' },
+      }),
     }),
     UserModule,
+    EnvModule,
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
     ]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
