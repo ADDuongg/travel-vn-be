@@ -14,7 +14,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
 
-@Controller('api/v1/user')
+@Controller('api/v1/users')
 @UseFilters(new HttpExceptionFilter())
 export class UserController {
   constructor(private readonly userService: UserService) {}

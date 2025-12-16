@@ -1,31 +1,29 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
+  UploadedFiles,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
-  UploadedFiles,
 } from '@nestjs/common';
-import { ProductService } from './product.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductDto } from './dto/update-product.dto';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { Roles, RolesGuard } from 'src/guards/role.guard';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth } from '@nestjs/swagger';
+import * as fs from 'fs';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import * as fs from 'fs';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { Roles, RolesGuard } from 'src/guards/role.guard';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { ProductService } from './product.service';
 
 const destination = './public/uploads/products';
 
-/* cái này để cho có Authorisation trong header nhé để test swagger còn dùng cookie thì phải sửa ở JwtStrategy thêm hàm check cookie */
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('api/v1/product')

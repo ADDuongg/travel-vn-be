@@ -19,6 +19,11 @@ import { EventsModule } from './socket/socket.module';
 import { TestApiModule } from './test_api/test_api.module';
 import { SharedModule } from './shared/shared.module';
 import { EnvModule } from './env/env.module';
+import { RolesModule } from './roles/roles.module';
+import { RoutersModule } from './routers/routers.module';
+import { ApiPermissionModule } from './api-permission/api-permission.module';
+import { RouterRoleModule } from './router-role/router-role.module';
+import { ApiRoleModule } from './api-role/api-role.module';
 
 @Module({
   imports: [
@@ -42,6 +47,11 @@ import { EnvModule } from './env/env.module';
     }),
     TestApiModule,
     SharedModule,
+    RolesModule,
+    RoutersModule,
+    ApiPermissionModule,
+    RouterRoleModule,
+    ApiRoleModule,
   ],
   controllers: [AppController],
   providers: [AppService],

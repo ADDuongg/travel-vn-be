@@ -16,7 +16,7 @@ async function bootstrap() {
   });
   const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 9000;
+  const port = configService.get<number>('PORT') || 9001;
   const config = new DocumentBuilder()
     .setTitle('Cats example')
     .setDescription('The cats API description')
@@ -33,7 +33,7 @@ async function bootstrap() {
     )
     .build();
   app.enableCors({
-    origin: ['http://localhost:5174'],
+    origin: ['http://localhost:5174', 'http://localhost:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Authorization, X-Requested-With',
     credentials: true,
