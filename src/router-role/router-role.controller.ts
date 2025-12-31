@@ -45,10 +45,11 @@ export class RouterRoleController {
    * Replace router list của role
    * Dùng cho checkbox UI
    */
-  @Post('replace/:roleCode')
+  @Post('replace')
   replace(
-    @Param('roleCode') roleCode: string,
+    // @Param('roleCode') roleCode: string,
     @Body('routerCodes') routerCodes: string[],
+    @Body('roleCode') roleCode: string,
   ) {
     return this.routerRoleService.replaceByRole(roleCode, routerCodes);
   }

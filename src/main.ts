@@ -1,20 +1,18 @@
-import { NestFactory, Reflector } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
+import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
-import { ConfigService } from '@nestjs/config';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/role.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
-  const reflector = app.get(Reflector);
+  // const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 9001;
   const config = new DocumentBuilder()

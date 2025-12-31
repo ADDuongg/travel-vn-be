@@ -3,5 +3,9 @@ export class CreateUserDto {
   password: string;
   age: number;
   email: string;
-  role: 'user' | 'admin';
+  roles: string[];
+  permissions: {
+    routers: string[];
+    apis: string[];
+  };
 }

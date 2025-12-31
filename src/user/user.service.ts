@@ -1,18 +1,21 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import * as bcrypt from 'bcryptjs';
+import { Model } from 'mongoose';
+import { PermissionService } from 'src/permission/permission.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import * as bcrypt from 'bcryptjs';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model } from 'mongoose';
+import { AuthUser, UserWithPassword } from './interfaces/user-interface';
 import { User, UserDocument } from './schema/user.schema';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly permissionService: PermissionService,
     // @InjectConnection() private connection: Connection,
   ) {}
-  async create(userDto: CreateUserDto): Promise<any> {
+  async create(userDto: CreateUserDto): Promise<User> {
     const existedUser = await this.userModel.findOne({
       $or: [{ username: userDto.username }, { email: userDto.email }],
     });
@@ -35,12 +38,36 @@ export class UserService {
     return this.userModel.find().exec();
   }
 
-  findOneById(id: number) {
-    return this.userModel.findById(id).exec();
+  async findOneById(id: string): Promise<AuthUser | null> {
+    const user = await this.userModel
+      .findById(id)
+      .select('_id username roles')
+      .lean<AuthUser>()
+      .exec();
+    if (!user) return null;
+
+    const permissions = await this.permissionService.resolvePermissions(
+      user.roles || [],
+    );
+
+    return {
+      ...user,
+      permissions,
+    };
   }
 
-  async findOne(username: string): Promise<UserDocument | null> {
-    return this.userModel.findOne({ username });
+  async findOne(username: string): Promise<UserWithPassword | null> {
+    const user = await this.userModel.findOne({ username });
+    if (!user) return null;
+
+    const permissions = await this.permissionService.resolvePermissions(
+      user.roles || [],
+    );
+
+    return {
+      ...user,
+      permissions,
+    };
   }
 
   update(id: string, updateUserDto: UpdateUserDto) {

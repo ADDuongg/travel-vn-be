@@ -1,29 +1,27 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ApiPermissionModule } from './api-permission/api-permission.module';
+import { ApiRoleModule } from './api-role/api-role.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ProductModule } from './product/product.module';
-import { OrderModule } from './order/order.module';
-import { logger } from './middleware/logger.middleware';
-import { ProductController } from './product/product.controller';
-import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
-import { MongooseModule } from '@nestjs/mongoose';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { UploadModule } from './upload/upload.module';
-import { EventsModule } from './socket/socket.module';
-import { TestApiModule } from './test_api/test_api.module';
-import { SharedModule } from './shared/shared.module';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { EnvModule } from './env/env.module';
+import { LanguageModule } from './language/language.module';
+import { logger } from './middleware/logger.middleware';
+import { OrderModule } from './order/order.module';
+import { PermissionModule } from './permission/permission.module';
+import { ProductController } from './product/product.controller';
+import { ProductModule } from './product/product.module';
 import { RolesModule } from './roles/roles.module';
-import { RoutersModule } from './routers/routers.module';
-import { ApiPermissionModule } from './api-permission/api-permission.module';
 import { RouterRoleModule } from './router-role/router-role.module';
-import { ApiRoleModule } from './api-role/api-role.module';
+import { RoutersModule } from './routers/routers.module';
+import { SharedModule } from './shared/shared.module';
+import { EventsModule } from './socket/socket.module';
+import { UploadModule } from './upload/upload.module';
+import { UserModule } from './user/user.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -45,13 +43,16 @@ import { ApiRoleModule } from './api-role/api-role.module';
         uri: configService.get<string>('DB_URI'),
       }),
     }),
-    TestApiModule,
     SharedModule,
     RolesModule,
     RoutersModule,
     ApiPermissionModule,
     RouterRoleModule,
     ApiRoleModule,
+    PermissionModule,
+    LanguageModule,
+    CloudinaryModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

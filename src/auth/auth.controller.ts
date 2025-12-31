@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ZodValidationPipe } from 'src/pipe/zod-validation.pipe';
-import { LoginDtoSchema } from './dto/login.dto';
+import { LoginDto, LoginDtoSchema } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
@@ -32,7 +32,7 @@ export class AuthController {
     },
   })
   @UsePipes(new ZodValidationPipe(LoginDtoSchema))
-  async login(@Body() dto: any) {
+  async login(@Body() dto: LoginDto) {
     const user = await this.authService.validateUser(
       dto.username,
       dto.password,
@@ -41,9 +41,32 @@ export class AuthController {
     if (!user) throw new UnauthorizedException();
     return this.authService.login(user);
   }
+
+  /* @ApiBody({})
   @Post('refresh')
   async refresh(@Req() req) {
-    const refreshToken = req.cookies.refreshToken; // refresh nên để trong cookie
+    // const refreshToken = req.cookies.refreshToken; // refresh nên để trong cookie
+    console.log('1234', req);
+
+    return this.authService.refresh(req);
+  } */
+  @Post('refresh')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['refreshToken'],
+      properties: {
+        refreshToken: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+      },
+    },
+  })
+  async refresh(@Body('refreshToken') refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Missing refresh token');
+    }
     return this.authService.refresh(refreshToken);
   }
   @Post('register')
@@ -54,10 +77,8 @@ export class AuthController {
   @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard)
   @Post('logout-all')
-  async logoutAll(@Req() req) {
-    const userId = req.user.userId;
-    console.log('Logout all for userId:', req.user);
-
+  async logoutAll(@Req() req: any) {
+    const userId = (req as { user: { userId: string } }).user.userId;
     return this.authService.logoutAll(userId);
   }
 }

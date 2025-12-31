@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
-import { UserService } from 'src/user/user.service';
 import { JwtStrategy } from 'src/jwt/jwt.strategy';
 import { AuthController } from './auth.controller';
 import { UserModule } from 'src/user/user.module';
@@ -14,6 +13,12 @@ import {
 } from './schema/refresh_token.schema';
 import { EnvService } from 'src/env/env.service';
 import { EnvModule } from 'src/env/env.module';
+import {
+  RouterRole,
+  RouterRoleSchema,
+} from 'src/router-role/schema/router-role.schema';
+import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
+import { PermissionService } from '../permission/permission.service';
 
 @Module({
   imports: [
@@ -30,10 +35,12 @@ import { EnvModule } from 'src/env/env.module';
     EnvModule,
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
+      { name: RouterRole.name, schema: RouterRoleSchema },
+      { name: ApiRole.name, schema: ApiRoleSchema },
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, JwtStrategy, PermissionService],
+  exports: [AuthService, JwtModule, PermissionService],
 })
 export class AuthModule {}
