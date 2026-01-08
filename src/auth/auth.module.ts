@@ -19,6 +19,7 @@ import {
 } from 'src/router-role/schema/router-role.schema';
 import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
 import { PermissionService } from '../permission/permission.service';
+import { User, UserSchema } from 'src/user/schema/user.schema';
 
 @Module({
   imports: [
@@ -26,7 +27,7 @@ import { PermissionService } from '../permission/permission.service';
     JwtModule.registerAsync({
       imports: [EnvModule],
       inject: [EnvService],
-      useFactory: async (env: EnvService) => ({
+      useFactory: (env: EnvService) => ({
         secret: env.get('JWT_SECRET', 'your_jwt_secret'),
         signOptions: { expiresIn: '60m' },
       }),
@@ -37,6 +38,7 @@ import { PermissionService } from '../permission/permission.service';
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: RouterRole.name, schema: RouterRoleSchema },
       { name: ApiRole.name, schema: ApiRoleSchema },
+      { name: User.name, schema: UserSchema },
     ]),
   ],
   controllers: [AuthController],

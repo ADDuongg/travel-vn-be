@@ -22,12 +22,22 @@ import { EventsModule } from './socket/socket.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { MediaModule } from './media/media.module';
+import { RoomModule } from './room/room.module';
+import { AmenitiesModule } from './amenities/amenities.module';
+import { ReviewModule } from './review/review.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri: configService.get<string>('DB_URI'),
+      }),
     }),
     ProductModule,
     OrderModule,
@@ -36,13 +46,6 @@ import { MediaModule } from './media/media.module';
     UploadModule,
     EventsModule,
     EnvModule,
-    MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('DB_URI'),
-      }),
-    }),
     SharedModule,
     RolesModule,
     RoutersModule,
@@ -53,6 +56,9 @@ import { MediaModule } from './media/media.module';
     LanguageModule,
     CloudinaryModule,
     MediaModule,
+    RoomModule,
+    AmenitiesModule,
+    ReviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],

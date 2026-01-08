@@ -33,6 +33,9 @@ export class UserService {
     const savedUser = await createdUser.save();
     return savedUser;
   }
+  async findForAuth(username: string) {
+    return this.userModel.findOne({ username }).select('+password').lean();
+  }
 
   findAll() {
     return this.userModel.find().exec();
@@ -65,7 +68,7 @@ export class UserService {
     );
 
     return {
-      ...user,
+      ...user.toObject(),
       permissions,
     };
   }

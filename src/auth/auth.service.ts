@@ -24,16 +24,19 @@ import {
 } from './interfaces/jwt-payload.interface';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { PermissionService } from '../permission/permission.service';
+import { User, UserDocument } from 'src/user/schema/user.schema';
 
 @Injectable()
 export class AuthService {
   constructor(
+    @InjectModel(RefreshToken.name)
+    private readonly refreshTokenModel: Model<RefreshToken>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
     private readonly usersService: UserService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly env: EnvService,
-    @InjectModel(RefreshToken.name)
-    private readonly refreshTokenModel: Model<RefreshToken>,
     private readonly permissionService: PermissionService,
   ) {}
 
@@ -218,14 +221,42 @@ export class AuthService {
       await this.saveRefreshToken(user, newRefreshToken, jti);
 
       const newAccessToken = this.signAccessToken(user);
-
+      const permissions = await this.permissionService.resolvePermissions(
+        user.roles || [],
+      );
       return {
         access_token: newAccessToken,
         refresh_token: newRefreshToken,
+        account: {
+          _id: user._id,
+          username: user.username,
+          roles: user.roles,
+          permissions,
+        },
       };
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+  }
+
+  async me(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('_id username roles')
+      .lean();
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    const permissions = await this.permissionService.resolvePermissions(
+      user.roles || [],
+    );
+    return {
+      id: user._id.toString(),
+      username: user.username,
+      roles: user.roles,
+      permissions: permissions,
+    };
   }
 
   async logout(refreshToken: string) {

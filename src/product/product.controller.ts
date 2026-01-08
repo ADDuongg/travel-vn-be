@@ -73,7 +73,6 @@ export class ProductController {
 
   @Get(':id')
   findOne(@Param('id') id: string, @Query('type') type: string) {
-    console.log('find product type', type);
     return this.productService.findOne(+id);
   }
 

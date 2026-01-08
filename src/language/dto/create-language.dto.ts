@@ -1,4 +1,6 @@
+import { Transform } from 'class-transformer';
 import { IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { toBoolean } from 'src/common/utils/transform.util';
 
 export class CreateLanguageDto {
   @IsString()
@@ -13,6 +15,7 @@ export class CreateLanguageDto {
   @IsString()
   flagUrl?: string;
 
+  @Transform(toBoolean)
   @IsBoolean()
   isActive: boolean;
 }

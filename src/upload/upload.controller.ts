@@ -25,7 +25,6 @@ export class UploadController {
     }),
   )
   uploadFile(@UploadedFile() file: Express.Multer.File) {
-    // trả về đường dẫn file hoặc thông tin file
     return {
       filename: file.filename,
       path: file.path,

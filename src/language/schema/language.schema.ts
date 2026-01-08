@@ -15,6 +15,9 @@ export class Language {
   name: string;
 
   @Prop()
+  flagPublicId?: string;
+
+  @Prop()
   flagUrl?: string;
 
   @Prop({ default: true })

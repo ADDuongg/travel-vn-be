@@ -1,13 +1,13 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
-
+import * as cookieParser from 'cookie-parser';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
@@ -30,6 +30,7 @@ async function bootstrap() {
       'bearer',
     )
     .build();
+  app.use(cookieParser());
   app.enableCors({
     origin: ['http://localhost:5174', 'http://localhost:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -44,7 +45,13 @@ async function bootstrap() {
   });
   app.useGlobalInterceptors(new ResponseTransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe());
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: false,
+    }),
+  );
   /* app.useGlobalGuards(new JwtAuthGuard(), new RolesGuard(reflector)); */
   await app.listen(port);
 }
