@@ -1,11 +1,25 @@
-// amenities/schemas/amenity.schema.ts
+// amenity.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
+export type AmenityDocument = Amenity & Document;
+
 @Schema({ timestamps: true })
-export class Amenity extends Document {
-  @Prop({ required: true })
-  name: string;
+export class Amenity {
+  @Prop({ default: true })
+  isActive: boolean;
+
+  @Prop({
+    type: Object,
+    required: true,
+  })
+  translations: {
+    [langCode: string]: {
+      name: string;
+      description?: string;
+      shortDescription?: string;
+    };
+  };
 
   @Prop({
     type: {
@@ -17,9 +31,6 @@ export class Amenity extends Document {
     url: string;
     publicId: string;
   };
-
-  @Prop({ default: true })
-  isActive: boolean;
 }
 
 export const AmenitySchema = SchemaFactory.createForClass(Amenity);

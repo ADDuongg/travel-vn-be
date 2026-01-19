@@ -88,8 +88,6 @@ export class ReviewService {
     return true;
   }
 
-  /* ================= LIST PUBLIC REVIEWS ================= */
-
   async findPublicReviews(params: {
     entityType: ReviewEntityType;
     entityId: string;
@@ -109,8 +107,6 @@ export class ReviewService {
       .limit(limit)
       .lean();
   }
-
-  /* ================= GET MY REVIEW ================= */
 
   async findMyReview(params: {
     entityType: ReviewEntityType;

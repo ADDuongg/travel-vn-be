@@ -10,7 +10,6 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { EnvModule } from './env/env.module';
 import { LanguageModule } from './language/language.module';
 import { logger } from './middleware/logger.middleware';
-import { OrderModule } from './order/order.module';
 import { PermissionModule } from './permission/permission.module';
 import { ProductController } from './product/product.controller';
 import { ProductModule } from './product/product.module';
@@ -25,9 +24,17 @@ import { MediaModule } from './media/media.module';
 import { RoomModule } from './room/room.module';
 import { AmenitiesModule } from './amenities/amenities.module';
 import { ReviewModule } from './review/review.module';
+import { PaymentModule } from './payment/payment.module';
+import { OrdersModule } from './orders/orders.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { BookingModule } from './booking/booking.module';
+import { HotelModule } from './hotel/hotel.module';
+import { RoomInventoryModule } from './room-inventory/room-inventory.module';
+import { IdempotencyModule } from './idempotency/idempotency.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -40,7 +47,7 @@ import { ReviewModule } from './review/review.module';
       }),
     }),
     ProductModule,
-    OrderModule,
+    OrdersModule,
     UserModule,
     AuthModule,
     UploadModule,
@@ -59,6 +66,12 @@ import { ReviewModule } from './review/review.module';
     RoomModule,
     AmenitiesModule,
     ReviewModule,
+    PaymentModule,
+    OrdersModule,
+    BookingModule,
+    HotelModule,
+    RoomInventoryModule,
+    IdempotencyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

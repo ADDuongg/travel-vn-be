@@ -1,5 +1,9 @@
 // amenities/amenities.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateAmenityDto } from './dto/create-amenity.dto';
@@ -17,6 +21,7 @@ export class AmenitiesService {
 
   async create(dto: CreateAmenityDto, file?: Express.Multer.File) {
     let icon;
+    console.log('dto ', dto);
 
     if (file) {
       const uploaded = await this.cloudinaryService.uploadFile(file);
@@ -26,9 +31,13 @@ export class AmenitiesService {
       };
     }
 
+    if (!dto.translations || Object.keys(dto.translations).length === 0) {
+      throw new BadRequestException('At least one language is required');
+    }
+
     return this.amenityModel.create({
-      name: dto.name,
-      isActive: true,
+      isActive: dto.isActive ?? true,
+      translations: dto.translations,
       icon,
     });
   }
@@ -60,7 +69,14 @@ export class AmenitiesService {
       };
     }
 
-    Object.assign(amenity, dto);
+    if (dto.translations) {
+      amenity.translations = dto.translations;
+    }
+
+    if (typeof dto.isActive === 'boolean') {
+      amenity.isActive = dto.isActive;
+    }
+
     return amenity.save();
   }
 

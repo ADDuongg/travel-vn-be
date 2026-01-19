@@ -12,9 +12,16 @@ export class CloudinaryService {
     private readonly cloudinary: CloudinaryClient,
   ) {}
 
-  uploadFile(file: Express.Multer.File): Promise<CloudinaryResponse> {
+  uploadFile(
+    file: Express.Multer.File,
+    options?: { folder?: string; public_id?: string },
+  ): Promise<CloudinaryResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
+        {
+          folder: options?.folder, // 👈 có thì dùng
+          public_id: options?.public_id, // 👈 optional
+        },
         (error, result) => {
           if (error) {
             return reject(
@@ -35,6 +42,7 @@ export class CloudinaryService {
       streamifier.createReadStream(file.buffer).pipe(uploadStream);
     });
   }
+
   async uploadFiles(
     files: Express.Multer.File[],
     // folder?: string,

@@ -8,10 +8,13 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
 import * as cookieParser from 'cookie-parser';
+import * as bodyParser from 'body-parser';
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
+  app.use('/payments/webhook', bodyParser.raw({ type: 'application/json' }));
   // const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 9001;
@@ -30,6 +33,7 @@ async function bootstrap() {
       'bearer',
     )
     .build();
+
   app.use(cookieParser());
   app.enableCors({
     origin: ['http://localhost:5174', 'http://localhost:5173'],

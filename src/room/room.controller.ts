@@ -46,6 +46,8 @@ export class RoomController {
     @Body() updateRoomDto: UpdateRoomDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
+    console.log('updateRoomDto', updateRoomDto);
+
     return this.roomService.update(id, updateRoomDto, files);
   }
 

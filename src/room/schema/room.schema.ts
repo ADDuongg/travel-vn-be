@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
+import { Hotel } from 'src/hotel/schema/hotel.schema';
 
 export type RoomDocument = Room & Document;
 
@@ -28,7 +29,16 @@ export class Room {
   children: number;
 
   @Prop()
-  roomSize?: number; // m2
+  roomSize?: number;
+
+  /* ================= RELATION ================= */
+  @Prop({
+    type: Types.ObjectId,
+    ref: Hotel.name,
+    required: true,
+    index: true,
+  })
+  hotelId: Types.ObjectId;
 
   /* ================= PRICING ================= */
 
@@ -92,6 +102,10 @@ export class Room {
       description: string;
       shortDescription?: string;
       hotelRule?: string[];
+      faq: {
+        question: string;
+        answer: string;
+      }[];
     };
   };
 
@@ -117,6 +131,23 @@ export class Room {
     minNights: number;
     maxNights?: number;
     allowInstantBooking: boolean;
+  };
+
+  /* ================= CAPACITY ================= */
+  @Prop({
+    type: {
+      baseAdults: { type: Number, required: true },
+      baseChildren: { type: Number, default: 0 },
+      maxAdults: { type: Number, required: true },
+      maxChildren: { type: Number, default: 0 },
+    },
+    required: true,
+  })
+  capacity: {
+    baseAdults: number;
+    baseChildren: number;
+    maxAdults: number;
+    maxChildren: number;
   };
 
   /* ================= INVENTORY ================= */
@@ -179,3 +210,5 @@ RoomSchema.index({ code: 1 }, { unique: true });
 RoomSchema.index({ slug: 1 }, { unique: true });
 RoomSchema.index({ isActive: 1 });
 RoomSchema.index({ 'pricing.basePrice': 1 });
+RoomSchema.index({ hotelId: 1 });
+RoomSchema.index({ hotelId: 1, isActive: 1 });

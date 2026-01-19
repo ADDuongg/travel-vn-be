@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   Allow,
   IsArray,
@@ -9,7 +9,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { toBoolean, toNumber } from 'src/common/utils/transform.util';
+import { toNumber, TransformValue } from 'src/utils/transform.util';
 
 export class CreateRoomDto {
   /* ========= CORE ========= */
@@ -22,33 +22,52 @@ export class CreateRoomDto {
   @IsNotEmpty()
   slug: string;
 
-  @Transform(toBoolean)
+  @TransformValue()
   @IsBoolean()
   isActive: boolean;
 
   /* ========= CAPACITY ========= */
 
-  @Transform(toNumber)
+  @TransformValue()
   @IsNumber()
   maxGuests: number;
 
-  @Transform(toNumber)
+  @TransformValue()
   @IsNumber()
   adults: number;
 
-  @Transform(toNumber)
+  @TransformValue()
   @IsNumber()
   @IsOptional()
   children?: number;
 
-  @Transform(toNumber)
+  @TransformValue()
   @IsNumber()
   @IsOptional()
   roomSize?: number;
 
+  @IsString()
+  @IsNotEmpty()
+  hotelId: string;
+
+  /* ========= CAPACITY ========= */
+
+  @TransformValue()
+  @IsObject()
+  @IsOptional()
+  capacity?: {
+    baseAdults: number;
+    baseChildren: number;
+    maxAdults: number;
+    maxChildren: number;
+  };
+
   /* ========= PRICING ========= */
 
-  @Transform(toNumber)
+  @TransformValue()
+  // @Transform(toNumber)
+  @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   basePrice: number;
 
@@ -58,7 +77,10 @@ export class CreateRoomDto {
 
   /* ========= INVENTORY ========= */
 
-  @Transform(toNumber)
+  @TransformValue()
+  // @Transform(toNumber)
+  @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   totalRooms: number;
 
@@ -74,6 +96,15 @@ export class CreateRoomDto {
       shortDescription?: string;
     }
   >;
+
+  /* ========= BOOKING CONFIG ========= */
+  @Transform(({ value }) => JSON.parse(value))
+  @IsObject()
+  bookingConfig: {
+    minNights: number;
+    maxNights?: number;
+    allowInstantBooking: boolean;
+  };
 
   /* ========= AMENITIES ========= */
 

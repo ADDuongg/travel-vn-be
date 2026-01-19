@@ -1,16 +1,18 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CreateRoomDto } from './dto/create-room.dto';
-import { UpdateRoomDto } from './dto/update-room.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { Room, RoomDocument } from './schema/room.schema';
-import { AmenitiesService } from 'src/amenities/amenities.service';
+import { HotelService } from 'src/hotel/hotel.service';
+import { CreateRoomDto } from './dto/create-room.dto';
 import { RoomQueryDto, RoomSortBy } from './dto/room-query.dto';
+import { UpdateRoomDto } from './dto/update-room.dto';
+import { Room, RoomDocument } from './schema/room.schema';
+import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 
 @Injectable()
 export class RoomService {
@@ -18,7 +20,8 @@ export class RoomService {
     @InjectModel(Room.name)
     private readonly roomModel: Model<RoomDocument>,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly amenitiesService: AmenitiesService,
+    private readonly hotelService: HotelService,
+    private readonly roomInventoryService: RoomInventoryService,
   ) {}
 
   // ===== CREATE =====
@@ -27,9 +30,16 @@ export class RoomService {
       $or: [{ code: dto.code }, { slug: dto.slug }],
     });
 
+    const hotel = await this.hotelService.findById(dto.hotelId);
+    if (!hotel) {
+      throw new BadRequestException('Hotel not found');
+    }
+
     if (existed) {
       throw new ConflictException('Room already exists');
     }
+
+    this.validateBookingConfig(dto.bookingConfig);
 
     const { thumbnail, gallery } = await this.uploadGallery(files);
 
@@ -37,6 +47,8 @@ export class RoomService {
       code: dto.code.toUpperCase(),
       slug: dto.slug,
       isActive: dto.isActive,
+
+      hotelId: dto.hotelId,
 
       maxGuests: dto.maxGuests,
       adults: dto.adults,
@@ -51,6 +63,10 @@ export class RoomService {
       inventory: {
         totalRooms: dto.totalRooms,
       },
+
+      capacity: dto.capacity,
+
+      bookingConfig: dto.bookingConfig,
 
       translations: dto.translations,
       amenities: dto.amenities || [],
@@ -130,6 +146,22 @@ export class RoomService {
   async update(id: string, dto: UpdateRoomDto, files?: Express.Multer.File[]) {
     const room = await this.roomModel.findById(id);
     if (!room) throw new NotFoundException('Room not found');
+    const inventoryCount =
+      await this.roomInventoryService.countFutureInventories(id);
+    console.log('dto.totalRooms', dto.totalRooms);
+
+    const isTotalRoomsChanged =
+      dto.totalRooms !== undefined &&
+      dto.totalRooms !== room.inventory.totalRooms;
+
+    if (inventoryCount > 0 && isTotalRoomsChanged) {
+      throw new BadRequestException({
+        code: 'ROOM_HAS_FUTURE_INVENTORY',
+        message: `Room already has inventory for ${inventoryCount} future days. Changes are not allowed.`,
+      });
+    }
+
+    this.validateBookingConfig(dto.bookingConfig);
 
     let gallery = room.gallery;
     let thumbnail = room.thumbnail;
@@ -141,9 +173,16 @@ export class RoomService {
       gallery = uploaded.gallery;
       thumbnail = uploaded.thumbnail;
     }
-
     Object.assign(room, {
       ...dto,
+      pricing: {
+        basePrice: dto.basePrice,
+        currency: dto.currency || 'VND',
+      },
+
+      inventory: {
+        totalRooms: dto.totalRooms,
+      },
       thumbnail,
       gallery,
     });
@@ -191,5 +230,19 @@ export class RoomService {
         img.publicId ? this.cloudinaryService.deleteFile(img.publicId) : null,
       ),
     );
+  }
+
+  private validateBookingConfig(bookingConfig?: {
+    minNights: number;
+    maxNights?: number;
+  }) {
+    if (!bookingConfig) return;
+
+    if (
+      bookingConfig.maxNights &&
+      bookingConfig.maxNights < bookingConfig.minNights
+    ) {
+      throw new BadRequestException('maxNights cannot be less than minNights');
+    }
   }
 }

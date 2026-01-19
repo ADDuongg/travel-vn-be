@@ -15,8 +15,6 @@ export enum ReviewEntityType {
   timestamps: true,
 })
 export class Review {
-  /* ===== Target entity ===== */
-
   @Prop({
     required: true,
     enum: ReviewEntityType,
@@ -30,23 +28,17 @@ export class Review {
   })
   entityId: Types.ObjectId;
 
-  /* ===== Review content ===== */
-
   @Prop({ min: 1, max: 5 })
-  rating?: number; // 1–5 stars (optional for blog)
+  rating?: number;
 
   @Prop()
   comment?: string;
-
-  /* ===== Reviewer ===== */
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   userId?: Types.ObjectId;
 
   @Prop({ default: false })
   isAnonymous: boolean;
-
-  /* ===== Moderation ===== */
 
   @Prop({ default: false })
   isApproved: boolean;

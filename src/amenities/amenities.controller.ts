@@ -25,6 +25,8 @@ export class AmenitiesController {
     @Body() dto: CreateAmenityDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
+    console.log('dto controller', dto);
+
     return this.amenitiesService.create(dto, file);
   }
 
