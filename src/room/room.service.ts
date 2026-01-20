@@ -50,10 +50,7 @@ export class RoomService {
 
       hotelId: dto.hotelId,
 
-      maxGuests: dto.maxGuests,
-      adults: dto.adults,
-      children: dto.children,
-      roomSize: dto.roomSize,
+      capacity: dto.capacity,
 
       pricing: {
         basePrice: dto.basePrice,
@@ -63,8 +60,6 @@ export class RoomService {
       inventory: {
         totalRooms: dto.totalRooms,
       },
-
-      capacity: dto.capacity,
 
       bookingConfig: dto.bookingConfig,
 
@@ -86,7 +81,7 @@ export class RoomService {
     };
 
     if (adults) {
-      filter.adults = { $gte: adults };
+      filter['capacity.maxAdults'] = { $gte: adults };
     }
 
     if (minPrice || maxPrice) {

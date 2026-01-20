@@ -18,18 +18,23 @@ export class Room {
   isActive: boolean;
 
   /* ================= CAPACITY ================= */
-
-  @Prop({ required: true })
-  maxGuests: number;
-
-  @Prop({ required: true })
-  adults: number;
-
-  @Prop({ default: 0 })
-  children: number;
-
-  @Prop()
-  roomSize?: number;
+  @Prop({
+    type: {
+      baseAdults: { type: Number, required: true },
+      baseChildren: { type: Number, default: 0 },
+      maxAdults: { type: Number, required: true },
+      maxChildren: { type: Number, default: 0 },
+      roomSize: { type: Number },
+    },
+    required: true,
+  })
+  capacity: {
+    baseAdults: number;
+    baseChildren: number;
+    maxAdults: number;
+    maxChildren: number;
+    roomSize?: number;
+  };
 
   /* ================= RELATION ================= */
   @Prop({
@@ -131,23 +136,6 @@ export class Room {
     minNights: number;
     maxNights?: number;
     allowInstantBooking: boolean;
-  };
-
-  /* ================= CAPACITY ================= */
-  @Prop({
-    type: {
-      baseAdults: { type: Number, required: true },
-      baseChildren: { type: Number, default: 0 },
-      maxAdults: { type: Number, required: true },
-      maxChildren: { type: Number, default: 0 },
-    },
-    required: true,
-  })
-  capacity: {
-    baseAdults: number;
-    baseChildren: number;
-    maxAdults: number;
-    maxChildren: number;
   };
 
   /* ================= INVENTORY ================= */

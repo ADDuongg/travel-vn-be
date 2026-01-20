@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -14,7 +15,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
-  app.use('/payments/webhook', bodyParser.raw({ type: 'application/json' }));
+  app.use('/payments/webhook/stripe', bodyParser.raw({ type: 'application/json' }));
   // const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 9001;
@@ -38,7 +39,7 @@ async function bootstrap() {
   app.enableCors({
     origin: ['http://localhost:5174', 'http://localhost:5173'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, X-Requested-With',
+    allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Idempotency-Key',
     credentials: true,
     maxAge: 86400,
   });

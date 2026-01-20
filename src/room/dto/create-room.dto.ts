@@ -9,7 +9,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { toNumber, TransformValue } from 'src/utils/transform.util';
+import { TransformValue } from 'src/utils/transform.util';
 
 export class CreateRoomDto {
   /* ========= CORE ========= */
@@ -27,40 +27,19 @@ export class CreateRoomDto {
   isActive: boolean;
 
   /* ========= CAPACITY ========= */
-
   @TransformValue()
-  @IsNumber()
-  maxGuests: number;
-
-  @TransformValue()
-  @IsNumber()
-  adults: number;
-
-  @TransformValue()
-  @IsNumber()
-  @IsOptional()
-  children?: number;
-
-  @TransformValue()
-  @IsNumber()
-  @IsOptional()
-  roomSize?: number;
+  @IsObject()
+  capacity: {
+    baseAdults: number;
+    baseChildren?: number;
+    maxAdults: number;
+    maxChildren?: number;
+    roomSize?: number;
+  };
 
   @IsString()
   @IsNotEmpty()
   hotelId: string;
-
-  /* ========= CAPACITY ========= */
-
-  @TransformValue()
-  @IsObject()
-  @IsOptional()
-  capacity?: {
-    baseAdults: number;
-    baseChildren: number;
-    maxAdults: number;
-    maxChildren: number;
-  };
 
   /* ========= PRICING ========= */
 

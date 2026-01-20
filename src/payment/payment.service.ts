@@ -111,6 +111,71 @@ export class PaymentService {
     }
   }
 
+  async getPaymentByBookingId(bookingId: string) {
+    if (!Types.ObjectId.isValid(bookingId)) {
+      throw new BadRequestException('Invalid bookingId');
+    }
+
+    const payment = await this.paymentModel
+      .findOne({
+        bookingId: new Types.ObjectId(bookingId),
+      })
+      .lean();
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    return payment;
+  }
+
+  async getPaymentById(paymentId: string) {
+    if (!Types.ObjectId.isValid(paymentId)) {
+      throw new BadRequestException('Invalid paymentId');
+    }
+
+    const payment = await this.paymentModel.findById(paymentId).lean();
+
+    if (!payment) {
+      throw new NotFoundException('Payment not found');
+    }
+
+    return payment;
+  }
+
+  async getPaymentStatus(bookingId: string) {
+    if (!Types.ObjectId.isValid(bookingId)) {
+      throw new BadRequestException('Invalid bookingId');
+    }
+
+    const payment = await this.paymentModel
+      .findOne({
+        bookingId: new Types.ObjectId(bookingId),
+      })
+      .select('status amount currency refundedAmount createdAt')
+      .lean();
+
+    if (!payment) {
+      return {
+        exists: false,
+        status: null,
+      };
+    }
+
+    const paymentWithTimestamps = payment as typeof payment & {
+      createdAt: Date;
+    };
+
+    return {
+      exists: true,
+      status: payment.status,
+      amount: payment.amount,
+      currency: payment.currency,
+      refundedAmount: payment.refundedAmount ?? 0,
+      createdAt: paymentWithTimestamps.createdAt,
+    };
+  }
+
   async refund(bookingId: string, amount?: number) {
     const payment = await this.paymentModel.findOne({
       bookingId: new Types.ObjectId(bookingId),

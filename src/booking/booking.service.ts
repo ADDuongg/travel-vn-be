@@ -130,9 +130,13 @@ export class BookingService {
       );
     }
 
-    /* ===== maxGuests PER ROOM ===== */
+    /* ===== CAPACITY PER ROOM ===== */
     for (const r of dto.rooms) {
-      if (r.adults + (r.children ?? 0) > room.maxGuests) {
+      const totalGuests = r.adults + (r.children ?? 0);
+      const maxCapacity =
+        (room.capacity?.maxAdults ?? 0) + (room.capacity?.maxChildren ?? 0);
+
+      if (totalGuests > maxCapacity) {
         throw new BadRequestException('Exceed max guests per room');
       }
     }
@@ -251,7 +255,7 @@ export class BookingService {
         .find(filter)
         .populate({
           path: 'rooms.roomId',
-          select: 'name slug thumbnail roomSize maxGuests',
+          select: 'name slug thumbnail capacity',
         })
         .sort(mongoSort)
         .skip(skip)
@@ -290,7 +294,7 @@ export class BookingService {
       })
       .populate({
         path: 'rooms.roomId',
-        select: 'name slug thumbnail roomSize maxGuests',
+        select: 'name slug thumbnail capacity',
       })
       .populate({
         path: 'userId',
