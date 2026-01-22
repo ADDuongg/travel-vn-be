@@ -7,8 +7,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
-import { parseDateOnly } from 'src/utils/date.util';
+import { parseDateOnly, todayInVietnam } from 'src/utils/date.util';
 import { RoomService } from '../room/room.service';
+import { Room } from 'src/room/schema/room.schema';
 import { BookingQueryDto } from './dto/booking-query.dto';
 import { CreateRoomBookingDto } from './dto/create-room-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
@@ -31,6 +32,62 @@ export class BookingService {
     private readonly cloudinaryService: CloudinaryService,
     // private readonly tourService: TourService,
   ) {}
+
+  /* ===== Helpers: pricing ===== */
+  private applySale(basePrice: number, sale?: Room['sale']) {
+    if (!sale?.isActive) return basePrice;
+
+    const now = new Date();
+    if (sale.startDate && new Date(sale.startDate) > now) return basePrice;
+    if (sale.endDate && new Date(sale.endDate) < now) return basePrice;
+
+    if (sale.type === 'PERCENT') {
+      return Math.max(0, Math.round(basePrice * (1 - sale.value / 100)));
+    }
+
+    if (sale.type === 'FIXED') {
+      return Math.max(0, basePrice - sale.value);
+    }
+
+    return basePrice;
+  }
+
+  private calcRoomNightPrice({
+    room,
+    adults,
+    children,
+  }: {
+    room: Room;
+    adults: number;
+    children: number;
+  }) {
+    const capacity = room.capacity || {
+      baseAdults: 0,
+      baseChildren: 0,
+      maxAdults: 0,
+      maxChildren: 0,
+    };
+
+    const baseAdults = capacity.baseAdults ?? capacity.maxAdults ?? 0;
+    const baseChildren = capacity.baseChildren ?? capacity.maxChildren ?? 0;
+    const extraAdults = Math.max(0, adults - baseAdults);
+    const extraChildren = Math.max(0, children - baseChildren);
+
+    const pricing = room.pricing || {
+      basePrice: 0,
+      currency: 'VND',
+    };
+
+    const discountedBase = this.applySale(pricing.basePrice ?? 0, room.sale);
+    const extraAdultPrice = pricing.extraAdultPrice ?? 0;
+    const extraChildPrice = pricing.extraChildPrice ?? 0;
+
+    return (
+      discountedBase +
+      extraAdults * extraAdultPrice +
+      extraChildren * extraChildPrice
+    );
+  }
 
   /* ================= TOUR BOOKING ================= */
 
@@ -139,10 +196,35 @@ export class BookingService {
       if (totalGuests > maxCapacity) {
         throw new BadRequestException('Exceed max guests per room');
       }
+
+      if (room.capacity?.maxAdults && r.adults > room.capacity.maxAdults) {
+        throw new BadRequestException(
+          `Exceed max adults per room (${room.capacity.maxAdults})`,
+        );
+      }
+
+      if (
+        room.capacity?.maxChildren &&
+        (r.children ?? 0) > room.capacity.maxChildren
+      ) {
+        throw new BadRequestException(
+          `Exceed max children per room (${room.capacity.maxChildren})`,
+        );
+      }
     }
 
     /* ===== amount ===== */
-    const amount = nights * room.pricing.basePrice * quantity;
+    const roomPrices = dto.rooms.map((r) => {
+      const nightlyPrice = this.calcRoomNightPrice({
+        room,
+        adults: r.adults,
+        children: r.children ?? 0,
+      });
+
+      return nightlyPrice * nights;
+    });
+
+    const amount = roomPrices.reduce((sum, price) => sum + price, 0);
 
     /* ===== build booked rooms ===== */
     const bookedRooms = dto.rooms.map((r) => ({
@@ -212,6 +294,98 @@ export class BookingService {
     };
   } */
 
+  /* ================= ADMIN LIST ================= */
+  async getAllBookings(query: BookingQueryDto) {
+    const {
+      pageIndex = 0,
+      pageSize = 10,
+      status,
+      paymentStatus,
+      q,
+      sort,
+      bookingType = BookingType.ROOM,
+    } = query;
+
+    const filter: any = {
+      bookingType,
+    };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (q) {
+      filter.$or = [
+        { 'rooms.roomName': { $regex: q, $options: 'i' } },
+        { 'tourInfo.title': { $regex: q, $options: 'i' } },
+        { 'userId.email': { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    let mongoSort: any = { createdAt: -1 };
+
+    if (sort?.length) {
+      mongoSort = {};
+      for (const s of sort) {
+        if (
+          [
+            'createdAt',
+            'amount',
+            'status',
+            'paymentStatus',
+            'bookingType',
+          ].includes(s.by)
+        ) {
+          mongoSort[s.by] = s.dir === 'asc' ? 1 : -1;
+        }
+      }
+    }
+
+    const skip = pageIndex * pageSize;
+
+    const [items, total] = await Promise.all([
+      this.bookingModel
+        .find(filter)
+        .populate({
+          path: 'rooms.roomId',
+          select: 'name slug roomType thumbnail capacity pricing sale category',
+        })
+        .populate({
+          path: 'userId',
+          select: 'email name',
+        })
+        .sort(mongoSort)
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      this.bookingModel.countDocuments(filter),
+    ]);
+
+    const formatted = items.map((booking) => ({
+      ...booking,
+      rooms: booking.rooms.map((r) => ({
+        room: r.roomId,
+        checkIn: r.checkIn,
+        checkOut: r.checkOut,
+        guests: r.guests,
+      })),
+    }));
+
+    return {
+      data: formatted,
+      meta: {
+        pageIndex,
+        pageSize,
+        total,
+        pageCount: Math.ceil(total / pageSize),
+      },
+    };
+  }
+
   async getBookingsByUser(userId: string, query: BookingQueryDto) {
     const { pageIndex, pageSize, status, paymentStatus, q, sort } = query;
 
@@ -255,7 +429,7 @@ export class BookingService {
         .find(filter)
         .populate({
           path: 'rooms.roomId',
-          select: 'name slug thumbnail capacity',
+          select: 'name slug roomType thumbnail capacity pricing sale category',
         })
         .sort(mongoSort)
         .skip(skip)
@@ -294,7 +468,7 @@ export class BookingService {
       })
       .populate({
         path: 'rooms.roomId',
-        select: 'name slug thumbnail capacity',
+        select: 'name slug roomType thumbnail capacity pricing sale category',
       })
       .populate({
         path: 'userId',
@@ -304,7 +478,7 @@ export class BookingService {
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
-    const { userId: _, ...rest } = booking;
+    const { userId: bookingUserId, ...rest } = booking;
     const formatted = {
       ...rest,
       rooms: booking.rooms.map((r) => ({
@@ -313,9 +487,41 @@ export class BookingService {
         checkOut: r.checkOut,
         guests: r.guests,
       })),
-      user: booking.userId,
+      user: bookingUserId,
     };
     return formatted;
+  }
+
+  /* ================= ADMIN DETAIL ================= */
+  async getBookingByIdForAdmin(bookingId: string) {
+    const booking = await this.bookingModel
+      .findById(new Types.ObjectId(bookingId))
+      .populate({
+        path: 'rooms.roomId',
+        select: 'name slug roomType thumbnail capacity pricing sale category',
+      })
+      .populate({
+        path: 'userId',
+        select: 'email name',
+      })
+      .lean();
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    const { userId: bookingUser, ...rest } = booking;
+
+    return {
+      ...rest,
+      rooms: booking.rooms.map((r) => ({
+        room: r.roomId,
+        checkIn: r.checkIn,
+        checkOut: r.checkOut,
+        guests: r.guests,
+      })),
+      user: bookingUser,
+    };
   }
 
   /* ================= UPDATE ================= */
@@ -367,6 +573,45 @@ export class BookingService {
       );
     }
 
+    // Rollback inventory per booked-room group (roomId + date range),
+    // and only for ranges that haven't started yet.
+    const now = new Date();
+    const groups = new Map<
+      string,
+      {
+        roomId: Types.ObjectId;
+        checkIn: Date;
+        checkOut: Date;
+        quantity: number;
+      }
+    >();
+
+    for (const r of booking.rooms) {
+      const key = `${r.roomId.toString()}|${r.checkIn.toISOString()}|${r.checkOut.toISOString()}`;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.quantity += 1;
+      } else {
+        groups.set(key, {
+          roomId: r.roomId,
+          checkIn: r.checkIn,
+          checkOut: r.checkOut,
+          quantity: 1,
+        });
+      }
+    }
+
+    for (const g of groups.values()) {
+      if (new Date(g.checkIn) > now) {
+        await this.roomInventoryService.rollbackInventoryRange(
+          g.roomId,
+          g.checkIn,
+          g.checkOut,
+          g.quantity,
+        );
+      }
+    }
+
     booking.status = BookingStatus.CANCELLED;
     return booking.save();
   }
@@ -388,16 +633,9 @@ export class BookingService {
 
     if (booking.status !== BookingStatus.PENDING) return;
 
-    /* const { roomId, checkIn, checkOut } = booking.rooms[0];
-
-    const quantity = booking.rooms.length;
-
-    await this.roomInventoryService.rollbackInventoryRange(
-      roomId,
-      checkIn,
-      checkOut,
-      quantity,
-    ); */
+    // NOTE: DO NOT rollback inventory on payment failure
+    // Payment failure can be due to card issues or internet problems,
+    // so the booking remains valid and inventory should stay reserved
 
     booking.status = BookingStatus.CANCELLED;
     booking.paymentStatus = BookingPaymentStatus.FAILED;
@@ -410,16 +648,58 @@ export class BookingService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     booking.paymentStatus = BookingPaymentStatus.REFUNDED;
-    const quantity = booking.rooms.length;
-    if (fullyRefunded) {
-      const { roomId, checkIn, checkOut } = booking.rooms[0];
 
-      await this.roomInventoryService.rollbackInventoryRange(
-        roomId,
-        checkIn,
-        checkOut,
-        quantity,
+    // Rollback inventory only if fully refunded AND before check-in date
+    if (fullyRefunded) {
+      // Rollback inventory per booked-room group (roomId + date range),
+      // and only for ranges that haven't started yet.
+      const now = todayInVietnam();
+      const groups = new Map<
+        string,
+        {
+          roomId: Types.ObjectId;
+          checkIn: Date;
+          checkOut: Date;
+          quantity: number;
+        }
+      >();
+
+      for (const r of booking.rooms) {
+        const key = `${r.roomId.toString()}|${r.checkIn.toISOString()}|${r.checkOut.toISOString()}`;
+        const existing = groups.get(key);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          groups.set(key, {
+            roomId: r.roomId,
+            checkIn: r.checkIn,
+            checkOut: r.checkOut,
+            quantity: 1,
+          });
+        }
+      }
+      console.log(
+        'new Date(g.checkIn)',
+        groups.values().next().value.checkIn.toISOString().substring(0, 10),
       );
+      console.log('now', now);
+      console.log('compare');
+      console.log(
+        groups.values().next().value.checkIn.toISOString().substring(0, 10) >
+          now,
+      );
+
+      for (const g of groups.values()) {
+        if (g.checkIn.toISOString().substring(0, 10) > now) {
+          console.log('new Date(g.checkIn) > now');
+          await this.roomInventoryService.rollbackInventoryRange(
+            g.roomId,
+            g.checkIn,
+            g.checkOut,
+            g.quantity,
+          );
+        }
+      }
 
       booking.status = BookingStatus.CANCELLED;
     }

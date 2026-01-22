@@ -61,3 +61,12 @@ export class Payment {
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);
+PaymentSchema.index(
+  { providerRef: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      providerRef: { $exists: true, $ne: null }
+    }
+  }
+);

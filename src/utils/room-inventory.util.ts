@@ -1,14 +1,16 @@
 import { MAX_STAY_NIGHTS } from 'src/validators/max-stay.validator';
 
 export function clampDateRange(from: Date, to: Date): { from: Date; to: Date } {
-  const start = new Date(from);
-  start.setHours(0, 0, 0, 0);
+  const start = new Date(
+    Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()),
+  );
 
-  const end = new Date(to);
-  end.setHours(0, 0, 0, 0);
+  const end = new Date(
+    Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()),
+  );
 
   const maxEnd = new Date(start);
-  maxEnd.setDate(maxEnd.getDate() + MAX_STAY_NIGHTS);
+  maxEnd.setUTCDate(maxEnd.getUTCDate() + MAX_STAY_NIGHTS);
 
   if (end > maxEnd) {
     return {

@@ -46,6 +46,7 @@ export class RoomService {
     return this.roomModel.create({
       code: dto.code.toUpperCase(),
       slug: dto.slug,
+      roomType: dto.roomType,
       isActive: dto.isActive,
 
       hotelId: dto.hotelId,

@@ -9,7 +9,11 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { BookingPaymentStatus, BookingStatus } from '../schema/booking.schema';
+import {
+  BookingPaymentStatus,
+  BookingStatus,
+  BookingType,
+} from '../schema/booking.schema';
 
 export class SortDto {
   @IsString()
@@ -46,6 +50,10 @@ export class BookingQueryDto {
   @IsOptional()
   @IsIn(Object.values(BookingPaymentStatus))
   paymentStatus?: BookingPaymentStatus;
+
+  @IsOptional()
+  @IsIn(Object.values(BookingType))
+  bookingType?: BookingType = BookingType.ROOM;
 
   /* sorting */
   @IsArray()

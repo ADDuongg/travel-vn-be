@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Types } from 'mongoose';
 import { RoomInventoryService } from './room-inventory.service';
+import { parseDateOnly } from 'src/utils/date.util';
 
 @Controller('api/v1/room-inventories')
 export class RoomInventoryController {
@@ -25,10 +26,13 @@ export class RoomInventoryController {
 
     const roomObjectId = new Types.ObjectId(roomId);
 
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
+    let fromDate: Date;
+    let toDate: Date;
 
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    try {
+      fromDate = parseDateOnly(from);
+      toDate = parseDateOnly(to);
+    } catch {
       throw new BadRequestException('Invalid date format');
     }
 
@@ -54,10 +58,13 @@ export class RoomInventoryController {
       throw new BadRequestException('from and to are required');
     }
 
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
+    let fromDate: Date;
+    let toDate: Date;
 
-    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
+    try {
+      fromDate = parseDateOnly(from);
+      toDate = parseDateOnly(to);
+    } catch {
       throw new BadRequestException('Invalid date');
     }
 

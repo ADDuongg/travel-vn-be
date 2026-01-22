@@ -22,6 +22,10 @@ export class CreateRoomDto {
   @IsNotEmpty()
   slug: string;
 
+  @IsString()
+  @IsNotEmpty()
+  roomType: string; // e.g., "Master", "Deluxe"
+
   @TransformValue()
   @IsBoolean()
   isActive: boolean;

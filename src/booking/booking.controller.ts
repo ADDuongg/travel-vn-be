@@ -28,6 +28,12 @@ export class BookingController {
     return this.bookingService.createRoomBooking(dto);
   }
 
+  // @UseGuards(JwtAuthGuard)
+  @Get()
+  getAll(@Query() query: BookingQueryDto) {
+    return this.bookingService.getAllBookings(query);
+  }
+
   /* @Post('tour')
   createTour(@Body() dto: CreateTourBookingDto) {
     return this.bookingService.createTourBooking(dto);
@@ -62,9 +68,15 @@ export class BookingController {
     return this.bookingService.verifyReceipt(id);
   }
 
+  // Admin manual confirm payment (cashier) - no receipt required
+  @Patch(':id/mark-paid')
+  async markPaid(@Param('id') id: string) {
+    return this.bookingService.markAsPaid(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.bookingService.findOne(id);
+    return this.bookingService.getBookingByIdForAdmin(id);
   }
 
   @Patch(':id')
@@ -75,5 +87,13 @@ export class BookingController {
   @Patch(':id/cancel')
   cancel(@Param('id') id: string) {
     return this.bookingService.cancel(id);
+  }
+
+  @Patch(':id/refund')
+  async refund(
+    @Param('id') id: string,
+    @Body() body: { fullyRefunded?: boolean },
+  ) {
+    return this.bookingService.markAsRefunded(id, body.fullyRefunded ?? true);
   }
 }

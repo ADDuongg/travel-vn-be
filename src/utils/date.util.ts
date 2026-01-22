@@ -1,7 +1,7 @@
 export function normalizeDate(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
 }
 
 export function todayInVietnam(): string {
@@ -12,22 +12,7 @@ export function todayInVietnam(): string {
     now.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }),
   );
 
-  return vnTime.toISOString().substring(0, 10); // YYYY-MM-DD
-}
-export function normalizeDateOnly(input: string | Date): string {
-  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) {
-    return input;
-  }
-
-  const date = new Date(input);
-
-  if (isNaN(date.getTime())) {
-    throw new Error('Invalid date input');
-  }
-
-  return date.toLocaleDateString('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-  }); // YYYY-MM-DD
+  return formatDateOnly(vnTime); // YYYY-MM-DD
 }
 
 /* export function validateBookingDates(from: string, to: string) {
@@ -46,8 +31,8 @@ export function normalizeDateOnly(input: string | Date): string {
 export function validateFutureDateRange(from: Date, to: Date) {
   const todayVN = todayInVietnam();
 
-  const fromDate = from.toISOString().substring(0, 10);
-  const toDate = to.toISOString().substring(0, 10);
+  const fromDate = formatDateOnly(from);
+  const toDate = formatDateOnly(to);
 
   if (fromDate < todayVN) {
     throw new Error('Check-in date must be today or later');
@@ -63,18 +48,24 @@ export function validateFutureDateRange(from: Date, to: Date) {
 } */
 
 export function parseDateOnly(input: string | Date): Date {
-  if (input instanceof Date) {
-    return new Date(
-      Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()),
-    );
+  const date = new Date(input);
+
+  if (isNaN(date.getTime())) {
+    throw new Error('Invalid date input');
   }
 
-  const [y, m, d] = input.substring(0, 10).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
+  // Normalize to UTC midnight to avoid timezone drift when comparing/saving
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
 }
 
 export function diffInDays(from: Date, to: Date): number {
   return Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function formatDateOnly(date: Date): string {
+  return date.toISOString().substring(0, 10); // YYYY-MM-DD
 }
 
 /* export function buildNights(from: Date, to: Date): Date[] {

@@ -10,6 +10,7 @@ import {
   buildNights,
   getDatesInRange,
   normalizeDate,
+  parseDateOnly,
   todayInVietnam,
   validateFutureDateRange,
 } from 'src/utils/date.util';
@@ -235,8 +236,9 @@ export class RoomInventoryService {
   }
 
   async countFutureInventories(roomId: string) {
-    // const today = normalizeDate(new Date());
-    const todayVN = todayInVietnam();
+    // Compare against today (Vietnam) at UTC midnight to avoid timezone drift
+    const todayVNString = todayInVietnam();
+    const todayVN = parseDateOnly(todayVNString);
     return this.RoomInventoryModel.countDocuments({
       roomId: new Types.ObjectId(roomId),
       date: { $gte: todayVN },

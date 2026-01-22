@@ -14,6 +14,9 @@ export class Room {
   @Prop({ required: true, unique: true })
   slug: string;
 
+  @Prop({ required: true })
+  roomType: string; // e.g., Master, Deluxe
+
   @Prop({ default: true })
   isActive: boolean;
 
@@ -33,7 +36,7 @@ export class Room {
     baseChildren: number;
     maxAdults: number;
     maxChildren: number;
-    roomSize?: number;
+  roomSize?: number;
   };
 
   /* ================= RELATION ================= */

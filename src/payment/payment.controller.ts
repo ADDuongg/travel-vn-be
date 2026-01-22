@@ -32,7 +32,7 @@ export class PaymentController {
   ) {}
 
   @ApiOperation({ summary: 'Create Stripe payment intent' })
-  @ApiBody({
+  /* @ApiBody({
     schema: {
       type: 'object',
       properties: {
@@ -44,8 +44,8 @@ export class PaymentController {
       },
       required: ['bookingId'],
     },
-  })
-  @ApiResponse({
+  }) */
+  /* @ApiResponse({
     status: 201,
     description: 'Payment intent created successfully',
     schema: {
@@ -61,7 +61,7 @@ export class PaymentController {
         },
       },
     },
-  })
+  }) */
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Booking not found' })
   @UseGuards(JwtAuthGuard)
