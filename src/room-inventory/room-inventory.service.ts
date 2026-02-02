@@ -110,6 +110,26 @@ export class RoomInventoryService {
     return inventories.length === nights.length;
   }
 
+  /**
+   * Get room IDs that have at least 1 room available for every night in [from, to).
+   */
+  async getRoomIdsWithAvailability(
+    from: Date,
+    to: Date,
+  ): Promise<Types.ObjectId[]> {
+    const nights = buildNights(from, to);
+    if (nights.length === 0) return [];
+
+    const result = await this.RoomInventoryModel.aggregate<{ _id: Types.ObjectId }>([
+      { $match: { date: { $in: nights }, available: { $gt: 0 } } },
+      { $group: { _id: '$roomId', count: { $sum: 1 } } },
+      { $match: { count: nights.length } },
+      { $project: { _id: 1 } },
+    ]);
+
+    return result.map((r) => r._id);
+  }
+
   /* ======================================================
      BOOK / CANCEL
      ====================================================== */

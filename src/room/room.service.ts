@@ -5,14 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { AmenitiesService } from 'src/amenities/amenities.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { HotelService } from 'src/hotel/hotel.service';
+import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
+import { parseDateOnly } from 'src/utils/date.util';
 import { CreateRoomDto } from './dto/create-room.dto';
 import { RoomQueryDto, RoomSortBy } from './dto/room-query.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { Room, RoomDocument } from './schema/room.schema';
-import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 
 @Injectable()
 export class RoomService {
@@ -22,6 +24,7 @@ export class RoomService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly hotelService: HotelService,
     private readonly roomInventoryService: RoomInventoryService,
+    private readonly amenitiesService: AmenitiesService,
   ) {}
 
   // ===== CREATE =====
@@ -75,7 +78,23 @@ export class RoomService {
   }
 
   async findAll(query: RoomQueryDto) {
-    const { page, limit, sortBy, minPrice, maxPrice, adults, keyword } = query;
+    const {
+      page,
+      limit,
+      sortBy,
+      minPrice,
+      maxPrice,
+      adults,
+      keyword,
+      lang,
+      checkIn,
+      checkOut,
+      minRating,
+      amenities,
+      roomSize: roomSizeFilter,
+      hotelIds,
+    } = query;
+    console.log('query', query);
 
     const filter: any = {
       isActive: true,
@@ -92,10 +111,51 @@ export class RoomService {
     }
 
     if (keyword) {
-      filter['translations.en.name'] = {
+      const searchLang = lang || 'en';
+      filter[`translations.${searchLang}.name`] = {
         $regex: keyword,
         $options: 'i',
       };
+    }
+
+    if (checkIn && checkOut) {
+      const from = parseDateOnly(checkIn);
+      const to = parseDateOnly(checkOut);
+      if (from < to) {
+        const roomIds =
+          await this.roomInventoryService.getRoomIdsWithAvailability(from, to);
+        if (roomIds.length === 0) {
+          return {
+            items: [],
+            pagination: { page, limit, total: 0, totalPages: 0 },
+          };
+        }
+        filter._id = { $in: roomIds };
+      }
+    }
+
+    if (minRating != null && minRating > 0) {
+      filter['ratingSummary.average'] = { $gte: minRating };
+    }
+    console.log('amenities', amenities);
+
+    if (amenities?.length) {
+      const amenityIds = await this.amenitiesService.findIdsByCodes(amenities);
+      console.log('amenityIds', amenityIds);
+
+      if (amenityIds.length) {
+        filter.amenities = {
+          $all: amenityIds.map((id) => new Types.ObjectId(id)),
+        };
+      }
+    }
+
+    if (roomSizeFilter?.length) {
+      filter['capacity.roomSize'] = { $in: roomSizeFilter };
+    }
+
+    if (hotelIds?.length) {
+      filter.hotelId = { $in: hotelIds.map((id) => new Types.ObjectId(id)) };
     }
 
     let sort: any = { createdAt: -1 };

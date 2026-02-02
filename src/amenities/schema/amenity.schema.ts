@@ -9,6 +9,10 @@ export class Amenity {
   @Prop({ default: true })
   isActive: boolean;
 
+  /** Optional code for filtering (e.g. wifi, air_condition, pool) */
+  @Prop({ sparse: true, unique: true })
+  code?: string;
+
   @Prop({
     type: Object,
     required: true,

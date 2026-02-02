@@ -36,6 +36,7 @@ export class AmenitiesService {
     }
 
     return this.amenityModel.create({
+      code: dto.code,
       isActive: dto.isActive ?? true,
       translations: dto.translations,
       icon,
@@ -53,6 +54,16 @@ export class AmenitiesService {
     });
   }
 
+  /** Find amenity ids by codes (for room search filter) */
+  async findIdsByCodes(codes: string[]): Promise<string[]> {
+    if (!codes?.length) return [];
+    const amenities = await this.amenityModel
+      .find({ code: { $in: codes }, isActive: true })
+      .select('_id')
+      .lean();
+    return amenities.map((a) => String(a._id));
+  }
+
   async update(id: string, dto: UpdateAmenityDto, file?: Express.Multer.File) {
     const amenity = await this.amenityModel.findById(id);
     if (!amenity) throw new NotFoundException();
@@ -67,6 +78,10 @@ export class AmenitiesService {
         url: uploaded.secure_url,
         publicId: uploaded.public_id,
       };
+    }
+
+    if (dto.code !== undefined) {
+      amenity.code = dto.code;
     }
 
     if (dto.translations) {
