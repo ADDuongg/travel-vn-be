@@ -31,6 +31,7 @@ import { BookingModule } from './booking/booking.module';
 import { HotelModule } from './hotel/hotel.module';
 import { RoomInventoryModule } from './room-inventory/room-inventory.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
+import { ProvincesModule } from './provinces/provinces.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { IdempotencyModule } from './idempotency/idempotency.module';
     HotelModule,
     RoomInventoryModule,
     IdempotencyModule,
+    ProvincesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

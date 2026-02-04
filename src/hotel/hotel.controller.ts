@@ -1,19 +1,42 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { HotelService } from './hotel.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
-import { Hotel } from './schema/hotel.schema';
+import { UpdateHotelDto } from './dto/update-hotel.dto';
 
 @Controller('api/v1/hotels')
 export class HotelController {
   constructor(private readonly hotelService: HotelService) {}
 
   @Post()
-  async create(@Body() createHotelDto: CreateHotelDto): Promise<Hotel> {
-    return this.hotelService.create(createHotelDto);
+  create(@Body() dto: CreateHotelDto) {
+    return this.hotelService.create(dto);
   }
 
   @Get('options')
-  async getOptions() {
-    return this.hotelService.findAllActive();
+  getOptions(@Query('provinceId') provinceId?: string) {
+    return this.hotelService.findAllActive(provinceId);
+  }
+
+  @Get()
+  findAll(@Query('provinceId') provinceId?: string) {
+    return this.hotelService.findAllActive(provinceId);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.hotelService.findById(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateHotelDto) {
+    return this.hotelService.update(id, dto);
   }
 }

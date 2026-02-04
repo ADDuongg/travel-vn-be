@@ -48,6 +48,11 @@ export class RoomQueryDto {
   @IsOptional()
   adults?: number;
 
+  @Type(() => Number)
+  @IsNumber()
+  @IsOptional()
+  children?: number;
+
   @IsString()
   @IsOptional()
   keyword?: string;
@@ -111,6 +116,11 @@ export class RoomQueryDto {
   @IsArray()
   @IsNumber({}, { each: true })
   roomSize?: number[];
+
+  /** Filter by province – rooms in hotels belonging to this province */
+  @IsOptional()
+  @IsString()
+  provinceId?: string;
 
   /** Filter by hotel IDs (destinations) */
   @IsOptional()

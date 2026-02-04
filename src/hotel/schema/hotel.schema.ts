@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
+import { Province } from 'src/provinces/schema/province.schema';
 
 export type HotelDocument = Hotel & Document;
 
@@ -8,20 +9,29 @@ export type HotelDocument = Hotel & Document;
 ======================= */
 
 @Schema({ _id: false })
-export class AdministrativeUnit {
-  @Prop({ required: true })
-  id: string; // mã hành chính từ API VN
-
-  @Prop({ required: true })
-  type: string;
-  // VD: PROVINCE | MUNICIPALITY | CAPITAL | SPECIAL | ...
+export class HotelContact {
+  @Prop()
+  phone?: string;
 
   @Prop()
-  name?: string; // cache tên để hiển thị / SEO
+  email?: string;
+
+  @Prop()
+  website?: string;
 }
 
-export const AdministrativeUnitSchema =
-  SchemaFactory.createForClass(AdministrativeUnit);
+export const HotelContactSchema = SchemaFactory.createForClass(HotelContact);
+
+@Schema({ _id: false })
+export class HotelLocation {
+  @Prop()
+  lat?: number;
+
+  @Prop()
+  lng?: number;
+}
+
+export const HotelLocationSchema = SchemaFactory.createForClass(HotelLocation);
 
 /* =======================
    HOTEL SCHEMA
@@ -34,32 +44,96 @@ export const AdministrativeUnitSchema =
 export class Hotel {
   /* ================= CORE ================= */
 
-  @Prop({ required: true })
-  name: string;
-
   @Prop({ required: true, unique: true })
   slug: string;
 
   @Prop({ default: true })
   isActive: boolean;
 
-  /* ================= ADMINISTRATIVE (VN) ================= */
+  @Prop({ default: 3, min: 1, max: 5 })
+  starRating: number;
+
+  /* ================= PROVINCE ================= */
 
   @Prop({
-    type: AdministrativeUnitSchema,
+    type: Types.ObjectId,
+    ref: Province.name,
     required: true,
+    index: true,
   })
-  administrativeUnit: AdministrativeUnit;
+  provinceId: Types.ObjectId;
+
+  /* ================= TRANSLATIONS ================= */
+  /** Keys: langCode (vi, en, ...). Values: translated fields */
+  @Prop({
+    type: Object,
+    required: true,
+    default: {},
+  })
+  translations: {
+    [langCode: string]: {
+      name: string;
+      description?: string;
+      shortDescription?: string;
+      address?: string;
+      policies?: string[];
+      seo?: {
+        title?: string;
+        description?: string;
+      };
+    };
+  };
+
+  /* ================= CONTACT ================= */
+
+  @Prop({ type: HotelContactSchema })
+  contact?: HotelContact;
 
   /* ================= LOCATION ================= */
 
-  @Prop()
-  address?: string;
+  @Prop({ type: HotelLocationSchema })
+  location?: HotelLocation;
 
-  /* ================= META ================= */
+  /* ================= MEDIA ================= */
 
-  @Prop()
-  description?: string;
+  @Prop({
+    type: {
+      url: String,
+      publicId: String,
+      alt: String,
+    },
+  })
+  thumbnail?: {
+    url: string;
+    publicId?: string;
+    alt?: string;
+  };
+
+  @Prop({
+    type: [
+      {
+        url: String,
+        publicId: String,
+        alt: String,
+        order: Number,
+      },
+    ],
+    default: [],
+  })
+  gallery: Array<{
+    url: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  }>;
+
+  /* ================= AMENITIES (hotel-level) ================= */
+
+  @Prop({
+    type: [{ type: Types.ObjectId, ref: 'Amenity' }],
+    default: [],
+  })
+  amenities: Types.ObjectId[];
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);
@@ -67,5 +141,7 @@ export const HotelSchema = SchemaFactory.createForClass(Hotel);
 /* ================= INDEX ================= */
 
 HotelSchema.index({ slug: 1 }, { unique: true });
-HotelSchema.index({ 'administrativeUnit.id': 1 });
+HotelSchema.index({ provinceId: 1 });
 HotelSchema.index({ isActive: 1 });
+HotelSchema.index({ provinceId: 1, isActive: 1 });
+HotelSchema.index({ starRating: 1 });

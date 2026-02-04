@@ -85,6 +85,7 @@ export class RoomService {
       minPrice,
       maxPrice,
       adults,
+      children,
       keyword,
       lang,
       checkIn,
@@ -92,6 +93,7 @@ export class RoomService {
       minRating,
       amenities,
       roomSize: roomSizeFilter,
+      provinceId,
       hotelIds,
     } = query;
     console.log('query', query);
@@ -100,8 +102,19 @@ export class RoomService {
       isActive: true,
     };
 
-    if (adults) {
+    /* if (adults) {
       filter['capacity.maxAdults'] = { $gte: adults };
+    } */
+
+    if (adults || children) {
+      filter.$expr = {
+        $gte: [
+          {
+            $add: ['$capacity.maxAdults', '$capacity.maxChildren'],
+          },
+          (adults ?? 0) + (children ?? 0),
+        ],
+      };
     }
 
     if (minPrice || maxPrice) {
@@ -154,7 +167,16 @@ export class RoomService {
       filter['capacity.roomSize'] = { $in: roomSizeFilter };
     }
 
-    if (hotelIds?.length) {
+    if (provinceId && Types.ObjectId.isValid(provinceId)) {
+      const ids = await this.hotelService.findIdsByProvinceId(provinceId);
+      if (ids.length === 0) {
+        return {
+          items: [],
+          pagination: { page, limit, total: 0, totalPages: 0 },
+        };
+      }
+      filter.hotelId = { $in: ids.map((id) => new Types.ObjectId(id)) };
+    } else if (hotelIds?.length) {
       filter.hotelId = { $in: hotelIds.map((id) => new Types.ObjectId(id)) };
     }
 
@@ -178,7 +200,17 @@ export class RoomService {
     const skip = (page - 1) * limit;
 
     const [items, total] = await Promise.all([
-      this.roomModel.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      this.roomModel
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate({
+        path: 'hotelId',
+        select: '_id slug translations provinceId',
+        populate: { path: 'provinceId', select: 'name code slug' },
+      })
+        .lean(),
       this.roomModel.countDocuments(filter),
     ]);
 
@@ -194,7 +226,14 @@ export class RoomService {
   }
 
   async findOne(id: string) {
-    const room = await this.roomModel.findById(id).populate('amenities');
+    const room = await this.roomModel
+      .findById(id)
+      .populate({
+        path: 'hotelId',
+        select: '_id slug translations provinceId contact location',
+        populate: { path: 'provinceId', select: 'name code slug fullName' },
+      })
+      .populate('amenities');
     if (!room) throw new NotFoundException('Room not found');
     return room;
   }

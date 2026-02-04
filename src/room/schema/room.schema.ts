@@ -36,7 +36,7 @@ export class Room {
     baseChildren: number;
     maxAdults: number;
     maxChildren: number;
-  roomSize?: number;
+    roomSize?: number;
   };
 
   /* ================= RELATION ================= */
