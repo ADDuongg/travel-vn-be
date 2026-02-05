@@ -21,6 +21,15 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
+## VN Tours Backend (Travel Platform)
+
+Backend NestJS cho nền tảng du lịch, gồm **tour**, **lưu trú (hotel/room/booking)** và **e-commerce (product/orders/payment)**, có **auth/roles/permissions**, **provinces**, **upload/media (Cloudinary)**, **realtime (Socket.IO)** và **Swagger**.
+
+- **Project overview**: xem `docs/PROJECT-OVERVIEW.md`
+- **Tour API cho FE**: xem `docs/FE-API-TOUR.md`
+- **API changes (provinces/hotel/room)**: xem `docs/FE-API-CHANGES.md`
+- **Tour module plan**: xem `plans/TOUR-MODULE-PLAN.md`
+
 ## Description
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.

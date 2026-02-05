@@ -206,10 +206,10 @@ export class RoomService {
         .skip(skip)
         .limit(limit)
         .populate({
-        path: 'hotelId',
-        select: '_id slug translations provinceId',
-        populate: { path: 'provinceId', select: 'name code slug' },
-      })
+          path: 'hotelId',
+          select: '_id slug translations provinceId',
+          populate: { path: 'provinceId', select: 'name code slug' },
+        })
         .lean(),
       this.roomModel.countDocuments(filter),
     ]);
