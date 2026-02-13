@@ -18,7 +18,14 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "provinces:transform": "node scripts/transform-provinces.mjs"
+    "provinces:transform": "node scripts/transform-provinces.mjs",
+    "play:array-methods": "ts-node playground/array-methods.ts",
+    "play:object-methods": "ts-node playground/object-methods.ts",
+    "play:map-methods": "ts-node playground/map-methods.ts",
+    "play:set-methods": "ts-node playground/set-methods.ts",
+    "play:stack-structure": "ts-node playground/stack-structure.ts",
+    "play:js-method-cheatsheet": "ts-node playground/js-method-cheatsheet.ts",
+    "seed:tours-hotels-rooms": "ts-node scripts/seed-tours-hotels-rooms.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
