@@ -12,6 +12,7 @@ import {
 import { PaymentService } from './payment.service';
 import { Request } from 'express';
 import { CreatePaymentIntentDto } from './dto/create-payment.dto';
+import { CreatePaymentIntentTourDto } from './dto/create-payment-tour.dto';
 import { stripe } from 'src/stripe.service';
 import {
   ApiBody,
@@ -78,9 +79,39 @@ export class PaymentController {
 
     return this.idempotencyService.execute(
       key,
-      userId, // hoặc req.user.id tuỳ auth
+      String(userId ?? ''),
       'POST /payments/create-intent',
       () => this.paymentService.createPaymentIntent(body.bookingId),
+    );
+  }
+
+  @ApiOperation({ summary: 'Create Stripe payment intent for tour booking' })
+  @ApiResponse({
+    status: 201,
+    description: 'Returns clientSecret and paymentId',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request / Tour booking already paid',
+  })
+  @ApiResponse({ status: 404, description: 'Tour booking not found' })
+  @UseGuards(JwtAuthGuard)
+  @Post('create-intent/tour')
+  async createIntentTour(
+    @Body() body: CreatePaymentIntentTourDto,
+    @Headers('idempotency-key') key: string,
+    @Req() req: any,
+  ) {
+    const userId = req.user?.userId;
+    if (!key) {
+      throw new BadRequestException('Idempotency-Key is required');
+    }
+
+    return this.idempotencyService.execute(
+      key,
+      String(userId ?? ''),
+      'POST /payments/create-intent/tour',
+      () => this.paymentService.createPaymentIntentForTour(body.tourBookingId),
     );
   }
 
@@ -117,7 +148,21 @@ export class PaymentController {
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid bookingId' })
+  @ApiOperation({ summary: 'Get payment status by tour booking ID' })
+  @ApiParam({
+    name: 'tourBookingId',
+    description: 'Tour booking MongoDB ObjectId',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid tourBookingId' })
+  @UseGuards(JwtAuthGuard)
+  @Get('status/tour/:tourBookingId')
+  async getPaymentStatusByTourBooking(
+    @Param('tourBookingId') tourBookingId: string,
+  ) {
+    return this.paymentService.getPaymentStatusByTourBookingId(tourBookingId);
+  }
+
+  @ApiOperation({ summary: 'Get payment status by booking ID (room)' })
   @UseGuards(JwtAuthGuard)
   @Get('status/:bookingId')
   async getPaymentStatus(@Param('bookingId') bookingId: string) {
@@ -139,6 +184,19 @@ export class PaymentController {
   @Get('booking/:bookingId')
   async getPaymentByBookingId(@Param('bookingId') bookingId: string) {
     return this.paymentService.getPaymentByBookingId(bookingId);
+  }
+
+  @ApiOperation({ summary: 'Get payment details by tour booking ID' })
+  @ApiParam({
+    name: 'tourBookingId',
+    description: 'Tour booking MongoDB ObjectId',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Get('tour-booking/:tourBookingId')
+  async getPaymentByTourBookingId(
+    @Param('tourBookingId') tourBookingId: string,
+  ) {
+    return this.paymentService.getPaymentByTourBookingId(tourBookingId);
   }
 
   @ApiOperation({ summary: 'Get payment details by payment ID' })
@@ -168,8 +226,11 @@ export class PaymentController {
     @Req() req: Request,
     @Headers('stripe-signature') signature: string,
   ) {
-    await this.paymentService.handleStripeWebhook(signature, req.body);
-
+    const payload =
+      typeof req.body === 'string'
+        ? Buffer.from(req.body)
+        : (req.body as Buffer);
+    await this.paymentService.handleStripeWebhook(signature, payload);
     return { received: true };
   }
 

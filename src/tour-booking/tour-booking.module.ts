@@ -12,6 +12,10 @@ import {
   TourInventorySchema,
 } from 'src/tour-inventory/schema/tour-inventory.schema';
 import { TourInventoryModule } from 'src/tour-inventory/tour-inventory.module';
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { Payment, PaymentSchema } from 'src/payment/schema/payment.schema';
+import { TourBookingExpireService } from './tour-booking-expire.service';
+import { TourBookingReconcileService } from './tour-booking-reconcile.service';
 
 @Module({
   imports: [
@@ -19,11 +23,17 @@ import { TourInventoryModule } from 'src/tour-inventory/tour-inventory.module';
       { name: TourBooking.name, schema: TourBookingSchema },
       { name: Tour.name, schema: TourSchema },
       { name: TourInventory.name, schema: TourInventorySchema },
+      { name: Payment.name, schema: PaymentSchema },
     ]),
     TourInventoryModule,
+    CloudinaryModule,
   ],
   controllers: [TourBookingController],
-  providers: [TourBookingService],
+  providers: [
+    TourBookingService,
+    TourBookingExpireService,
+    TourBookingReconcileService,
+  ],
   exports: [TourBookingService],
 })
 export class TourBookingModule {}

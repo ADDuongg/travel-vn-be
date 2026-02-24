@@ -6,6 +6,7 @@ import { Payment, PaymentSchema } from './schema/payment.schema';
 import { Order, OrderSchema } from '../orders/schema/order.schema';
 import { PaymentExpireService } from './payment-expire.service';
 import { BookingModule } from 'src/booking/booking.module';
+import { TourBookingModule } from 'src/tour-booking/tour-booking.module';
 import { IdempotencyModule } from 'src/idempotency/idempotency.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { IdempotencyModule } from 'src/idempotency/idempotency.module';
       { name: Order.name, schema: OrderSchema },
     ]),
     BookingModule,
+    TourBookingModule,
     IdempotencyModule,
   ],
   controllers: [PaymentController],

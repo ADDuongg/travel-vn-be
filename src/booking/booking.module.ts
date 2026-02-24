@@ -7,16 +7,21 @@ import { BookingService } from './booking.service';
 import { Booking, BookingSchema } from './schema/booking.schema';
 import { ExpirePendingBookings } from './booking-room-expire.service';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { BookingReconcileService } from './booking-reconcile.service';
+import { Payment, PaymentSchema } from 'src/payment/schema/payment.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }]),
+    MongooseModule.forFeature([
+      { name: Booking.name, schema: BookingSchema },
+      { name: Payment.name, schema: PaymentSchema },
+    ]),
     RoomModule,
     RoomInventoryModule,
     CloudinaryModule,
   ],
   controllers: [BookingController],
-  providers: [BookingService, ExpirePendingBookings],
+  providers: [BookingService, ExpirePendingBookings, BookingReconcileService],
   exports: [BookingService],
 })
 export class BookingModule {}

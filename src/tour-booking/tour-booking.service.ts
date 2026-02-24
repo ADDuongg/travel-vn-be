@@ -18,9 +18,11 @@ import {
   TourBooking,
   TourBookingDocument,
   TourBookingStatus,
+  TourPaymentStatus,
 } from './schema/tour-booking.schema';
 import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 @Injectable()
 export class TourBookingService {
@@ -32,6 +34,7 @@ export class TourBookingService {
     @InjectModel(TourInventory.name)
     private readonly inventoryModel: Model<TourInventoryDocument>,
     private readonly tourInventoryService: TourInventoryService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   private async generateBookingCode(): Promise<string> {
@@ -165,6 +168,7 @@ export class TourBookingService {
       depositAmount,
       paidAmount: 0,
       status: TourBookingStatus.PENDING,
+      paymentStatus: TourPaymentStatus.UNPAID,
     });
 
     return booking.populate([
@@ -216,7 +220,10 @@ export class TourBookingService {
       totalPages: number;
     };
   }> {
-    const filter = { userId: new Types.ObjectId(userId) };
+    const filter: Record<string, unknown> = {
+      userId: new Types.ObjectId(userId),
+      paymentStatus: { $ne: TourPaymentStatus.EXPIRED },
+    };
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
       this.bookingModel
@@ -328,10 +335,73 @@ export class TourBookingService {
     };
     if (booking.paidAmount >= booking.totalAmount) {
       booking.status = TourBookingStatus.PAID;
+      booking.paymentStatus = TourPaymentStatus.PAID;
       booking.paidAt = new Date();
     } else if (booking.paidAmount >= booking.depositAmount) {
       booking.status = TourBookingStatus.CONFIRMED;
+      booking.paymentStatus = TourPaymentStatus.PAID;
     }
+    return booking.save();
+  }
+
+  /**
+   * Gọi từ Payment webhook khi Stripe payment_intent.succeeded.
+   * Cập nhật paidAmount, payment (STRIPE), status PAID/CONFIRMED.
+   */
+  async markAsPaid(
+    tourBookingId: string,
+    amount: number,
+    transactionId: string,
+  ): Promise<TourBooking> {
+    const booking = await this.bookingModel.findById(tourBookingId);
+    if (!booking) throw new NotFoundException('Tour booking not found');
+    if (booking.status === TourBookingStatus.CANCELLED) {
+      return booking;
+    }
+
+    const newPaidAmount = (booking.paidAmount ?? 0) + amount;
+    booking.paidAmount = newPaidAmount;
+    booking.payment = {
+      provider: 'STRIPE',
+      transactionId,
+      amount,
+      paidAt: new Date(),
+    };
+    booking.paymentStatus = TourPaymentStatus.PAID;
+    if (newPaidAmount >= booking.totalAmount) {
+      booking.status = TourBookingStatus.PAID;
+      booking.paidAt = new Date();
+    } else {
+      booking.status = TourBookingStatus.CONFIRMED;
+    }
+    return booking.save();
+  }
+
+  /**
+   * Gọi từ Payment webhook khi Stripe payment_intent.payment_failed.
+   * Hủy đơn và release slots để người khác có thể đặt.
+   */
+  async markAsFailed(tourBookingId: string): Promise<TourBooking> {
+    const booking = await this.bookingModel.findById(tourBookingId);
+    if (!booking) throw new NotFoundException('Tour booking not found');
+    if (booking.status !== TourBookingStatus.PENDING) {
+      return booking;
+    }
+
+    const totalGuests = booking.adults + booking.children + booking.infants;
+    const inv = await this.inventoryModel.findById(booking.tourInventoryId);
+    if (inv) {
+      await this.tourInventoryService.releaseSlots({
+        tourId: String(booking.tourId),
+        departureDate: inv.departureDate.toISOString().slice(0, 10),
+        slots: totalGuests,
+      });
+    }
+
+    booking.status = TourBookingStatus.CANCELLED;
+    booking.paymentStatus = TourPaymentStatus.FAILED;
+    booking.cancelledAt = new Date();
+    booking.cancelReason = 'Payment failed';
     return booking.save();
   }
 
@@ -363,5 +433,78 @@ export class TourBookingService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /**
+   * User upload ảnh chuyển khoản (bank receipt). Chỉ đơn PENDING và chưa thanh toán đủ.
+   */
+  async uploadReceipt(tourBookingId: string, file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Receipt image is required');
+    }
+
+    const booking = await this.bookingModel.findById(tourBookingId);
+    if (!booking) {
+      throw new NotFoundException('Tour booking not found');
+    }
+
+    if (booking.status === TourBookingStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Cannot upload receipt for cancelled booking',
+      );
+    }
+
+    if (booking.status === TourBookingStatus.PAID) {
+      throw new BadRequestException('Booking already paid');
+    }
+
+    const result = await this.cloudinaryService.uploadFile(file, {
+      folder: `tour-bookings/${tourBookingId}/receipts`,
+    });
+
+    booking.bankReceipt = {
+      url: result.secure_url,
+      uploadedAt: new Date(),
+      verified: false,
+    };
+
+    await booking.save();
+
+    return {
+      message: 'Receipt uploaded successfully',
+      receipt: booking.bankReceipt,
+    };
+  }
+
+  /**
+   * Admin xác nhận đã nhận tiền chuyển khoản (verify receipt) → cập nhật paidAmount, status PAID.
+   */
+  async verifyReceipt(id: string): Promise<TourBooking> {
+    const booking = await this.bookingModel.findById(id);
+    if (!booking?.bankReceipt) {
+      throw new BadRequestException('No receipt to verify');
+    }
+
+    if (booking.status === TourBookingStatus.CANCELLED) {
+      throw new BadRequestException(
+        'Cannot verify receipt for cancelled booking',
+      );
+    }
+
+    booking.bankReceipt.verified = true;
+    const payAmount = booking.totalAmount - (booking.paidAmount ?? 0);
+    booking.paidAmount = booking.totalAmount;
+    booking.payment = {
+      provider: 'BANK_TRANSFER',
+      transactionId: `receipt-${id}`,
+      amount: payAmount,
+      paidAt: new Date(),
+    };
+    booking.status = TourBookingStatus.PAID;
+    booking.paymentStatus = TourPaymentStatus.PAID;
+    booking.paidAt = new Date();
+
+    await booking.save();
+    return booking;
   }
 }

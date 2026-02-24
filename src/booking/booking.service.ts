@@ -570,20 +570,13 @@ export class BookingService {
   /**
    * Hủy đơn. Chỉ chủ đơn (booking.userId === userId) hoặc admin mới được hủy.
    */
-  async cancel(
-    id: string,
-    userId: string,
-    role?: string,
-    roles?: string[],
-  ) {
+  async cancel(id: string, userId: string, role?: string, roles?: string[]) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
 
-    const isOwner =
-      booking.userId && String(booking.userId) === userId;
+    const isOwner = booking.userId && String(booking.userId) === userId;
     const isAdmin =
-      role === 'admin' ||
-      (Array.isArray(roles) && roles.includes('admin'));
+      role === 'admin' || (Array.isArray(roles) && roles.includes('admin'));
     if (!isOwner && !isAdmin) {
       throw new ForbiddenException(
         'Only the booking owner or admin can cancel this booking',

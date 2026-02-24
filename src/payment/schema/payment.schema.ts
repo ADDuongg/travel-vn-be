@@ -26,6 +26,10 @@ export class Payment {
   @Prop({ required: true, unique: true })
   intentId: string;
 
+  /** Id tham chiếu từ provider (Stripe intentId, etc.). Dùng cho unique index, tránh duplicate key khi null. */
+  @Prop({ index: true })
+  providerRef?: string;
+
   @Prop({ required: true })
   amount: number;
 
@@ -42,10 +46,16 @@ export class Payment {
   @Prop({
     type: Types.ObjectId,
     ref: 'Booking',
-    required: true,
     index: true,
   })
-  bookingId: Types.ObjectId;
+  bookingId?: Types.ObjectId;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'TourBooking',
+    index: true,
+  })
+  tourBookingId?: Types.ObjectId;
 
   @Prop({ type: [Object], default: [] })
   rawEvents?: any[];
@@ -66,7 +76,7 @@ PaymentSchema.index(
   {
     unique: true,
     partialFilterExpression: {
-      providerRef: { $exists: true, $ne: null }
-    }
-  }
+      providerRef: { $exists: true, $ne: null },
+    },
+  },
 );

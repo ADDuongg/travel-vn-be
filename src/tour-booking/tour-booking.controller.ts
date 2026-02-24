@@ -7,8 +7,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { TourBookingService } from './tour-booking.service';
 import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
@@ -81,6 +84,22 @@ export class TourBookingController {
   @Post(':id/payment')
   recordPayment(@Param('id') id: string, @Body() dto: PaymentTourBookingDto) {
     return this.tourBookingService.recordPayment(id, dto);
+  }
+
+  /** User upload ảnh chuyển khoản (bank receipt) */
+  @Post(':id/receipt')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadReceipt(
+    @Param('id') tourBookingId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.tourBookingService.uploadReceipt(tourBookingId, file);
+  }
+
+  /** Admin xác nhận đã nhận tiền (verify receipt) → đơn chuyển PAID */
+  @Patch(':id/verify-receipt')
+  verifyReceipt(@Param('id') id: string) {
+    return this.tourBookingService.verifyReceipt(id);
   }
 
   @Get('admin')

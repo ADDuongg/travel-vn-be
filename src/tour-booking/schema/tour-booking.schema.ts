@@ -13,6 +13,15 @@ export enum TourBookingStatus {
   COMPLETED = 'COMPLETED',
 }
 
+/** Trạng thái thanh toán của đơn tour (dùng cho filter, hiển thị, expire). */
+export enum TourPaymentStatus {
+  UNPAID = 'UNPAID',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
+  EXPIRED = 'EXPIRED',
+}
+
 @Schema({ _id: false })
 export class TourBookingGuest {
   @Prop({ required: true })
@@ -87,6 +96,13 @@ export class TourBooking {
   })
   status: TourBookingStatus;
 
+  @Prop({
+    type: String,
+    enum: TourPaymentStatus,
+    default: TourPaymentStatus.UNPAID,
+  })
+  paymentStatus: TourPaymentStatus;
+
   @Prop()
   paidAt?: Date;
 
@@ -110,9 +126,24 @@ export class TourBooking {
     amount?: number;
     paidAt?: Date;
   };
+
+  /** Ảnh chuyển khoản (upload bởi user, admin verify) */
+  @Prop({
+    type: {
+      url: String,
+      uploadedAt: Date,
+      verified: { type: Boolean, default: false },
+    },
+  })
+  bankReceipt?: {
+    url: string;
+    uploadedAt: Date;
+    verified: boolean;
+  };
 }
 
 export const TourBookingSchema = SchemaFactory.createForClass(TourBooking);
 
 TourBookingSchema.index({ userId: 1, createdAt: -1 });
 TourBookingSchema.index({ status: 1 });
+TourBookingSchema.index({ paymentStatus: 1 });
