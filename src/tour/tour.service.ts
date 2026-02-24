@@ -11,6 +11,7 @@ import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto, TourSortBy } from './dto/tour-query.dto';
 import { Tour, TourDocument } from './schema/tour.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 /* interface PaginatedResult<T> {
   items: T[];
@@ -28,12 +29,16 @@ export class TourService {
     @InjectModel(Tour.name)
     private readonly tourModel: Model<TourDocument>,
     private readonly provincesService: ProvincesService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   /**
    * Create a new tour
    */
-  async create(dto: CreateTourDto): Promise<Tour> {
+  async create(
+    dto: CreateTourDto,
+    files?: Express.Multer.File[],
+  ): Promise<Tour> {
     // Check slug uniqueness
     const existedSlug = await this.tourModel.findOne({ slug: dto.slug });
     if (existedSlug) {
@@ -61,6 +66,8 @@ export class TourService {
     if (invalidDestinations) {
       throw new BadRequestException('Invalid destination province(s)');
     }
+
+    const { thumbnail, gallery } = await this.uploadGallery(files);
 
     // Create tour
     return this.tourModel.create({
@@ -93,6 +100,8 @@ export class TourService {
       transportTypes: dto.transportTypes ?? [],
       bookingConfig: dto.bookingConfig ?? {},
       difficulty: dto.difficulty ?? 'MODERATE',
+      thumbnail: thumbnail ?? undefined,
+      gallery,
     });
   }
 
@@ -252,7 +261,11 @@ export class TourService {
   /**
    * Update tour
    */
-  async update(id: string, dto: UpdateTourDto): Promise<Tour> {
+  async update(
+    id: string,
+    dto: UpdateTourDto,
+    files?: Express.Multer.File[],
+  ): Promise<Tour> {
     const tour = await this.tourModel.findById(id);
     if (!tour) {
       throw new NotFoundException('Tour not found');
@@ -274,6 +287,14 @@ export class TourService {
         throw new ConflictException('Tour code already exists');
       }
       tour.code = dto.code;
+    }
+
+    // Update gallery/thumbnail when new files are uploaded
+    if (files?.length) {
+      await this.deleteGallery(tour.gallery || []);
+      const uploaded = await this.uploadGallery(files);
+      tour.thumbnail = uploaded.thumbnail ?? undefined;
+      tour.gallery = uploaded.gallery;
     }
 
     // Update fields
@@ -350,5 +371,45 @@ export class TourService {
       .populate('destinations.provinceId', 'name code slug')
       .populate('departureProvinceId', 'name code slug')
       .lean();
+  }
+
+  private async uploadGallery(files?: Express.Multer.File[]) {
+    let thumbnail: { url: string; publicId?: string; alt?: string } | null =
+      null;
+    const gallery: Array<{ url: string; publicId?: string; alt?: string; order?: number }> =
+      [];
+
+    if (files?.length) {
+      for (let i = 0; i < files.length; i++) {
+        const uploaded = await this.cloudinaryService.uploadFile(files[i], {
+          folder: 'tours',
+        });
+
+        const image = {
+          url: uploaded.secure_url,
+          publicId: uploaded.public_id,
+          order: i,
+        };
+
+        if (i === 0) thumbnail = image;
+        gallery.push(image);
+      }
+    }
+
+    return { thumbnail, gallery };
+  }
+
+  private async deleteGallery(
+    gallery: Array<{ url?: string; publicId?: string }>,
+  ) {
+    if (!gallery?.length) return;
+
+    await Promise.all(
+      gallery.map((img) =>
+        img.publicId
+          ? this.cloudinaryService.deleteFile(img.publicId)
+          : Promise.resolve(),
+      ),
+    );
   }
 }

@@ -197,4 +197,69 @@ interface Hotel {
 
 ---
 
-_v1.0 | nestjs-tours backend_
+## 5. Booking & Tour Booking – userId từ JWT (Breaking change)
+
+**Áp dụng từ:** 2025-02-23
+
+### 5.1. Thay đổi
+
+- **Room Booking** (`POST /api/v1/bookings/room`) và **Tour Booking** (`POST /api/v1/tour-bookings`) **bắt buộc đăng nhập** (gửi Bearer token).
+- **userId không còn nhận từ payload:** Backend lấy `userId` từ JWT (`req.user.userId`), FE **không được** gửi `userId` trong body.
+
+### 5.2. Cập nhật FE
+
+| Endpoint | Trước | Sau |
+|----------|--------|-----|
+| `POST /api/v1/bookings/room` | Có thể gửi `userId` trong body (optional) | **Header:** `Authorization: Bearer <token>` bắt buộc. **Body:** không gửi `userId`. |
+| `POST /api/v1/tour-bookings` | Có thể gửi `userId` trong body (optional) | **Header:** `Authorization: Bearer <token>` bắt buộc. **Body:** không gửi `userId`. |
+
+### 5.3. Body sau khi sửa
+
+**POST /api/v1/bookings/room** – không có field `userId`:
+
+```json
+{
+  "roomId": "...",
+  "checkIn": "2025-03-01",
+  "checkOut": "2025-03-03",
+  "rooms": [{ "adults": 2, "children": 0 }]
+}
+```
+
+**POST /api/v1/tour-bookings** – không có field `userId`:
+
+```json
+{
+  "tourId": "...",
+  "departureDate": "2025-03-08",
+  "guest": { "fullName": "...", "email": "...", "phone": "..." },
+  "adults": 2,
+  "children": 0,
+  "infants": 0
+}
+```
+
+### 5.4. Lưu ý
+
+- User phải **đăng nhập** trước khi gọi tạo đặt phòng hoặc đặt tour.
+- Nếu không gửi token hoặc token hết hạn → 401 Unauthorized.
+
+---
+
+## 6. Cancel booking – User & Admin (thống nhất Room + Tour)
+
+**Áp dụng từ:** 2025-02-23
+
+### 6.1. Quy tắc hủy đơn
+
+- **Room:** `PATCH /api/v1/bookings/:id/cancel` – cần **Bearer token**. Chỉ **chủ đơn** (user đã đặt) hoặc **admin** mới hủy được.
+- **Tour:** `PATCH /api/v1/tour-bookings/:id/cancel` – cần **Bearer token**. Chỉ **chủ đơn** hoặc **admin** mới hủy được.
+
+### 6.2. Cập nhật FE
+
+- **FE Client:** Có thể gọi cancel cho **đơn của chính user** (truyền id đơn từ "Đơn của tôi"). Gửi kèm Bearer token. Nếu không phải chủ đơn → 403 Forbidden.
+- **FE Admin:** Gọi cancel với token admin → hủy được mọi đơn (room hoặc tour).
+
+---
+
+_v1.1 | nestjs-tours backend | 2025-02-23_

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -123,7 +124,10 @@ export class BookingService {
 
   /* ================= ROOM BOOKING ================= */
 
-  async createRoomBooking(dto: CreateRoomBookingDto): Promise<Booking> {
+  async createRoomBooking(
+    dto: CreateRoomBookingDto,
+    userId: string,
+  ): Promise<Booking> {
     const room = await this.roomService.findOne(dto.roomId);
     if (!room) throw new NotFoundException('Room not found');
 
@@ -247,7 +251,7 @@ export class BookingService {
 
       rooms: bookedRooms,
 
-      userId: dto.userId ? new Types.ObjectId(dto.userId) : undefined,
+      userId: new Types.ObjectId(userId),
     });
 
     return booking.save();
@@ -563,9 +567,28 @@ export class BookingService {
 
   /* ================= CANCEL ================= */
 
-  async cancel(id: string) {
+  /**
+   * Hủy đơn. Chỉ chủ đơn (booking.userId === userId) hoặc admin mới được hủy.
+   */
+  async cancel(
+    id: string,
+    userId: string,
+    role?: string,
+    roles?: string[],
+  ) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
+
+    const isOwner =
+      booking.userId && String(booking.userId) === userId;
+    const isAdmin =
+      role === 'admin' ||
+      (Array.isArray(roles) && roles.includes('admin'));
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException(
+        'Only the booking owner or admin can cancel this booking',
+      );
+    }
 
     if (booking.paymentStatus === BookingPaymentStatus.PAID) {
       throw new BadRequestException(

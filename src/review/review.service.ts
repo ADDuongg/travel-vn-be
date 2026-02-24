@@ -6,6 +6,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Room, RoomDocument } from 'src/room/schema/room.schema';
+import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
 import {
   Review,
   ReviewDocument,
@@ -20,6 +21,9 @@ export class ReviewService {
 
     @InjectModel(Room.name)
     private readonly roomModel: Model<RoomDocument>,
+
+    @InjectModel(Tour.name)
+    private readonly tourModel: Model<TourDocument>,
   ) {}
 
   /* ================= CREATE OR UPDATE REVIEW ================= */
@@ -69,9 +73,13 @@ export class ReviewService {
       { upsert: true, new: true },
     );
 
-    // update rating summary nếu là ROOM
-    if (entityType === ReviewEntityType.ROOM && rating) {
-      await this.recalculateRoomRating(entityId);
+    // update rating summary: ROOM hoặc TOUR
+    if (rating) {
+      if (entityType === ReviewEntityType.ROOM) {
+        await this.recalculateRoomRating(entityId);
+      } else if (entityType === ReviewEntityType.TOUR) {
+        await this.recalculateTourRating(entityId);
+      }
     }
 
     return review;
@@ -83,6 +91,8 @@ export class ReviewService {
 
     if (review.entityType === ReviewEntityType.ROOM && review.rating) {
       await this.recalculateRoomRating(review.entityId.toString());
+    } else if (review.entityType === ReviewEntityType.TOUR && review.rating) {
+      await this.recalculateTourRating(review.entityId.toString());
     }
 
     return true;
@@ -171,6 +181,8 @@ export class ReviewService {
 
     if (review.entityType === ReviewEntityType.ROOM && review.rating) {
       await this.recalculateRoomRating(review.entityId.toString());
+    } else if (review.entityType === ReviewEntityType.TOUR && review.rating) {
+      await this.recalculateTourRating(review.entityId.toString());
     }
 
     return review;
@@ -200,6 +212,35 @@ export class ReviewService {
     const ratingSummary = result[0] || { average: 0, total: 0 };
 
     await this.roomModel.findByIdAndUpdate(roomId, {
+      ratingSummary: {
+        average: Number(ratingSummary.average?.toFixed(2) || 0),
+        total: ratingSummary.total || 0,
+      },
+    });
+  }
+
+  private async recalculateTourRating(tourId: string) {
+    const result = await this.reviewModel.aggregate([
+      {
+        $match: {
+          entityType: ReviewEntityType.TOUR,
+          entityId: new Types.ObjectId(tourId),
+          isApproved: true,
+          rating: { $exists: true },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          average: { $avg: '$rating' },
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const ratingSummary = result[0] || { average: 0, total: 0 };
+
+    await this.tourModel.findByIdAndUpdate(tourId, {
       ratingSummary: {
         average: Number(ratingSummary.average?.toFixed(2) || 0),
         total: ratingSummary.total || 0,

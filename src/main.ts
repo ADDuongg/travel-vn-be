@@ -15,7 +15,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   });
-  app.use('/payments/webhook/stripe', bodyParser.raw({ type: 'application/json' }));
+  app.use(
+    '/payments/webhook/stripe',
+    bodyParser.raw({ type: 'application/json' }),
+  );
   // const reflector = app.get(Reflector);
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 9001;
@@ -37,9 +40,14 @@ async function bootstrap() {
 
   app.use(cookieParser());
   app.enableCors({
-    origin: ['http://localhost:5174', 'http://localhost:5173'],
+    origin: [
+      'http://localhost:5174',
+      'http://localhost:5173',
+      'http://localhost:5175',
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Idempotency-Key',
+    allowedHeaders:
+      'Content-Type, Authorization, X-Requested-With, Idempotency-Key',
     credentials: true,
     maxAge: 86400,
   });

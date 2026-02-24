@@ -26,13 +26,7 @@ export class CreateRoomBookingDto {
   @Type(() => RoomGuestDto)
   rooms: RoomGuestDto[];
 
-  /* ===== USER (OPTIONAL) ===== */
-
-  @IsOptional()
-  @IsString()
-  userId?: string;
-
-  /* check tối đa ngày có thể book */
+  /* userId lấy từ JWT (req.user), không gửi từ payload */
   /* @Validate(MaxStayValidator)
   _maxStayCheck: boolean; */
 }

@@ -28,11 +28,16 @@ Module quản lý tour du lịch với các tính năng:
 - GET `/api/v1/tours/slug/:slug` - Tour theo slug
 - GET `/api/v1/tours/options` - Options cho dropdown
 - GET `/api/v1/tours/featured` - Tours nổi bật
+- GET `/api/v1/reviews` - Danh sách review công khai (query: entityType, entityId)
 
 **Protected endpoints** (cần Bearer token):
 - POST `/api/v1/tours` - Tạo tour (Admin)
 - PATCH `/api/v1/tours/:id` - Cập nhật tour (Admin)
 - DELETE `/api/v1/tours/:id` - Xóa tour (Admin)
+- GET `/api/v1/reviews/me` - Review của tôi (entityType, entityId)
+- POST `/api/v1/reviews` - Gửi/cập nhật đánh giá (user hoặc Admin)
+- PATCH `/api/v1/reviews/:id/approve` - Duyệt review (Admin)
+- DELETE `/api/v1/reviews/:id` - Xóa review (Admin)
 
 ---
 
@@ -277,7 +282,12 @@ Module quản lý tour du lịch với các tính năng:
 
 **Headers:** `Authorization: Bearer {token}`
 
-**Body:**
+**Content-Type:** `multipart/form-data` (khi gửi ảnh) hoặc `application/json` (chỉ dữ liệu).
+
+- **Ảnh gallery:** field name `gallery`, gửi nhiều file (tối đa 10). Ảnh đầu tiên dùng làm **thumbnail**, thứ tự giữ nguyên theo `order`.
+- **Body (form fields):** các field giống JSON bên dưới, với object/array có thể stringify (ví dụ `duration`, `translations`, `itinerary`... gửi dạng string JSON).
+
+**Body (JSON - khi không dùng form-data):**
 ```json
 {
   "slug": "halong-2-ngay-1-dem",
@@ -348,7 +358,7 @@ Module quản lý tour du lịch với các tính năng:
 }
 ```
 
-**Response:** Tour object hoặc error (409: slug/code đã tồn tại, 400: province không hợp lệ)
+**Response:** Tour object (có `thumbnail`, `gallery` nếu đã gửi ảnh) hoặc error (409: slug/code đã tồn tại, 400: province không hợp lệ)
 
 ---
 
@@ -356,7 +366,12 @@ Module quản lý tour du lịch với các tính năng:
 
 **Headers:** `Authorization: Bearer {token}`
 
-**Body:** Partial update (chỉ gửi fields cần update)
+**Content-Type:** `multipart/form-data` (khi gửi ảnh mới) hoặc `application/json`.
+
+- **Ảnh gallery:** field name `gallery`, tối đa 10 file. Khi gửi ảnh mới, toàn bộ gallery cũ sẽ bị thay thế; ảnh đầu tiên = thumbnail.
+- **Body (form fields):** partial update, object/array gửi dạng string JSON nếu dùng form-data.
+
+**Body (JSON - partial update):**
 ```json
 {
   "isActive": false,
@@ -373,6 +388,113 @@ Module quản lý tour du lịch với các tính năng:
 **Headers:** `Authorization: Bearer {token}`
 
 **Response:** Success hoặc 404 (Tour not found)
+
+---
+
+## ⭐ Reviews & Rating (Tour)
+
+Collection **reviews** dùng chung cho Room, Hotel, **Tour**, Blog. Với tour: dùng `entityType: 'TOUR'` và `entityId` = ID tour.
+
+### GET `/api/v1/reviews` - Danh sách review công khai (theo tour)
+
+**Query:**
+
+| Parameter | Type | Mô tả |
+|-----------|------|--------|
+| entityType | string | **TOUR** (bắt buộc khi lấy review tour) |
+| entityId | string | Tour ID (MongoDB ObjectId) |
+| page | number | Trang (default: 1) |
+| limit | number | Số item/trang (default: 10) |
+
+**Ví dụ:** `GET /api/v1/reviews?entityType=TOUR&entityId=675abc123&page=1&limit=10`
+
+**Response:** Mảng review (chỉ review đã duyệt `isApproved: true`):
+
+```json
+[
+  {
+    "_id": "...",
+    "entityType": "TOUR",
+    "entityId": "675abc123",
+    "rating": 5,
+    "comment": "Tour rất hay!",
+    "userId": "675user1",
+    "isAnonymous": false,
+    "isApproved": true,
+    "createdAt": "2025-01-20T10:00:00.000Z"
+  }
+]
+```
+
+---
+
+### GET `/api/v1/reviews/me` - Review của tôi cho một tour (Bearer)
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Query:** `entityType=TOUR`, `entityId=<tourId>`
+
+**Response:** Một review object hoặc null (chưa đánh giá).
+
+---
+
+### POST `/api/v1/reviews` - Gửi / cập nhật đánh giá tour (Bearer)
+
+**Headers:** `Authorization: Bearer {token}`
+
+**Body:**
+
+```json
+{
+  "entityType": "TOUR",
+  "entityId": "675abc123",
+  "rating": 5,
+  "comment": "Tour rất hay!",
+  "isAnonymous": false
+}
+```
+
+| Field | Type | Bắt buộc | Mô tả |
+|-------|------|----------|--------|
+| entityType | string | Có | **TOUR** |
+| entityId | string | Có | Tour ID |
+| rating | number | Không* | 1–5 (*cần ít nhất rating hoặc comment) |
+| comment | string | Không* | Nội dung đánh giá |
+| isAnonymous | boolean | Không | Default: false |
+
+- Mỗi user chỉ có **một review** cho một tour: gửi lại = cập nhật (upsert).
+- Sau khi gửi, **ratingSummary** của tour (average, total) được cập nhật tự động.
+
+**Response:** Review document (đã lưu).
+
+---
+
+### PATCH `/api/v1/reviews/:id/approve` - Duyệt review (Admin)
+
+**Headers:** `Authorization: Bearer {token}` (Admin)
+
+**Response:** Review đã duyệt. Sau khi duyệt, `ratingSummary` của tour được recalculate.
+
+---
+
+### DELETE `/api/v1/reviews/:id` - Xóa review (Admin)
+
+**Response:** Thành công. `ratingSummary` của tour được cập nhật lại.
+
+---
+
+### GET `/api/v1/reviews/admin` - Danh sách review (Admin)
+
+**Query:** `entityType=TOUR`, `isApproved=true|false`, `page`, `limit`
+
+**Response:**
+
+```json
+{
+  "data": [ { ... review, userId populated (username, email) } ],
+  "pagination": { "page": 1, "limit": 20, "total": 100 }
+}
+```
 
 ---
 

@@ -7,19 +7,30 @@ import {
   Patch,
   Post,
   Query,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { TourService } from './tour.service';
+import { TourInventoryService } from 'src/tour-inventory/tour-inventory.service';
 import { CreateTourDto } from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto } from './dto/tour-query.dto';
 
 @Controller('api/v1/tours')
 export class TourController {
-  constructor(private readonly tourService: TourService) {}
+  constructor(
+    private readonly tourService: TourService,
+    private readonly tourInventoryService: TourInventoryService,
+  ) {}
 
   @Post()
-  create(@Body() dto: CreateTourDto) {
-    return this.tourService.create(dto);
+  @UseInterceptors(FilesInterceptor('gallery', 10))
+  create(
+    @Body() dto: CreateTourDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.tourService.create(dto, files);
   }
 
   @Get()
@@ -42,14 +53,25 @@ export class TourController {
     return this.tourService.findBySlug(slug);
   }
 
+  @Get(':id/availability')
+  getAvailability(@Param('id') id: string, @Query('month') month?: string) {
+    const m = month ?? new Date().toISOString().slice(0, 7);
+    return this.tourInventoryService.getAvailabilityByMonth(id, m);
+  }
+
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.tourService.findById(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateTourDto) {
-    return this.tourService.update(id, dto);
+  @UseInterceptors(FilesInterceptor('gallery', 10))
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateTourDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    return this.tourService.update(id, dto, files);
   }
 
   @Delete(':id')

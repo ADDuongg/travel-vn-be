@@ -24,8 +24,12 @@ export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
   @Post('room')
-  createRoom(@Body() dto: CreateRoomBookingDto) {
-    return this.bookingService.createRoomBooking(dto);
+  @UseGuards(JwtAuthGuard)
+  createRoom(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: CreateRoomBookingDto,
+  ) {
+    return this.bookingService.createRoomBooking(dto, req.user.userId);
   }
 
   // @UseGuards(JwtAuthGuard)
@@ -85,8 +89,17 @@ export class BookingController {
   }
 
   @Patch(':id/cancel')
-  cancel(@Param('id') id: string) {
-    return this.bookingService.cancel(id);
+  @UseGuards(JwtAuthGuard)
+  cancel(
+    @Req() req: { user: { userId: string; role?: string; roles?: string[] } },
+    @Param('id') id: string,
+  ) {
+    return this.bookingService.cancel(
+      id,
+      req.user.userId,
+      req.user.role,
+      req.user.roles,
+    );
   }
 
   @Patch(':id/refund')
