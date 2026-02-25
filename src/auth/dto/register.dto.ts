@@ -1,10 +1,18 @@
 // src/auth/dto/register.dto.ts
 import { OmitType } from '@nestjs/mapped-types';
 import { CreateUserDto } from 'src/user/dto/create-user.dto';
-import { IsString, Length } from 'class-validator';
+import { IsOptional, IsString, Length } from 'class-validator';
 
-export class RegisterDto extends OmitType(CreateUserDto, ['roles'] as const) {
+export class RegisterDto extends OmitType(CreateUserDto, ['roles', 'permissions'] as const) {
   @IsString()
   @Length(8, 128)
   confirmPassword!: string;
+
+  @IsOptional()
+  @IsString()
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

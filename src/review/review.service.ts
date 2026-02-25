@@ -8,6 +8,10 @@ import { Model, Types } from 'mongoose';
 import { Room, RoomDocument } from 'src/room/schema/room.schema';
 import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
 import {
+  TourGuide,
+  TourGuideDocument,
+} from 'src/tour-guide/schema/tour-guide.schema';
+import {
   Review,
   ReviewDocument,
   ReviewEntityType,
@@ -24,6 +28,9 @@ export class ReviewService {
 
     @InjectModel(Tour.name)
     private readonly tourModel: Model<TourDocument>,
+
+    @InjectModel(TourGuide.name)
+    private readonly tourGuideModel: Model<TourGuideDocument>,
   ) {}
 
   /* ================= CREATE OR UPDATE REVIEW ================= */
@@ -73,12 +80,14 @@ export class ReviewService {
       { upsert: true, new: true },
     );
 
-    // update rating summary: ROOM hoặc TOUR
+    // update rating summary: ROOM, TOUR hoặc GUIDE
     if (rating) {
       if (entityType === ReviewEntityType.ROOM) {
         await this.recalculateRoomRating(entityId);
       } else if (entityType === ReviewEntityType.TOUR) {
         await this.recalculateTourRating(entityId);
+      } else if (entityType === ReviewEntityType.GUIDE) {
+        await this.recalculateGuideRating(entityId);
       }
     }
 
@@ -89,10 +98,14 @@ export class ReviewService {
     const review = await this.reviewModel.findByIdAndDelete(id);
     if (!review) return false;
 
-    if (review.entityType === ReviewEntityType.ROOM && review.rating) {
-      await this.recalculateRoomRating(review.entityId.toString());
-    } else if (review.entityType === ReviewEntityType.TOUR && review.rating) {
-      await this.recalculateTourRating(review.entityId.toString());
+    if (review.rating) {
+      if (review.entityType === ReviewEntityType.ROOM) {
+        await this.recalculateRoomRating(review.entityId.toString());
+      } else if (review.entityType === ReviewEntityType.TOUR) {
+        await this.recalculateTourRating(review.entityId.toString());
+      } else if (review.entityType === ReviewEntityType.GUIDE) {
+        await this.recalculateGuideRating(review.entityId.toString());
+      }
     }
 
     return true;
@@ -179,10 +192,14 @@ export class ReviewService {
 
     if (!review) throw new NotFoundException('Review not found');
 
-    if (review.entityType === ReviewEntityType.ROOM && review.rating) {
-      await this.recalculateRoomRating(review.entityId.toString());
-    } else if (review.entityType === ReviewEntityType.TOUR && review.rating) {
-      await this.recalculateTourRating(review.entityId.toString());
+    if (review.rating) {
+      if (review.entityType === ReviewEntityType.ROOM) {
+        await this.recalculateRoomRating(review.entityId.toString());
+      } else if (review.entityType === ReviewEntityType.TOUR) {
+        await this.recalculateTourRating(review.entityId.toString());
+      } else if (review.entityType === ReviewEntityType.GUIDE) {
+        await this.recalculateGuideRating(review.entityId.toString());
+      }
     }
 
     return review;
@@ -241,6 +258,35 @@ export class ReviewService {
     const ratingSummary = result[0] || { average: 0, total: 0 };
 
     await this.tourModel.findByIdAndUpdate(tourId, {
+      ratingSummary: {
+        average: Number(ratingSummary.average?.toFixed(2) || 0),
+        total: ratingSummary.total || 0,
+      },
+    });
+  }
+
+  private async recalculateGuideRating(guideId: string) {
+    const result = await this.reviewModel.aggregate([
+      {
+        $match: {
+          entityType: ReviewEntityType.GUIDE,
+          entityId: new Types.ObjectId(guideId),
+          isApproved: true,
+          rating: { $exists: true },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          average: { $avg: '$rating' },
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const ratingSummary = result[0] || { average: 0, total: 0 };
+
+    await this.tourGuideModel.findByIdAndUpdate(guideId, {
       ratingSummary: {
         average: Number(ratingSummary.average?.toFixed(2) || 0),
         total: ratingSummary.total || 0,

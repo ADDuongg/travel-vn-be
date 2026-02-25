@@ -8,11 +8,18 @@ import {
   Delete,
   UseFilters,
   ForbiddenException,
+  UnauthorizedException,
+  UseGuards,
+  Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('api/v1/users')
 @UseFilters(new HttpExceptionFilter())
@@ -24,7 +31,7 @@ export class UserController {
     try {
       const user = this.userService.create(createUserDto);
       return user;
-    } catch (error) {
+    } catch {
       throw new ForbiddenException();
     }
   }
@@ -32,6 +39,19 @@ export class UserController {
   @Get()
   findAll() {
     return this.userService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile/me')
+  @UseInterceptors(FileInterceptor('avatar'))
+  updateProfile(
+    @Req() req: { user?: { userId: string } },
+    @Body() updateUserDto: UpdateUserDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const userId = req.user?.userId;
+    if (!userId) throw new UnauthorizedException('Unauthorized');
+    return this.userService.updateProfile(userId, updateUserDto, file);
   }
 
   @Get(':id')

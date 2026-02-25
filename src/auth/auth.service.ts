@@ -147,8 +147,9 @@ export class AuthService {
       username: dto.username,
       password: dto.password,
       roles: ['user'],
-      age: dto.age,
       email: dto.email,
+      fullName: dto.fullName,
+      phone: dto.phone,
       permissions: {
         apis: [],
         routers: [],
@@ -242,7 +243,7 @@ export class AuthService {
   async me(userId: string) {
     const user = await this.userModel
       .findById(userId)
-      .select('_id username roles')
+      .select('-password')
       .lean();
 
     if (!user) {
@@ -252,10 +253,9 @@ export class AuthService {
       user.roles || [],
     );
     return {
-      id: user._id.toString(),
-      username: user.username,
-      roles: user.roles,
-      permissions: permissions,
+      ...user,
+      id: String(user._id),
+      permissions,
     };
   }
 

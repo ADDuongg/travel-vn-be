@@ -15,6 +15,10 @@ import {
   TourInventoryDocument,
 } from 'src/tour-inventory/schema/tour-inventory.schema';
 import {
+  TourGuide,
+  TourGuideDocument,
+} from 'src/tour-guide/schema/tour-guide.schema';
+import {
   TourBooking,
   TourBookingDocument,
   TourBookingStatus,
@@ -33,6 +37,8 @@ export class TourBookingService {
     private readonly tourModel: Model<TourDocument>,
     @InjectModel(TourInventory.name)
     private readonly inventoryModel: Model<TourInventoryDocument>,
+    @InjectModel(TourGuide.name)
+    private readonly tourGuideModel: Model<TourGuideDocument>,
     private readonly tourInventoryService: TourInventoryService,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
@@ -148,7 +154,7 @@ export class TourBookingService {
       slots: totalGuests,
     });
 
-    const booking = await this.bookingModel.create({
+    const bookingPayload: any = {
       bookingCode,
       tourId,
       tourInventoryId: inventory._id,
@@ -169,7 +175,13 @@ export class TourBookingService {
       paidAmount: 0,
       status: TourBookingStatus.PENDING,
       paymentStatus: TourPaymentStatus.UNPAID,
-    });
+    };
+
+    if (dto.guideId && Types.ObjectId.isValid(dto.guideId)) {
+      bookingPayload.guideId = new Types.ObjectId(dto.guideId);
+    }
+
+    const booking = await this.bookingModel.create(bookingPayload);
 
     return booking.populate([
       { path: 'tourId', select: 'code slug translations duration pricing' },
@@ -506,5 +518,40 @@ export class TourBookingService {
 
     await booking.save();
     return booking;
+  }
+
+  /**
+   * Admin gán hoặc thay đổi hướng dẫn viên cho booking.
+   */
+  async assignGuide(bookingId: string, guideId: string): Promise<TourBooking> {
+    if (!Types.ObjectId.isValid(bookingId)) {
+      throw new BadRequestException('Invalid booking ID');
+    }
+    if (!Types.ObjectId.isValid(guideId)) {
+      throw new BadRequestException('Invalid guide ID');
+    }
+
+    const [booking, guide] = await Promise.all([
+      this.bookingModel.findById(bookingId),
+      this.tourGuideModel.findById(guideId),
+    ]);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (!guide || !guide.isActive) {
+      throw new BadRequestException('Tour guide not found or inactive');
+    }
+
+    booking.guideId = guide._id as Types.ObjectId | undefined;
+    await booking.save();
+
+    return booking.populate([
+      {
+        path: 'tourId',
+        select: 'code slug translations duration pricing',
+      },
+    ]);
   }
 }

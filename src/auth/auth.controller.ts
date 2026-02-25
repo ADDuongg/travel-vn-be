@@ -22,7 +22,6 @@ import { Response, Request } from 'express';
 export class AuthController {
   constructor(private authService: AuthService) {}
   @ApiBearerAuth('bearer')
-  @Post('login')
   @ApiBody({
     schema: {
       type: 'object',
@@ -51,7 +50,8 @@ export class AuthController {
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       sameSite: 'lax',
-      path: '/api/v1/auth/refresh',
+      // path: '/api/v1/auth',
+      path: '/',
     });
 
     return {
@@ -89,7 +89,8 @@ export class AuthController {
       res.cookie('refresh_token', result.refresh_token, {
         httpOnly: true,
         sameSite: 'lax',
-        path: '/api/v1/auth/refresh',
+        // path: '/api/v1/auth',
+        path: '/',
       });
     }
 
@@ -114,7 +115,8 @@ export class AuthController {
       httpOnly: true,
       // secure: this.env.isProduction(),
       sameSite: 'lax',
-      path: '/api/v1/auth/refresh',
+      // path: '/api/v1/auth/refresh',
+      path: '/',
     });
 
     return { message: 'Logged out successfully' };

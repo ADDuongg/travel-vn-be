@@ -8,6 +8,7 @@ export enum ReviewEntityType {
   HOTEL = 'HOTEL',
   TOUR = 'TOUR',
   BLOG = 'BLOG',
+  GUIDE = 'GUIDE',
 }
 
 @Schema({

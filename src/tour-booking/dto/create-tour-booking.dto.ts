@@ -29,6 +29,10 @@ export class CreateTourBookingDto {
   @IsString()
   tourId: string;
 
+  @IsOptional()
+  @IsString()
+  guideId?: string;
+
   @IsDateString()
   departureDate: string;
 

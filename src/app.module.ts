@@ -35,6 +35,7 @@ import { ProvincesModule } from './provinces/provinces.module';
 import { TourModule } from './tour/tour.module';
 import { TourInventoryModule } from './tour-inventory/tour-inventory.module';
 import { TourBookingModule } from './tour-booking/tour-booking.module';
+import { TourGuideModule } from './tour-guide/tour-guide.module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { TourBookingModule } from './tour-booking/tour-booking.module';
     TourModule,
     TourInventoryModule,
     TourBookingModule,
+    TourGuideModule,
   ],
   controllers: [AppController],
   providers: [AppService],

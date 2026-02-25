@@ -10,10 +10,11 @@ export class ProvincesService {
     private readonly provinceModel: Model<ProvinceDocument>,
   ) {}
 
+  /** Danh sách tỉnh/thành, kèm wards (quận/huyện, phường/xã) cho FE dropdown địa chỉ */
   findAll() {
     return this.provinceModel
       .find({ type: 'province' })
-      .select('_id code slug name fullName')
+      .select('_id code slug name fullName wards')
       .sort({ 'name.vi': 1 })
       .lean();
   }

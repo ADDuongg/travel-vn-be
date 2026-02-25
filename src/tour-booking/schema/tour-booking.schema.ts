@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { Tour } from 'src/tour/schema/tour.schema';
 import { TourInventory } from 'src/tour-inventory/schema/tour-inventory.schema';
+import { TourGuide } from 'src/tour-guide/schema/tour-guide.schema';
 
 export type TourBookingDocument = TourBooking & Document;
 
@@ -61,6 +62,9 @@ export class TourBooking {
 
   @Prop({ type: Types.ObjectId, ref: 'User', index: true })
   userId?: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: TourGuide.name, index: true })
+  guideId?: Types.ObjectId;
 
   @Prop({ type: TourBookingGuestSchema, required: true })
   guest: TourBookingGuest;
@@ -147,3 +151,4 @@ export const TourBookingSchema = SchemaFactory.createForClass(TourBooking);
 TourBookingSchema.index({ userId: 1, createdAt: -1 });
 TourBookingSchema.index({ status: 1 });
 TourBookingSchema.index({ paymentStatus: 1 });
+TourBookingSchema.index({ guideId: 1 });
