@@ -52,7 +52,7 @@ export class TourService {
     }
 
     // Validate provinces
-    const provinces = await this.provincesService.findAll();
+    const provinces = await this.provincesService.findAllForDropdown();
     const provinceIds = provinces.map((p: any) => String(p._id));
 
     const invalidDeparture = !provinceIds.includes(dto.departureProvinceId);

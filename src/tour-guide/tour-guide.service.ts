@@ -129,8 +129,12 @@ export class TourGuideService {
     return guide;
   }
 
-  /** Admin: tạo guide cho user (truyền userId trong body) + optional CV. */
-  async create(dto: CreateTourGuideDto, file?: Express.Multer.File) {
+  /** Admin: tạo guide cho user (truyền userId trong body) + optional CV + gallery (upload Cloudinary). */
+  async create(
+    dto: CreateTourGuideDto,
+    cvFile?: Express.Multer.File,
+    galleryFiles?: Express.Multer.File[],
+  ) {
     const userId = dto.userId;
     if (!userId || !Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('userId is required');
@@ -142,20 +146,24 @@ export class TourGuideService {
       throw new BadRequestException('User already has a tour guide profile');
     }
     const doc = this.toDoc(dto, new Types.ObjectId(userId));
+    if (galleryFiles?.length) {
+      doc.gallery = await this.uploadGallery(galleryFiles);
+    }
     const created = await this.tourGuideModel.create(doc);
     await this.userService.addRole(userId, 'guide');
-    if (file) {
-      await this.applyCvFile(created, file);
+    if (cvFile) {
+      await this.applyCvFile(created, cvFile);
       await created.save();
     }
     return created.toObject();
   }
 
-  /** User đăng ký làm guide (userId từ JWT, isVerified: false) + optional CV. */
+  /** User đăng ký làm guide (userId từ JWT, isVerified: false) + optional CV + gallery (upload Cloudinary). */
   async register(
     userId: string,
     dto: CreateTourGuideDto,
-    file?: Express.Multer.File,
+    cvFile?: Express.Multer.File,
+    galleryFiles?: Express.Multer.File[],
   ) {
     const existing = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId) })
@@ -166,43 +174,56 @@ export class TourGuideService {
       );
     }
     const doc = this.toDoc(dto, new Types.ObjectId(userId), false);
+    if (galleryFiles?.length) {
+      doc.gallery = await this.uploadGallery(galleryFiles);
+    }
     const created = await this.tourGuideModel.create(doc);
     await this.userService.addRole(userId, 'guide');
-    if (file) {
-      await this.applyCvFile(created, file);
+    if (cvFile) {
+      await this.applyCvFile(created, cvFile);
       await created.save();
     }
     return created.toObject();
   }
 
-  /** Guide cập nhật profile của mình (bao gồm CV nếu gửi kèm). */
+  /** Guide cập nhật profile của mình (CV + gallery upload Cloudinary nếu gửi kèm). */
   async updateMyProfile(
     userId: string,
     dto: UpdateTourGuideDto,
-    file?: Express.Multer.File,
+    cvFile?: Express.Multer.File,
+    galleryFiles?: Express.Multer.File[],
   ) {
     const guide = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId), isActive: true })
       .exec();
     if (!guide) throw new NotFoundException('Tour guide profile not found');
-    this.applyUpdate(guide, dto);
-    if (file) {
-      await this.applyCvFile(guide, file);
+    await this.applyUpdate(guide, dto);
+    if (galleryFiles?.length) {
+      const uploaded = await this.uploadGallery(galleryFiles);
+      guide.gallery = [...(guide.gallery || []), ...uploaded];
+    }
+    if (cvFile) {
+      await this.applyCvFile(guide, cvFile);
     }
     return guide.save().then((g) => g.toObject());
   }
 
-  /** Admin: cập nhật bất kỳ guide nào (bao gồm CV nếu gửi kèm). */
+  /** Admin: cập nhật bất kỳ guide nào (CV + gallery upload Cloudinary nếu gửi kèm). */
   async update(
     id: string,
     dto: UpdateTourGuideDto,
-    file?: Express.Multer.File,
+    cvFile?: Express.Multer.File,
+    galleryFiles?: Express.Multer.File[],
   ) {
     const guide = await this.tourGuideModel.findById(id).exec();
     if (!guide) throw new NotFoundException('Tour guide not found');
-    this.applyUpdate(guide, dto);
-    if (file) {
-      await this.applyCvFile(guide, file);
+    await this.applyUpdate(guide, dto);
+    if (galleryFiles?.length) {
+      const uploaded = await this.uploadGallery(galleryFiles);
+      guide.gallery = [...(guide.gallery || []), ...uploaded];
+    }
+    if (cvFile) {
+      await this.applyCvFile(guide, cvFile);
     }
     return guide.save().then((g) => g.toObject());
   }
@@ -222,6 +243,46 @@ export class TourGuideService {
     if (!guide) throw new NotFoundException('Tour guide not found');
     guide.isAvailable = !guide.isAvailable;
     return guide.save().then((g) => g.toObject());
+  }
+
+  /** Upload mảng ảnh lên Cloudinary (folder tour-guides/gallery), trả về mảng { url, publicId, alt }. */
+  private async uploadGallery(
+    files: Express.Multer.File[],
+  ): Promise<Array<{ url: string; publicId?: string; alt?: string }>> {
+    if (!files?.length) return [];
+    const result: Array<{ url: string; publicId?: string; alt?: string }> = [];
+    for (let i = 0; i < files.length; i++) {
+      const uploaded = await this.cloudinaryService.uploadFile(files[i], {
+        folder: 'tour-guides/gallery',
+      });
+      result.push({
+        url: uploaded.secure_url,
+        publicId: uploaded.public_id,
+        alt: files[i].originalname || undefined,
+      });
+    }
+    return result;
+  }
+
+  /** Xóa trên Cloudinary các ảnh có publicId không còn nằm trong danh sách mới. */
+  private async deleteRemovedGalleryImages(
+    currentGallery: Array<{ url?: string; publicId?: string }> | undefined,
+    newGallery: Array<{ url?: string; publicId?: string }> | undefined,
+  ) {
+    if (!currentGallery?.length || !newGallery) return;
+    const newIds = new Set(
+      newGallery.map((img) => img.publicId).filter(Boolean),
+    );
+    const toDelete = currentGallery.filter(
+      (img) => img.publicId && !newIds.has(img.publicId),
+    );
+    await Promise.all(
+      toDelete.map((img) =>
+        img.publicId
+          ? this.cloudinaryService.deleteFile(img.publicId).catch(() => {})
+          : Promise.resolve(),
+      ),
+    );
   }
 
   private async applyCvFile(
@@ -306,6 +367,9 @@ export class TourGuideService {
       yearsOfExperience: dto.yearsOfExperience,
       gallery: dto.gallery ?? [],
       ratingSummary: { average: 0, total: 0 },
+      responseRate: dto.responseRate ?? 0,
+      completedTripsCount: dto.completedTripsCount ?? 0,
+      returningCustomerRate: dto.returningCustomerRate ?? 0,
       isAvailable: dto.isAvailable ?? true,
       isActive: true,
       isVerified: isVerifiedDefault,
@@ -315,7 +379,7 @@ export class TourGuideService {
     };
   }
 
-  private applyUpdate(guide: TourGuideDocument, dto: UpdateTourGuideDto) {
+  private async applyUpdate(guide: TourGuideDocument, dto: UpdateTourGuideDto) {
     if (dto.translations !== undefined) guide.translations = dto.translations;
     if (dto.languages !== undefined) guide.languages = dto.languages;
     if (dto.specializedProvinces !== undefined) {
@@ -329,7 +393,15 @@ export class TourGuideService {
       guide.licenseNumber = dto.licenseNumber;
     if (dto.yearsOfExperience !== undefined)
       guide.yearsOfExperience = dto.yearsOfExperience;
-    if (dto.gallery !== undefined) guide.gallery = dto.gallery;
+    if (dto.gallery !== undefined) {
+      await this.deleteRemovedGalleryImages(guide.gallery, dto.gallery);
+      guide.gallery = dto.gallery;
+    }
+    if (dto.responseRate !== undefined) guide.responseRate = dto.responseRate;
+    if (dto.completedTripsCount !== undefined)
+      guide.completedTripsCount = dto.completedTripsCount;
+    if (dto.returningCustomerRate !== undefined)
+      guide.returningCustomerRate = dto.returningCustomerRate;
     if (dto.isAvailable !== undefined) guide.isAvailable = dto.isAvailable;
     if (dto.dailyRate !== undefined) guide.dailyRate = dto.dailyRate;
     if (dto.currency !== undefined) guide.currency = dto.currency;

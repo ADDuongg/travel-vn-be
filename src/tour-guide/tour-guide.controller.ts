@@ -8,12 +8,11 @@ import {
   Post,
   Query,
   Req,
-  UploadedFile,
   UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { AdminGuard } from 'src/guards/admin.guard';
 import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
@@ -53,33 +52,66 @@ export class TourGuideController {
 
   @Post()
   @UseGuards(JwtAuthGuard, AdminGuard)
-  @UseInterceptors(FileInterceptor('cv'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'cv', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
   create(
     @Body() dto: CreateTourGuideDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @Req() req: { files?: Record<string, Express.Multer.File[]> },
   ) {
-    return this.tourGuideService.create(dto, file);
+    const cv = req.files?.cv?.[0];
+    const gallery = req.files?.gallery ?? [];
+    return this.tourGuideService.create(dto, cv, gallery);
   }
 
   @Post('register')
   @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'cv', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
   register(
-    @Req() req: { user: { userId: string } },
+    @Req()
+    req: {
+      user: { userId: string };
+      files?: Record<string, Express.Multer.File[]>;
+    },
     @Body() dto: CreateTourGuideDto,
-    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.tourGuideService.register(req.user.userId, dto, file);
+    const cv = req.files?.cv?.[0];
+    const gallery = req.files?.gallery ?? [];
+    return this.tourGuideService.register(req.user.userId, dto, cv, gallery);
   }
 
   @Patch('my-profile')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('cv'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'cv', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
   updateMyProfile(
-    @Req() req: { user: { userId: string } },
+    @Req()
+    req: {
+      user: { userId: string };
+      files?: Record<string, Express.Multer.File[]>;
+    },
     @Body() dto: UpdateTourGuideDto,
-    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.tourGuideService.updateMyProfile(req.user.userId, dto, file);
+    const cv = req.files?.cv?.[0];
+    const gallery = req.files?.gallery ?? [];
+    return this.tourGuideService.updateMyProfile(
+      req.user.userId,
+      dto,
+      cv,
+      gallery,
+    );
   }
 
   @Patch(':id/verify')
@@ -96,13 +128,20 @@ export class TourGuideController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
-  @UseInterceptors(FileInterceptor('cv'))
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'cv', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTourGuideDto,
-    @UploadedFile() file?: Express.Multer.File,
+    @Req() req: { files?: Record<string, Express.Multer.File[]> },
   ) {
-    return this.tourGuideService.update(id, dto, file);
+    const cv = req.files?.cv?.[0];
+    const gallery = req.files?.gallery ?? [];
+    return this.tourGuideService.update(id, dto, cv, gallery);
   }
 
   @Delete(':id')

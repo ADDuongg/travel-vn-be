@@ -7,6 +7,7 @@ import {
   RoomInventorySchema,
 } from './schema/room-inventory.schema';
 import { Room, RoomSchema } from 'src/room/schema/room.schema';
+import { RoomInventoryCronService } from './room-inventory-cron.service';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { Room, RoomSchema } from 'src/room/schema/room.schema';
     ]),
   ],
   controllers: [RoomInventoryController],
-  providers: [RoomInventoryService],
+  providers: [RoomInventoryService, RoomInventoryCronService],
   exports: [RoomInventoryService],
 })
 export class RoomInventoryModule {}

@@ -29,7 +29,7 @@ export class HotelService {
       throw new ConflictException('Hotel slug already exists');
     }
 
-    const provinces = await this.provincesService.findAll();
+    const provinces = await this.provincesService.findAllForDropdown();
     const provinceExists = provinces.some(
       (p: { _id: unknown }) => String(p._id) === dto.provinceId,
     );
@@ -110,7 +110,7 @@ export class HotelService {
     }
 
     if (dto.provinceId !== undefined) {
-      const provinces = await this.provincesService.findAll();
+      const provinces = await this.provincesService.findAllForDropdown();
       const provinceExists = provinces.some(
         (p: { _id: unknown }) => String(p._id) === dto.provinceId,
       );

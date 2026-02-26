@@ -15,13 +15,14 @@ export class TourGuide {
   })
   userId: Types.ObjectId;
 
-  // === Multi-language bio ===
-  @Prop({ type: Object })
+  // === Multi-language (bio + chuyên môn) — giống Room ===
+  @Prop({ type: Object, default: {} })
   translations: {
     [langCode: string]: {
-      bio: string;
+      bio?: string;
       shortBio?: string;
       specialties?: string;
+      specialtyItems?: string[]; // mảng chuỗi chuyên môn theo ngôn ngữ (cùng thứ tự giữa các lang)
     };
   };
 
@@ -63,6 +64,16 @@ export class TourGuide {
     default: { average: 0, total: 0 },
   })
   ratingSummary: { average: number; total: number };
+
+  // === Thống kê hoạt động ===
+  @Prop({ default: 0 })
+  responseRate?: number; // 0-100, tỷ lệ phản hồi
+
+  @Prop({ default: 0 })
+  completedTripsCount?: number; // chuyến đi hoàn tất
+
+  @Prop({ default: 0 })
+  returningCustomerRate?: number; // 0-100, tỷ lệ khách quay lại
 
   // === Status ===
   @Prop({ default: true })
