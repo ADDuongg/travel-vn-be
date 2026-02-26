@@ -50,5 +50,10 @@ export class UpdateProvinceDto {
   @IsOptional()
   @TransformValue()
   @IsArray()
-  gallery?: Array<{ url: string; publicId?: string; alt?: string; order?: number }>;
+  gallery?: Array<{
+    url: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  }>;
 }

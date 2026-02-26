@@ -8,12 +8,7 @@ export function TransformValue() {
     }
 
     // ===== boolean =====
-    if (
-      value === 'true' ||
-      value === 'false' ||
-      value === '1' ||
-      value === '0'
-    ) {
+    if (value === 'true' || value === 'false') {
       return toBoolean({ value });
     }
 
