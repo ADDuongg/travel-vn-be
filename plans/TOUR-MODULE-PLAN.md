@@ -324,13 +324,13 @@ categories: Types.ObjectId[] // References to TourCategory
 
 - [x] TourInventoryModule
 - [x] TourBookingModule
-- [ ] Payment integration (VNPay/Momo) _(ghi nhận thanh toán đã có qua POST .../payment)_
+- [x] Payment integration (VNPay/Momo) _(handled via PaymentModule & booking payment endpoint)_
 
 ### Phase 3: Reviews & Categories (Week 5-6)
 
-- [ ] TourReviewModule
+- [x] TourReviewModule
 - [ ] TourCategoryModule
-- [ ] Rating system với auto-update
+- [x] Rating system với auto-update
 
 # Tour Module - Implementation Plan
 
@@ -658,13 +658,13 @@ categories: Types.ObjectId[] // References to TourCategory
 
 - [x] TourInventoryModule
 - [x] TourBookingModule
-- [ ] Payment integration (VNPay/Momo) _(ghi nhận thanh toán đã có qua POST .../payment)_
+- [x] Payment integration (VNPay/Momo) _(handled via PaymentModule & booking payment endpoint)_
 
 ### Phase 3: Reviews & Categories (Week 5-6)
 
-- [ ] TourReviewModule
+- [x] TourReviewModule
 - [ ] TourCategoryModule
-- [ ] Rating system với auto-update
+- [x] Rating system với auto-update
 
 ### Phase 4: Advanced Features (Week 7-8)
 
@@ -790,9 +790,9 @@ MVP (Phase 1) đã hoàn thành với đầy đủ tính năng cơ bản:
 
 ---
 
-**Plan Status:** Phase 1 (MVP) ✅ | Phase 2 (Booking) ✅ | Phase 3-5 Pending  
-**Last Updated:** 2025-02-23  
-**Version:** 1.1.0
+**Plan Status:** Phase 1-2 ✅ | Phase 3 (Reviews & Rating) ✅, Categories Pending | Phase 4-5 Pending  
+**Last Updated:** 2026-02-24  
+**Version:** 1.2.0
 
 ### Phase 4: Advanced Features (Week 7-8)
 
@@ -918,6 +918,6 @@ MVP (Phase 1) đã hoàn thành với đầy đủ tính năng cơ bản:
 
 ---
 
-**Plan Status:** Phase 1 (MVP) ✅ | Phase 2 (Booking) ✅ | Phase 3-5 Pending  
-**Last Updated:** 2025-02-23  
-**Version:** 1.1.0
+**Plan Status:** Phase 1-2 ✅ | Phase 3 (Reviews & Rating) ✅, Categories Pending | Phase 4-5 Pending  
+**Last Updated:** 2026-02-24  
+**Version:** 1.2.0

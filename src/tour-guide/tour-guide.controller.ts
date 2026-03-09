@@ -8,14 +8,12 @@ import {
   Post,
   Query,
   Req,
-  UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { AdminGuard } from 'src/guards/admin.guard';
-import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
+import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { TourGuideService } from './tour-guide.service';
 import { CreateTourGuideDto } from './dto/create-tour-guide.dto';
 import { UpdateTourGuideDto } from './dto/update-tour-guide.dto';
@@ -23,7 +21,6 @@ import { TourGuideQueryDto } from './dto/tour-guide-query.dto';
 import { VerifyTourGuideDto } from './dto/verify-tour-guide.dto';
 
 @Controller('api/v1/tour-guides')
-@UseFilters(new HttpExceptionFilter())
 export class TourGuideController {
   constructor(private readonly tourGuideService: TourGuideService) {}
 
@@ -51,7 +48,8 @@ export class TourGuideController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'cv', maxCount: 1 },
@@ -115,19 +113,22 @@ export class TourGuideController {
   }
 
   @Patch(':id/verify')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   verify(@Param('id') id: string, @Body() dto: VerifyTourGuideDto) {
     return this.tourGuideService.verify(id, dto.isVerified);
   }
 
   @Patch(':id/availability')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   toggleAvailability(@Param('id') id: string) {
     return this.tourGuideService.toggleAvailability(id);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'cv', maxCount: 1 },
@@ -145,7 +146,8 @@ export class TourGuideController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   softDelete(@Param('id') id: string) {
     return this.tourGuideService.softDelete(id);
   }

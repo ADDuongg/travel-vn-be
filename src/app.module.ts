@@ -1,15 +1,21 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { validateEnv } from './config/env.validation';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { ApiPermissionModule } from './api-permission/api-permission.module';
 import { ApiRoleModule } from './api-role/api-role.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { EnvModule } from './env/env.module';
+import { HealthModule } from './health/health.module';
 import { LanguageModule } from './language/language.module';
-import { logger } from './middleware/logger.middleware';
+import { loggerMiddleware } from './middleware/logger.middleware';
 import { PermissionModule } from './permission/permission.module';
 import { ProductController } from './product/product.controller';
 import { ProductModule } from './product/product.module';
@@ -43,6 +49,56 @@ import { TourGuideModule } from './tour-guide/tour-guide.module';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+      validate: validateEnv,
+    }),
+    LoggerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const isProduction = config.get<string>('NODE_ENV') === 'production';
+        const logLevel = config.get<string>('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
+        return {
+          pinoHttp: {
+            level: logLevel,
+            transport: isProduction
+              ? undefined
+              : { target: 'pino-pretty', options: { colorize: true, singleLine: true } },
+            redact: [
+              'req.headers.authorization',
+              'req.headers.cookie',
+              'req.headers["x-api-key"]',
+            ],
+            // Trim log payload: chỉ giữ fields cần thiết, bỏ security headers của helmet
+            serializers: {
+              req(req: any) {
+                return {
+                  id: req.id,
+                  method: req.method,
+                  url: req.url,
+                  query: req.query,
+                  remoteAddress: req.remoteAddress,
+                  userAgent: req.headers?.['user-agent'],
+                };
+              },
+              res(res: any) {
+                return {
+                  statusCode: res.statusCode,
+                };
+              },
+              err: (err: Error & { status?: number; code?: string }) => ({
+                type: err.constructor?.name,
+                message: err.message,
+                stack: err.stack,
+                status: err.status,
+                code: err.code,
+              }),
+            },
+            customProps: (req: any) => ({
+              requestId: req.headers['x-request-id'],
+            }),
+          },
+        };
+      },
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -51,6 +107,11 @@ import { TourGuideModule } from './tour-guide/tour-guide.module';
         uri: configService.get<string>('DB_URI'),
       }),
     }),
+    ThrottlerModule.forRoot([
+      { name: 'default', ttl: 60_000, limit: 60 },
+      { name: 'auth', ttl: 60_000, limit: 10 },
+    ]),
+    HealthModule,
     ProductModule,
     OrdersModule,
     UserModule,
@@ -84,10 +145,14 @@ import { TourGuideModule } from './tour-guide/tour-guide.module';
     TourGuideModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(logger).forRoutes(ProductController);
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
+    consumer.apply(loggerMiddleware).forRoutes(ProductController);
   }
 }

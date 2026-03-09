@@ -7,20 +7,17 @@ import {
   Patch,
   Query,
   Req,
-  UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { AdminGuard } from 'src/guards/admin.guard';
-import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
+import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { ProvincesService } from './provinces.service';
 import { UpdateProvinceDto } from './dto/update-province.dto';
 import { ProvinceQueryDto } from './dto/province-query.dto';
 
 @Controller('/api/v1/provinces')
-@UseFilters(new HttpExceptionFilter())
 export class ProvincesController {
   constructor(private readonly provincesService: ProvincesService) {}
 
@@ -49,7 +46,8 @@ export class ProvincesController {
   /* ================= ADMIN ================= */
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'thumbnail', maxCount: 1 },
@@ -67,19 +65,22 @@ export class ProvincesController {
   }
 
   @Patch(':id/toggle-popular')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   togglePopular(@Param('id') id: string) {
     return this.provincesService.togglePopular(id);
   }
 
   @Patch(':id/restore')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   restore(@Param('id') id: string) {
     return this.provincesService.restore(id);
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
   softDelete(@Param('id') id: string) {
     return this.provincesService.softDelete(id);
   }

@@ -3,11 +3,15 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { REQUEST_ID_HEADER } from 'src/common/middleware/correlation-id.middleware';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: any, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -15,13 +19,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = 500;
     let message = 'Internal server error';
-    console.log('Request info:', {
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
-      body: request.body,
-      query: request.query,
-    });
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -40,12 +37,26 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message;
     }
 
-    console.error('🔥 Exception caught:', {
-      status,
-      message,
-      stack: exception.stack,
-      response: exception.response,
-    });
+    const requestId = request.headers[REQUEST_ID_HEADER] as string | undefined;
+
+    if (status >= 500) {
+      this.logger.error({
+        requestId,
+        method: request.method,
+        url: request.url,
+        status,
+        message,
+        stack: exception?.stack,
+      });
+    } else {
+      this.logger.warn({
+        requestId,
+        method: request.method,
+        url: request.url,
+        status,
+        message,
+      });
+    }
 
     response.status(status).json({
       statusCode: status,

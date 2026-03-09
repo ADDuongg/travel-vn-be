@@ -9,6 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PaymentService } from './payment.service';
 import { Request } from 'express';
 import { CreatePaymentIntentDto } from './dto/create-payment.dto';
@@ -216,6 +217,7 @@ export class PaymentController {
     return this.paymentService.getPaymentById(paymentId);
   }
 
+  @SkipThrottle()
   @ApiOperation({ summary: 'Stripe webhook endpoint' })
   @ApiResponse({
     status: 200,

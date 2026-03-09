@@ -11,6 +11,7 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { ZodValidationPipe } from 'src/pipe/zod-validation.pipe';
 import { LoginDto, LoginDtoSchema } from './dto/login.dto';
@@ -18,9 +19,14 @@ import { RegisterDto } from './dto/register.dto';
 import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Response, Request } from 'express';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private configService: ConfigService,
+  ) {}
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @ApiBearerAuth('bearer')
   @ApiBody({
     schema: {
@@ -46,12 +52,12 @@ export class AuthController {
     if (!user) throw new UnauthorizedException();
     const result = await this.authService.login(user);
 
-    // ✅ SET REFRESH TOKEN VÀO COOKIE
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
-      sameSite: 'lax',
-      // path: '/api/v1/auth',
-      path: '/',
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      path: '/api/v1/auth',
     });
 
     return {
@@ -84,13 +90,13 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
 
-    // (nếu bạn rotate refresh token)
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     if (result.refresh_token) {
       res.cookie('refresh_token', result.refresh_token, {
         httpOnly: true,
-        sameSite: 'lax',
-        // path: '/api/v1/auth',
-        path: '/',
+        secure: isProduction,
+        sameSite: isProduction ? 'strict' : 'lax',
+        path: '/api/v1/auth',
       });
     }
 
@@ -111,12 +117,12 @@ export class AuthController {
 
     await this.authService.logout(refreshToken);
 
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     res.clearCookie('refresh_token', {
       httpOnly: true,
-      // secure: this.env.isProduction(),
-      sameSite: 'lax',
-      // path: '/api/v1/auth/refresh',
-      path: '/',
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      path: '/api/v1/auth',
     });
 
     return { message: 'Logged out successfully' };

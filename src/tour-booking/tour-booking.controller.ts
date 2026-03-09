@@ -17,7 +17,7 @@ import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
 import { CancelTourBookingDto } from './dto/cancel-tour-booking.dto';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { AdminGuard } from 'src/guards/admin.guard';
+import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TourGuide } from 'src/tour-guide/schema/tour-guide.schema';
@@ -76,11 +76,9 @@ export class TourBookingController {
   }
 
   @Patch(':id/assign-guide')
-  @UseGuards(JwtAuthGuard, AdminGuard)
-  assignGuide(
-    @Param('id') id: string,
-    @Body() body: AssignGuideDto,
-  ) {
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
+  assignGuide(@Param('id') id: string, @Body() body: AssignGuideDto) {
     return this.tourBookingService.assignGuide(id, body.guideId);
   }
 

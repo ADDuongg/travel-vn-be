@@ -143,6 +143,12 @@ export class AuthService {
       throw new ConflictException('Username already exists');
     }
 
+    const addressInput = (dto as any).address;
+    const normalizedAddress =
+      addressInput && typeof addressInput === 'string'
+        ? { detail: addressInput }
+        : addressInput;
+
     const created = await this.usersService.create({
       username: dto.username,
       password: dto.password,
@@ -150,6 +156,8 @@ export class AuthService {
       email: dto.email,
       fullName: dto.fullName,
       phone: dto.phone,
+      dateOfBirth: dto.dateOfBirth,
+      address: normalizedAddress,
       permissions: {
         apis: [],
         routers: [],

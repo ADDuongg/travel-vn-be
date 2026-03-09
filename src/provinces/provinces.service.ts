@@ -203,9 +203,7 @@ export class ProvincesService {
   }
 
   private async deleteRemovedGalleryImages(
-    currentGallery:
-      | Array<{ url?: string; publicId?: string }>
-      | undefined,
+    currentGallery: Array<{ url?: string; publicId?: string }> | undefined,
     newGallery: Array<{ url?: string; publicId?: string }> | undefined,
   ) {
     if (!currentGallery?.length || !newGallery) return;

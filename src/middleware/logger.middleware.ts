@@ -1,7 +1,9 @@
+import { Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 
-export function logger(req: Request, res: Response, next: NextFunction) {
-  console.log(`Request...`, req.method, req.url);
-  console.log('middleware running');
+const logger = new Logger('HTTP');
+
+export function loggerMiddleware(req: Request, _res: Response, next: NextFunction) {
+  logger.log(`${req.method} ${req.url}`);
   next();
 }

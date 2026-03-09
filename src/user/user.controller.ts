@@ -6,7 +6,6 @@ import {
   Patch,
   Param,
   Delete,
-  UseFilters,
   ForbiddenException,
   UnauthorizedException,
   UseGuards,
@@ -18,11 +17,9 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { HttpExceptionFilter } from 'src/interceptor/http-fail.interceptor.filter';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('api/v1/users')
-@UseFilters(new HttpExceptionFilter())
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
