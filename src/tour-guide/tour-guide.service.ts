@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UserService } from 'src/user/user.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { CreateTourGuideDto } from './dto/create-tour-guide.dto';
@@ -13,6 +14,9 @@ import { TourGuideQueryDto, TourGuideSortBy } from './dto/tour-guide-query.dto';
 import { TourGuide, TourGuideDocument } from './schema/tour-guide.schema';
 import { ReviewEntityType } from 'src/review/schema/ewview.schema';
 import { ReviewService } from 'src/review/review.service';
+import { NotificationEvent } from 'src/notification/notification.constants';
+import { GuideRegisteredEvent } from 'src/notification/events/guide-registered.event';
+import { GuideVerifiedEvent } from 'src/notification/events/guide-verified.event';
 
 const USER_POPULATE = {
   path: 'userId',
@@ -34,6 +38,7 @@ export class TourGuideService {
     private readonly userService: UserService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly reviewService: ReviewService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /** Public + admin: list guides (mặc định chỉ isActive: true). */
@@ -183,6 +188,18 @@ export class TourGuideService {
       await this.applyCvFile(created, cvFile);
       await created.save();
     }
+
+    const user = await this.userService.findBasicInfo(userId);
+    this.eventEmitter.emit(
+      NotificationEvent.GUIDE_REGISTERED,
+      new GuideRegisteredEvent(
+        String(created._id),
+        userId,
+        user?.fullName || user?.username || 'Người dùng',
+        user?.email,
+      ),
+    );
+
     return created.toObject();
   }
 
@@ -234,7 +251,21 @@ export class TourGuideService {
     if (!guide) throw new NotFoundException('Tour guide not found');
     guide.isVerified = isVerified;
     guide.verifiedAt = isVerified ? new Date() : undefined;
-    return guide.save().then((g) => g.toObject());
+    const saved = await guide.save();
+
+    const user = await this.userService.findBasicInfo(String(guide.userId));
+    this.eventEmitter.emit(
+      NotificationEvent.GUIDE_VERIFIED,
+      new GuideVerifiedEvent(
+        id,
+        String(guide.userId),
+        user?.fullName || user?.username || 'Người dùng',
+        user?.email,
+        isVerified,
+      ),
+    );
+
+    return saved.toObject();
   }
 
   /** Admin toggle availability cho bất kỳ guide nào. */

@@ -47,24 +47,7 @@ export class TourGuideController {
     return this.tourGuideService.findOne(id);
   }
 
-  @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(['admin'])
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'cv', maxCount: 1 },
-      { name: 'gallery', maxCount: 10 },
-    ]),
-  )
-  create(
-    @Body() dto: CreateTourGuideDto,
-    @Req() req: { files?: Record<string, Express.Multer.File[]> },
-  ) {
-    const cv = req.files?.cv?.[0];
-    const gallery = req.files?.gallery ?? [];
-    return this.tourGuideService.create(dto, cv, gallery);
-  }
-
+  /** User tự đăng ký làm tour guide - chỉ cần JWT (đặt trước @Post() để route /register match đúng) */
   @Post('register')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
@@ -84,6 +67,25 @@ export class TourGuideController {
     const cv = req.files?.cv?.[0];
     const gallery = req.files?.gallery ?? [];
     return this.tourGuideService.register(req.user.userId, dto, cv, gallery);
+  }
+
+  /** Admin tạo tour guide */
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(['admin'])
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'cv', maxCount: 1 },
+      { name: 'gallery', maxCount: 10 },
+    ]),
+  )
+  create(
+    @Body() dto: CreateTourGuideDto,
+    @Req() req: { files?: Record<string, Express.Multer.File[]> },
+  ) {
+    const cv = req.files?.cv?.[0];
+    const gallery = req.files?.gallery ?? [];
+    return this.tourGuideService.create(dto, cv, gallery);
   }
 
   @Patch('my-profile')

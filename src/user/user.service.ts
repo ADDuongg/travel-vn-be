@@ -171,6 +171,15 @@ export class UserService {
       .exec();
   }
 
+  /** Lấy thông tin cơ bản của user (cho notification). */
+  async findBasicInfo(userId: string) {
+    return this.userModel
+      .findById(userId)
+      .select('_id username fullName email')
+      .lean()
+      .exec();
+  }
+
   /** Tìm _id của users có fullName khớp search (cho TourGuide search). */
   async findIdsByFullNameSearch(search: string): Promise<Types.ObjectId[]> {
     if (!search?.trim()) return [];

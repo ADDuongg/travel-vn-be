@@ -5,6 +5,8 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { validateEnv } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { BullModule } from '@nestjs/bullmq';
 import { ApiPermissionModule } from './api-permission/api-permission.module';
 import { ApiRoleModule } from './api-role/api-role.module';
 import { AppController } from './app.controller';
@@ -42,27 +44,44 @@ import { TourModule } from './tour/tour.module';
 import { TourInventoryModule } from './tour-inventory/tour-inventory.module';
 import { TourBookingModule } from './tour-booking/tour-booking.module';
 import { TourGuideModule } from './tour-guide/tour-guide.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
       validate: validateEnv,
+    }),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        connection: {
+          host: config.get<string>('REDIS_HOST', 'localhost'),
+          port: config.get<number>('REDIS_PORT', 6379),
+          password: config.get<string>('REDIS_PASSWORD') || undefined,
+        },
+      }),
     }),
     LoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const isProduction = config.get<string>('NODE_ENV') === 'production';
-        const logLevel = config.get<string>('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
+        const logLevel =
+          config.get<string>('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
         return {
           pinoHttp: {
             level: logLevel,
             transport: isProduction
               ? undefined
-              : { target: 'pino-pretty', options: { colorize: true, singleLine: true } },
+              : {
+                  target: 'pino-pretty',
+                  options: { colorize: true, singleLine: true },
+                },
             redact: [
               'req.headers.authorization',
               'req.headers.cookie',
@@ -143,12 +162,10 @@ import { TourGuideModule } from './tour-guide/tour-guide.module';
     TourInventoryModule,
     TourBookingModule,
     TourGuideModule,
+    NotificationModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
-  ],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

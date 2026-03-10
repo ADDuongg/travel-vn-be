@@ -28,6 +28,16 @@ export const envSchema = z.object({
 
   // Logging — override log level at runtime without redeploy (e.g. LOG_LEVEL=debug on prod)
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).optional(),
+
+  // Redis (for BullMQ)
+  REDIS_HOST: z.string().default('localhost'),
+  REDIS_PORT: z.coerce.number().default(6379),
+  REDIS_PASSWORD: z.string().optional(),
+
+  // Resend (email)
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),
+  ADMIN_EMAIL: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

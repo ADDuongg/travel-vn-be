@@ -96,6 +96,15 @@ export class CreateUserDto {
   gender?: 'male' | 'female' | 'other';
 
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) => {
+    if (value === undefined || value === null || value === '') {
+      return undefined;
+    }
+    if (typeof value === 'string') {
+      return { detail: value };
+    }
+    return value;
+  })
   @TransformValue()
   @ValidateNested()
   @Type(() => AddressDto)
