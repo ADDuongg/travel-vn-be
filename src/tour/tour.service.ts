@@ -5,13 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { FilterQuery, Model, SortOrder, Types } from 'mongoose';
 import { CreateTourDto } from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto, TourSortBy } from './dto/tour-query.dto';
 import { Tour, TourDocument } from './schema/tour.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { NotificationEvent } from 'src/notification/notification.constants';
+import { TourNotificationEvent } from 'src/notification/events/tour-notification.event';
 
 /* interface PaginatedResult<T> {
   items: T[];
@@ -30,6 +33,7 @@ export class TourService {
     private readonly tourModel: Model<TourDocument>,
     private readonly provincesService: ProvincesService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -70,7 +74,7 @@ export class TourService {
     const { thumbnail, gallery } = await this.uploadGallery(files);
 
     // Create tour
-    return this.tourModel.create({
+    const created = await this.tourModel.create({
       slug: dto.slug,
       code: dto.code,
       isActive: dto.isActive ?? true,
@@ -103,6 +107,17 @@ export class TourService {
       thumbnail: thumbnail ?? undefined,
       gallery,
     });
+
+    const viName = dto.translations?.vi?.name;
+    const enName = dto.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      String(NotificationEvent.TOUR_CREATED),
+      new TourNotificationEvent(String(created._id), created.code, tourName),
+    );
+
+    return created;
   }
 
   /**
@@ -126,7 +141,7 @@ export class TourService {
     } = query;
 
     // Build filter
-    const filter: any = { isActive: true };
+    const filter: FilterQuery<TourDocument> = { isActive: true };
 
     if (destinationId && Types.ObjectId.isValid(destinationId)) {
       filter['destinations.provinceId'] = new Types.ObjectId(destinationId);
@@ -169,7 +184,7 @@ export class TourService {
     }
 
     // Build sort
-    let sort: any = {};
+    let sort: Record<string, SortOrder> = {};
     switch (sortBy) {
       case TourSortBy.PRICE_ASC:
         sort = { 'pricing.basePrice': 1 };
@@ -298,25 +313,41 @@ export class TourService {
     }
 
     // Update fields
+    const prevIsActive = tour.isActive;
+
     if (dto.isActive !== undefined) tour.isActive = dto.isActive;
     if (dto.tourType !== undefined) tour.tourType = dto.tourType;
-    if (dto.duration !== undefined) tour.duration = dto.duration;
-    if (dto.translations !== undefined) tour.translations = dto.translations;
-    if (dto.itinerary !== undefined) tour.itinerary = dto.itinerary as any;
-    if (dto.capacity !== undefined) tour.capacity = dto.capacity as any;
-    if (dto.pricing !== undefined) tour.pricing = dto.pricing as any;
-    if (dto.contact !== undefined) tour.contact = dto.contact as any;
-    if (dto.transportTypes !== undefined)
+    if (dto.duration !== undefined) {
+      tour.duration = dto.duration as any;
+    }
+    if (dto.translations !== undefined) {
+      tour.translations = dto.translations as any;
+    }
+    if (dto.itinerary !== undefined) {
+      tour.itinerary = dto.itinerary as any;
+    }
+    if (dto.capacity !== undefined) {
+      tour.capacity = dto.capacity as any;
+    }
+    if (dto.pricing !== undefined) {
+      tour.pricing = dto.pricing as any;
+    }
+    if (dto.contact !== undefined) {
+      tour.contact = dto.contact as any;
+    }
+    if (dto.transportTypes !== undefined) {
       tour.transportTypes = dto.transportTypes;
-    if (dto.bookingConfig !== undefined)
+    }
+    if (dto.bookingConfig !== undefined) {
       tour.bookingConfig = dto.bookingConfig as any;
+    }
     if (dto.difficulty !== undefined) tour.difficulty = dto.difficulty;
 
     if (dto.destinations !== undefined) {
       tour.destinations = dto.destinations.map((d) => ({
         provinceId: new Types.ObjectId(d.provinceId),
         isMainDestination: d.isMainDestination ?? false,
-      })) as any;
+      }));
     }
 
     if (dto.departureProvinceId !== undefined) {
@@ -324,10 +355,39 @@ export class TourService {
     }
 
     if (dto.amenities !== undefined) {
-      tour.amenities = dto.amenities.map((id) => new Types.ObjectId(id));
+      tour.amenities = dto.amenities.map(
+        (id: string) => new Types.ObjectId(id),
+      );
     }
 
-    return tour.save();
+    const saved = await tour.save();
+
+    const viName = saved.translations?.vi?.name;
+    const enName = saved.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      String(NotificationEvent.TOUR_UPDATED),
+      new TourNotificationEvent(String(saved._id), saved.code, tourName),
+    );
+
+    if (dto.isActive !== undefined && dto.isActive !== prevIsActive) {
+      this.eventEmitter.emit(
+        String(
+          dto.isActive
+            ? NotificationEvent.TOUR_CREATED
+            : NotificationEvent.TOUR_DELETED,
+        ),
+        new TourNotificationEvent(
+          String(saved._id),
+          saved.code,
+          tourName,
+          dto.isActive,
+        ),
+      );
+    }
+
+    return saved;
   }
 
   /**
@@ -341,13 +401,22 @@ export class TourService {
 
     tour.isActive = false;
     await tour.save();
+
+    const viName = tour.translations?.vi?.name;
+    const enName = tour.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      String(NotificationEvent.TOUR_DELETED),
+      new TourNotificationEvent(String(tour._id), tour.code, tourName, false),
+    );
   }
 
   /**
    * Find all active tours for options/dropdown
    */
   async findAllActive(destinationId?: string): Promise<any[]> {
-    const filter: any = { isActive: true };
+    const filter: FilterQuery<TourDocument> = { isActive: true };
 
     if (destinationId && Types.ObjectId.isValid(destinationId)) {
       filter['destinations.provinceId'] = new Types.ObjectId(destinationId);
@@ -376,8 +445,12 @@ export class TourService {
   private async uploadGallery(files?: Express.Multer.File[]) {
     let thumbnail: { url: string; publicId?: string; alt?: string } | null =
       null;
-    const gallery: Array<{ url: string; publicId?: string; alt?: string; order?: number }> =
-      [];
+    const gallery: Array<{
+      url: string;
+      publicId?: string;
+      alt?: string;
+      order?: number;
+    }> = [];
 
     if (files?.length) {
       for (let i = 0; i < files.length; i++) {

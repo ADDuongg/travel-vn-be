@@ -119,6 +119,7 @@ Ví dụ trong `TourGuideService`:
 - File: `src/tour-guide/tour-guide.service.ts`
 
 - Khi **user đăng ký tour guide** (`register()`):
+
   - Tạo document `TourGuide` mới.
   - Gán role `guide` cho user.
   - Emit event:
@@ -278,4 +279,3 @@ Chi tiết ở `docs/FE-API-NOTIFICATION.md`, ở đây chỉ nhắc lại:
     - `recipientId` trong DB có trùng `sub` của JWT không.
     - Có filter `type` hoặc `isRead` trên FE không.
     - Database name trong `.env` có trùng DB đang xem trong Compass không.
-

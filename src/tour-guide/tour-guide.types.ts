@@ -20,7 +20,12 @@ export interface TourGuideListItem {
   userId: TourGuidePublicUser;
   translations?: Record<string, TourGuideTranslation>;
   languages: string[];
-  specializedProvinces: Array<{ _id: string; name?: { vi?: string; en?: string }; code?: string; slug?: string }>;
+  specializedProvinces: Array<{
+    _id: string;
+    name?: { vi?: string; en?: string };
+    code?: string;
+    slug?: string;
+  }>;
   certifications: string[];
   licenseNumber?: string;
   yearsOfExperience?: number;

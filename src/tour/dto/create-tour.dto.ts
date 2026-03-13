@@ -46,10 +46,11 @@ export class TourItineraryDayDto {
 }
 
 export class TourDestinationDto {
-  @IsMongoId()
+  @IsString()
   provinceId: string;
 
-  @TransformValue()
+  // @TransformValue()
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsOptional()
   @IsBoolean()
   isMainDestination?: boolean;
@@ -237,9 +238,7 @@ export class CreateTourDto {
   @Type(() => TourDurationDto)
   duration: TourDurationDto;
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
+  @Transform(({ value }) => JSON.parse(value))
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TourDestinationDto)

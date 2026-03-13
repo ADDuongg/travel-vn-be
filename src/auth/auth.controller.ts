@@ -52,7 +52,8 @@ export class AuthController {
     if (!user) throw new UnauthorizedException();
     const result = await this.authService.login(user);
 
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       secure: isProduction,
@@ -90,7 +91,8 @@ export class AuthController {
 
     const result = await this.authService.refresh(refreshToken);
 
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     if (result.refresh_token) {
       res.cookie('refresh_token', result.refresh_token, {
         httpOnly: true,
@@ -117,7 +119,8 @@ export class AuthController {
 
     await this.authService.logout(refreshToken);
 
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     res.clearCookie('refresh_token', {
       httpOnly: true,
       secure: isProduction,

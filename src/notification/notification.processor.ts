@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -7,8 +10,10 @@ import { User, UserDocument } from 'src/user/schema/user.schema';
 import { NotificationService } from './notification.service';
 import { EmailService } from './email/email.service';
 import { NOTIFICATION_QUEUE, NotificationType } from './notification.constants';
-import { guideRegisteredTemplate } from './email/templates/guide-registered';
-import { guideVerifiedTemplate } from './email/templates/guide-verified';
+import {
+  guideRegisteredTemplate,
+  guideVerifiedTemplate,
+} from './email/templates/tour-guide-notification.templates';
 import { EnvService } from 'src/env/env.service';
 
 interface GuideRegisteredJobData {
@@ -40,7 +45,7 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<GuideRegisteredJobData | GuideVerifiedJobData>) {
+  async process(job: Job<GuideRegisteredJobData | GuideVerifiedJobData | any>) {
     this.logger.log(`Processing job ${job.name} [${job.id}]`);
 
     switch (job.name) {
@@ -50,6 +55,69 @@ export class NotificationProcessor extends WorkerHost {
       case 'guide-verified':
         await this.handleGuideVerified(job.data as GuideVerifiedJobData);
         break;
+      case 'tour-created':
+        await this.handleTourCreatedOrUpdated(
+          job.data as any,
+          NotificationType.TOUR_CREATED,
+        );
+        break;
+      case 'tour-updated':
+        await this.handleTourCreatedOrUpdated(
+          job.data as any,
+          NotificationType.TOUR_UPDATED,
+        );
+        break;
+      case 'tour-deleted':
+        await this.handleTourDeleted(job.data as any);
+        break;
+      case 'tour-inventory-low':
+        await this.handleTourInventoryEvent(
+          job.data as any,
+          NotificationType.TOUR_INVENTORY_LOW,
+        );
+        break;
+      case 'tour-inventory-sold-out':
+        await this.handleTourInventoryEvent(
+          job.data as any,
+          NotificationType.TOUR_INVENTORY_SOLD_OUT,
+        );
+        break;
+      case 'tour-inventory-restocked':
+        await this.handleTourInventoryEvent(
+          job.data as any,
+          NotificationType.TOUR_INVENTORY_RESTOCKED,
+        );
+        break;
+      case 'tour-booking-created':
+        await this.handleTourBookingEvent(
+          job.data as any,
+          NotificationType.TOUR_BOOKING_CREATED,
+        );
+        break;
+      case 'tour-booking-confirmed':
+        await this.handleTourBookingEvent(
+          job.data as any,
+          NotificationType.TOUR_BOOKING_CONFIRMED,
+        );
+        break;
+      case 'tour-booking-cancelled':
+        await this.handleTourBookingEvent(
+          job.data as any,
+          NotificationType.TOUR_BOOKING_CANCELLED,
+        );
+        break;
+      case 'tour-booking-payment-failed':
+        await this.handleTourBookingEvent(
+          job.data as any,
+          NotificationType.TOUR_BOOKING_PAYMENT_FAILED,
+        );
+        break;
+      case 'tour-booking-overbooking':
+        await this.handleTourBookingEvent(
+          job.data as any,
+          NotificationType.TOUR_BOOKING_OVERBOOKING,
+        );
+        break;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
     }
@@ -57,7 +125,7 @@ export class NotificationProcessor extends WorkerHost {
 
   private async handleGuideRegistered(data: GuideRegisteredJobData) {
     const adminUsers = await this.userModel
-      .find({ roles: 'admin', isActive: true })
+      .find({ roles: 'ADMIN', isActive: true })
       .select('_id email fullName')
       .lean();
 
@@ -66,8 +134,8 @@ export class NotificationProcessor extends WorkerHost {
       const notifications = adminUsers.map((admin) => ({
         recipientId: String(admin._id),
         type: NotificationType.GUIDE_REGISTRATION_PENDING,
-        title: 'Đơn đăng ký HDV mới',
-        message: `${data.userName || 'Người dùng'} vừa đăng ký làm hướng dẫn viên, cần duyệt.`,
+        title: 'notification.guide_registration_pending.title',
+        message: 'notification.guide_registration_pending.message',
         metadata: { guideId: data.guideId, userId: data.userId },
         link: `/admin/tour-guides/${data.guideId}`,
       }));
@@ -112,12 +180,12 @@ export class NotificationProcessor extends WorkerHost {
       : NotificationType.GUIDE_REJECTED;
 
     const title = data.isVerified
-      ? 'Hồ sơ HDV đã được duyệt!'
-      : 'Hồ sơ HDV chưa được duyệt';
+      ? 'notification.guide_verified.title'
+      : 'notification.guide_rejected.title';
 
     const message = data.isVerified
-      ? 'Chúc mừng! Hồ sơ hướng dẫn viên của bạn đã được admin phê duyệt. Bạn đã có thể nhận tour.'
-      : 'Hồ sơ hướng dẫn viên của bạn chưa được duyệt. Vui lòng liên hệ admin để biết thêm chi tiết.';
+      ? 'notification.guide_verified.message'
+      : 'notification.guide_rejected.message';
 
     // In-app notification for the user
     try {
@@ -153,6 +221,167 @@ export class NotificationProcessor extends WorkerHost {
         this.logger.error(`Failed to send email to user: ${error.message}`);
       }
     }
+  }
+
+  private async handleTourCreatedOrUpdated(
+    data: { tourId: string; tourCode?: string; tourName?: string },
+    type: NotificationType.TOUR_CREATED | NotificationType.TOUR_UPDATED,
+  ) {
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    if (adminUsers.length === 0) return;
+
+    const notifications = adminUsers.map((admin) => ({
+      recipientId: String(admin._id),
+      type,
+      title:
+        type === NotificationType.TOUR_CREATED
+          ? 'notification.tour_created.title'
+          : 'notification.tour_updated.title',
+      message:
+        type === NotificationType.TOUR_CREATED
+          ? 'notification.tour_created.message'
+          : 'notification.tour_updated.message',
+      metadata: {
+        tourId: data.tourId,
+        tourCode: data.tourCode,
+        tourName: data.tourName,
+      },
+      link: `/dashboard/tour/${data.tourId}/edit`,
+    }));
+
+    await this.notificationService.createMany(notifications);
+  }
+
+  private async handleTourDeleted(data: {
+    tourId: string;
+    tourCode?: string;
+    tourName?: string;
+  }) {
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    if (adminUsers.length === 0) return;
+
+    const notifications = adminUsers.map((admin) => ({
+      recipientId: String(admin._id),
+      type: NotificationType.TOUR_DELETED,
+      title: 'notification.tour_deleted.title',
+      message: 'notification.tour_deleted.message',
+      metadata: {
+        tourId: data.tourId,
+        tourCode: data.tourCode,
+        tourName: data.tourName,
+      },
+      link: `/dashboard/tour`,
+    }));
+
+    await this.notificationService.createMany(notifications);
+  }
+
+  private async handleTourInventoryEvent(
+    data: {
+      tourId: string;
+      departureDate: string;
+      totalSlots: number;
+      availableSlots: number;
+    },
+    type:
+      | NotificationType.TOUR_INVENTORY_LOW
+      | NotificationType.TOUR_INVENTORY_SOLD_OUT
+      | NotificationType.TOUR_INVENTORY_RESTOCKED,
+  ) {
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    if (adminUsers.length === 0) return;
+
+    const baseKey =
+      type === NotificationType.TOUR_INVENTORY_LOW
+        ? 'notification.tour_inventory_low'
+        : type === NotificationType.TOUR_INVENTORY_SOLD_OUT
+          ? 'notification.tour_inventory_sold_out'
+          : 'notification.tour_inventory_restocked';
+
+    const notifications = adminUsers.map((admin) => ({
+      recipientId: String(admin._id),
+      type,
+      title: `${baseKey}.title`,
+      message: `${baseKey}.message`,
+      metadata: {
+        tourId: data.tourId,
+        departureDate: data.departureDate,
+        totalSlots: data.totalSlots,
+        availableSlots: data.availableSlots,
+      },
+      link: `/dashboard/tour/inventory`,
+    }));
+
+    await this.notificationService.createMany(notifications);
+  }
+
+  private async handleTourBookingEvent(
+    data: {
+      bookingId: string;
+      bookingCode: string;
+      tourId: string;
+      tourName?: string;
+    },
+    type:
+      | NotificationType.TOUR_BOOKING_CREATED
+      | NotificationType.TOUR_BOOKING_CONFIRMED
+      | NotificationType.TOUR_BOOKING_CANCELLED
+      | NotificationType.TOUR_BOOKING_PAYMENT_FAILED
+      | NotificationType.TOUR_BOOKING_OVERBOOKING,
+  ) {
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    if (adminUsers.length === 0) return;
+
+    let baseKey = '';
+    switch (type) {
+      case NotificationType.TOUR_BOOKING_CREATED:
+        baseKey = 'notification.tour_booking_created';
+        break;
+      case NotificationType.TOUR_BOOKING_CONFIRMED:
+        baseKey = 'notification.tour_booking_confirmed';
+        break;
+      case NotificationType.TOUR_BOOKING_CANCELLED:
+        baseKey = 'notification.tour_booking_cancelled';
+        break;
+      case NotificationType.TOUR_BOOKING_PAYMENT_FAILED:
+        baseKey = 'notification.tour_booking_payment_failed';
+        break;
+      case NotificationType.TOUR_BOOKING_OVERBOOKING:
+        baseKey = 'notification.tour_booking_overbooking';
+        break;
+    }
+
+    const notifications = adminUsers.map((admin) => ({
+      recipientId: String(admin._id),
+      type,
+      title: `${baseKey}.title`,
+      message: `${baseKey}.message`,
+      metadata: {
+        bookingId: data.bookingId,
+        bookingCode: data.bookingCode,
+        tourId: data.tourId,
+        tourName: data.tourName,
+      },
+      link: `/dashboard/tour-bookings/${data.bookingId}`,
+    }));
+
+    await this.notificationService.createMany(notifications);
   }
 
   @OnWorkerEvent('failed')

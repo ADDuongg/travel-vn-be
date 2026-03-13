@@ -16,6 +16,7 @@ import { TourInventoryService } from 'src/tour-inventory/tour-inventory.service'
 import { CreateTourDto } from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto } from './dto/tour-query.dto';
+import { ParseFormDataJsonPipe } from 'src/common/pipes/parse-form-data-json.pipe';
 
 @Controller('api/v1/tours')
 export class TourController {
@@ -27,7 +28,7 @@ export class TourController {
   @Post()
   @UseInterceptors(FilesInterceptor('gallery', 10))
   create(
-    @Body() dto: CreateTourDto,
+    @Body(new ParseFormDataJsonPipe()) dto: CreateTourDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     return this.tourService.create(dto, files);
@@ -68,7 +69,7 @@ export class TourController {
   @UseInterceptors(FilesInterceptor('gallery', 10))
   update(
     @Param('id') id: string,
-    @Body() dto: UpdateTourDto,
+    @Body(new ParseFormDataJsonPipe()) dto: UpdateTourDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     return this.tourService.update(id, dto, files);

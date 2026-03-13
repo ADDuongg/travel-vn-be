@@ -14,6 +14,11 @@ import {
 } from './schema/tour-inventory.schema';
 import { BlockSlotsDto } from './dto/block-slots.dto';
 import { ReleaseSlotsDto } from './dto/release-slots.dto';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  NotificationEvent,
+} from 'src/notification/notification.constants';
+import { TourInventoryNotificationEvent } from 'src/notification/events/tour-inventory-notification.event';
 
 @Injectable()
 export class TourInventoryService {
@@ -22,6 +27,7 @@ export class TourInventoryService {
     private readonly inventoryModel: Model<TourInventoryDocument>,
     @InjectModel(Tour.name)
     private readonly tourModel: Model<TourDocument>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private updateInventoryStatus(inv: TourInventoryDocument): void {
@@ -114,8 +120,25 @@ export class TourInventoryService {
       );
     }
 
+    const prevStatus = inv.status;
     inv.availableSlots -= dto.slots;
     this.updateInventoryStatus(inv);
+
+    if (prevStatus !== inv.status) {
+      const event = new TourInventoryNotificationEvent(
+        String(inv.tourId),
+        (departureDate as Date).toISOString().slice(0, 10),
+        inv.totalSlots,
+        inv.availableSlots,
+      );
+
+      if (inv.status === TourInventoryStatus.FULL) {
+        this.eventEmitter.emit(NotificationEvent.TOUR_INVENTORY_SOLD_OUT, event);
+      } else if (inv.status === TourInventoryStatus.LIMITED) {
+        this.eventEmitter.emit(NotificationEvent.TOUR_INVENTORY_LOW, event);
+      }
+    }
+
     return inv.save();
   }
 
@@ -137,11 +160,37 @@ export class TourInventoryService {
       );
     }
 
+    const prevStatus = inv.status;
     inv.availableSlots = Math.min(
       inv.totalSlots,
       inv.availableSlots + dto.slots,
     );
     this.updateInventoryStatus(inv);
+
+    if (prevStatus !== inv.status) {
+      const event = new TourInventoryNotificationEvent(
+        String(inv.tourId),
+        (departureDate as Date).toISOString().slice(0, 10),
+        inv.totalSlots,
+        inv.availableSlots,
+      );
+
+      if (prevStatus === TourInventoryStatus.FULL) {
+        this.eventEmitter.emit(
+          NotificationEvent.TOUR_INVENTORY_RESTOCKED,
+          event,
+        );
+      } else if (
+        prevStatus === TourInventoryStatus.LIMITED &&
+        inv.status === TourInventoryStatus.AVAILABLE
+      ) {
+        this.eventEmitter.emit(
+          NotificationEvent.TOUR_INVENTORY_RESTOCKED,
+          event,
+        );
+      }
+    }
+
     return inv.save();
   }
 

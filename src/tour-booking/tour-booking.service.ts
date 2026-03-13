@@ -27,6 +27,11 @@ import {
 import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  NotificationEvent,
+} from 'src/notification/notification.constants';
+import { TourBookingNotificationEvent } from 'src/notification/events/tour-booking-notification.event';
 
 @Injectable()
 export class TourBookingService {
@@ -41,6 +46,7 @@ export class TourBookingService {
     private readonly tourGuideModel: Model<TourGuideDocument>,
     private readonly tourInventoryService: TourInventoryService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async generateBookingCode(): Promise<string> {
@@ -183,6 +189,20 @@ export class TourBookingService {
 
     const booking = await this.bookingModel.create(bookingPayload);
 
+    const viName = (tour.translations as any)?.vi?.name;
+    const enName = (tour.translations as any)?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      NotificationEvent.TOUR_BOOKING_CREATED,
+      new TourBookingNotificationEvent(
+        String(booking._id),
+        booking.bookingCode,
+        String(tour._id),
+        tourName,
+      ),
+    );
+
     return booking.populate([
       { path: 'tourId', select: 'code slug translations duration pricing' },
     ]);
@@ -280,7 +300,24 @@ export class TourBookingService {
       throw new BadRequestException('Only PENDING bookings can be confirmed');
     }
     booking.status = TourBookingStatus.CONFIRMED;
-    return booking.save();
+    const saved = await booking.save();
+
+    const populated = await saved.populate('tourId', 'translations');
+    const viName = (populated.tourId as any)?.translations?.vi?.name;
+    const enName = (populated.tourId as any)?.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      NotificationEvent.TOUR_BOOKING_CONFIRMED,
+      new TourBookingNotificationEvent(
+        String(saved._id),
+        saved.bookingCode,
+        String(saved.tourId),
+        tourName,
+      ),
+    );
+
+    return saved;
   }
 
   /**
@@ -325,7 +362,24 @@ export class TourBookingService {
     booking.status = TourBookingStatus.CANCELLED;
     booking.cancelledAt = new Date();
     booking.cancelReason = reason;
-    return booking.save();
+    const saved = await booking.save();
+
+    const populated = await saved.populate('tourId', 'translations');
+    const viName = (populated.tourId as any)?.translations?.vi?.name;
+    const enName = (populated.tourId as any)?.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      NotificationEvent.TOUR_BOOKING_CANCELLED,
+      new TourBookingNotificationEvent(
+        String(saved._id),
+        saved.bookingCode,
+        String(saved.tourId),
+        tourName,
+      ),
+    );
+
+    return saved;
   }
 
   async recordPayment(
@@ -353,7 +407,29 @@ export class TourBookingService {
       booking.status = TourBookingStatus.CONFIRMED;
       booking.paymentStatus = TourPaymentStatus.PAID;
     }
-    return booking.save();
+    const saved = await booking.save();
+
+    if (
+      saved.status === TourBookingStatus.CONFIRMED ||
+      saved.status === TourBookingStatus.PAID
+    ) {
+      const populated = await saved.populate('tourId', 'translations');
+      const viName = (populated.tourId as any)?.translations?.vi?.name;
+      const enName = (populated.tourId as any)?.translations?.en?.name;
+      const tourName = viName || enName;
+
+      this.eventEmitter.emit(
+        NotificationEvent.TOUR_BOOKING_CONFIRMED,
+        new TourBookingNotificationEvent(
+          String(saved._id),
+          saved.bookingCode,
+          String(saved.tourId),
+          tourName,
+        ),
+      );
+    }
+
+    return saved;
   }
 
   /**
@@ -386,7 +462,29 @@ export class TourBookingService {
     } else {
       booking.status = TourBookingStatus.CONFIRMED;
     }
-    return booking.save();
+    const saved = await booking.save();
+
+    if (
+      saved.status === TourBookingStatus.CONFIRMED ||
+      saved.status === TourBookingStatus.PAID
+    ) {
+      const populated = await saved.populate('tourId', 'translations');
+      const viName = (populated.tourId as any)?.translations?.vi?.name;
+      const enName = (populated.tourId as any)?.translations?.en?.name;
+      const tourName = viName || enName;
+
+      this.eventEmitter.emit(
+        NotificationEvent.TOUR_BOOKING_CONFIRMED,
+        new TourBookingNotificationEvent(
+          String(saved._id),
+          saved.bookingCode,
+          String(saved.tourId),
+          tourName,
+        ),
+      );
+    }
+
+    return saved;
   }
 
   /**
@@ -414,7 +512,24 @@ export class TourBookingService {
     booking.paymentStatus = TourPaymentStatus.FAILED;
     booking.cancelledAt = new Date();
     booking.cancelReason = 'Payment failed';
-    return booking.save();
+    const saved = await booking.save();
+
+    const populated = await saved.populate('tourId', 'translations');
+    const viName = (populated.tourId as any)?.translations?.vi?.name;
+    const enName = (populated.tourId as any)?.translations?.en?.name;
+    const tourName = viName || enName;
+
+    this.eventEmitter.emit(
+      NotificationEvent.TOUR_BOOKING_PAYMENT_FAILED,
+      new TourBookingNotificationEvent(
+        String(saved._id),
+        saved.bookingCode,
+        String(saved.tourId),
+        tourName,
+      ),
+    );
+
+    return saved;
   }
 
   async listForAdmin(

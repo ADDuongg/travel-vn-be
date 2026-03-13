@@ -40,8 +40,8 @@ GET /api/v1/notifications
         "_id": "674abc123...",
         "recipientId": "674...",
         "type": "GUIDE_REGISTRATION_PENDING",
-        "title": "Đơn đăng ký HDV mới",
-        "message": "Nguyễn Văn A vừa đăng ký làm hướng dẫn viên, cần duyệt.",
+        "title": "notification.guide_registration_pending.title",   // i18n key
+        "message": "notification.guide_registration_pending.message", // i18n key
         "metadata": { "guideId": "674...", "userId": "674..." },
         "isRead": false,
         "readAt": null,
@@ -97,8 +97,8 @@ PATCH /api/v1/notifications/:id/read
     "_id": "674abc123...",
     "recipientId": "674...",
     "type": "GUIDE_REGISTRATION_PENDING",
-    "title": "Đơn đăng ký HDV mới",
-    "message": "...",
+    "title": "notification.guide_registration_pending.title",   // i18n key
+    "message": "notification.guide_registration_pending.message", // i18n key
     "metadata": { "guideId": "674...", "userId": "674..." },
     "isRead": true,
     "readAt": "2026-03-10T09:00:00.000Z",
@@ -190,7 +190,7 @@ PATCH /api/v1/notifications/read-all
 
 3. **Danh sách thông báo**
    - `GET /notifications?page=1&limit=20`
-   - Hiển thị `title`, `message`, `createdAt`
+   - Hiển thị `title`, `message`, `createdAt` (lưu ý: `title`/`message` là **i18n key**, FE dùng i18n để dịch sang text hiển thị)
    - Dùng `link` (vd: `/guide/my-profile`) để điều hướng khi click
 
 4. **Đánh dấu đã đọc**
@@ -222,3 +222,4 @@ Admin duyệt HDV (PATCH /tour-guides/:id/verify)
 - **TTL**: Thông báo tự động xóa sau 90 ngày (MongoDB TTL index)
 - **401**: Nếu chưa đăng nhập hoặc token hết hạn → cần redirect về trang login
 - **Polling**: Không cần WebSocket; polling 30–60s là đủ cho UX thông thường
+- **i18n**: Trường `title` và `message` trong notification là **key i18n** do BE trả về (ví dụ: `notification.guide_registration_pending.title`). FE cần dùng hệ thống i18n để translate key này sang text hiển thị cho người dùng cuối.

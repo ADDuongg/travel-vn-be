@@ -15,8 +15,7 @@ import { TourGuide, TourGuideDocument } from './schema/tour-guide.schema';
 import { ReviewEntityType } from 'src/review/schema/ewview.schema';
 import { ReviewService } from 'src/review/review.service';
 import { NotificationEvent } from 'src/notification/notification.constants';
-import { GuideRegisteredEvent } from 'src/notification/events/guide-registered.event';
-import { GuideVerifiedEvent } from 'src/notification/events/guide-verified.event';
+import { TourGuideNotificationEvent } from 'src/notification/events/tour-guide-notification.event';
 
 const USER_POPULATE = {
   path: 'userId',
@@ -192,7 +191,7 @@ export class TourGuideService {
     const user = await this.userService.findBasicInfo(userId);
     this.eventEmitter.emit(
       NotificationEvent.GUIDE_REGISTERED,
-      new GuideRegisteredEvent(
+      new TourGuideNotificationEvent(
         String(created._id),
         userId,
         user?.fullName || user?.username || 'Người dùng',
@@ -256,7 +255,7 @@ export class TourGuideService {
     const user = await this.userService.findBasicInfo(String(guide.userId));
     this.eventEmitter.emit(
       NotificationEvent.GUIDE_VERIFIED,
-      new GuideVerifiedEvent(
+      new TourGuideNotificationEvent(
         id,
         String(guide.userId),
         user?.fullName || user?.username || 'Người dùng',

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Notification, NotificationDocument } from './schema/notification.schema';
+import {
+  Notification,
+  NotificationDocument,
+} from './schema/notification.schema';
 import { NotificationQueryDto } from './dto/notification-query.dto';
 
 @Injectable()

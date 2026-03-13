@@ -35,14 +35,18 @@ async function bootstrap() {
 
   // CORS from env (comma-separated origins, fallback to localhost for dev)
   const corsOrigins = configService
-    .get<string>('CORS_ORIGINS', 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
+    .get<string>(
+      'CORS_ORIGINS',
+      'http://localhost:5173,http://localhost:5174,http://localhost:5175',
+    )
     .split(',')
     .map((o) => o.trim());
 
   app.enableCors({
     origin: corsOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Idempotency-Key',
+    allowedHeaders:
+      'Content-Type, Authorization, X-Requested-With, Idempotency-Key',
     credentials: true,
     maxAge: 86400,
   });
@@ -59,7 +63,9 @@ async function bootstrap() {
       )
       .build();
 
-    SwaggerModule.setup('api', app, () => SwaggerModule.createDocument(app, swaggerConfig));
+    SwaggerModule.setup('api', app, () =>
+      SwaggerModule.createDocument(app, swaggerConfig),
+    );
   }
 
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/' });
