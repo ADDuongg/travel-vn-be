@@ -101,13 +101,17 @@ describe('PaymentService', () => {
   ═══════════════════════════════════════════════ */
   describe('createPaymentIntent', () => {
     it('throws BadRequestException for invalid bookingId format', async () => {
-      await expect(service.createPaymentIntent('not-valid-id')).rejects.toThrow(BadRequestException);
+      await expect(service.createPaymentIntent('not-valid-id')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws NotFoundException when booking not found', async () => {
       mockBookingService.findOne.mockResolvedValue(null);
 
-      await expect(service.createPaymentIntent(bookingId.toString())).rejects.toThrow(NotFoundException);
+      await expect(
+        service.createPaymentIntent(bookingId.toString()),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException when booking is EXPIRED', async () => {
@@ -115,7 +119,9 @@ describe('PaymentService', () => {
         paymentStatus: BookingPaymentStatus.EXPIRED,
       });
 
-      await expect(service.createPaymentIntent(bookingId.toString())).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createPaymentIntent(bookingId.toString()),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('throws BadRequestException when booking is already PAID', async () => {
@@ -123,11 +129,18 @@ describe('PaymentService', () => {
         paymentStatus: BookingPaymentStatus.PAID,
       });
 
-      await expect(service.createPaymentIntent(bookingId.toString())).rejects.toThrow(BadRequestException);
+      await expect(
+        service.createPaymentIntent(bookingId.toString()),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('creates stripe intent and saves payment record on success', async () => {
-      const booking = { _id: bookingId, paymentStatus: BookingPaymentStatus.UNPAID, amount: 500_000, currency: 'VND' };
+      const booking = {
+        _id: bookingId,
+        paymentStatus: BookingPaymentStatus.UNPAID,
+        amount: 500_000,
+        currency: 'VND',
+      };
       mockBookingService.findOne.mockResolvedValue(booking);
       stripeModule.stripe.paymentIntents.create.mockResolvedValue({
         id: 'pi_test_123',
@@ -166,7 +179,9 @@ describe('PaymentService', () => {
 
       expect(payment.status).toBe(PaymentStatus.SUCCEEDED);
       expect(payment.save).toHaveBeenCalled();
-      expect(mockBookingService.markAsPaid).toHaveBeenCalledWith(bookingId.toString());
+      expect(mockBookingService.markAsPaid).toHaveBeenCalledWith(
+        bookingId.toString(),
+      );
     });
 
     it('marks payment FAILED and booking failed on payment_intent.payment_failed', async () => {
@@ -180,7 +195,9 @@ describe('PaymentService', () => {
       await service.handleStripeWebhook('sig', Buffer.from('payload'));
 
       expect(payment.status).toBe(PaymentStatus.FAILED);
-      expect(mockBookingService.markAsFailed).toHaveBeenCalledWith(bookingId.toString());
+      expect(mockBookingService.markAsFailed).toHaveBeenCalledWith(
+        bookingId.toString(),
+      );
     });
 
     it('calls tourBookingService when payment has tourBookingId', async () => {
@@ -213,7 +230,9 @@ describe('PaymentService', () => {
       });
       mockPaymentModel.findOne.mockResolvedValue(null);
 
-      await expect(service.handleStripeWebhook('sig', Buffer.from('payload'))).resolves.not.toThrow();
+      await expect(
+        service.handleStripeWebhook('sig', Buffer.from('payload')),
+      ).resolves.not.toThrow();
     });
 
     it('ignores unknown event types without error', async () => {
@@ -222,7 +241,9 @@ describe('PaymentService', () => {
         data: { object: {} },
       });
 
-      await expect(service.handleStripeWebhook('sig', Buffer.from('payload'))).resolves.not.toThrow();
+      await expect(
+        service.handleStripeWebhook('sig', Buffer.from('payload')),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -233,7 +254,9 @@ describe('PaymentService', () => {
     it('throws BadRequestException when no refundable payment found', async () => {
       mockPaymentModel.findOne.mockResolvedValue(null);
 
-      await expect(service.refund(bookingId.toString())).rejects.toThrow(BadRequestException);
+      await expect(service.refund(bookingId.toString())).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when payment is already fully refunded', async () => {
@@ -241,7 +264,9 @@ describe('PaymentService', () => {
         makePayment({ amount: 500_000, refundedAmount: 500_000 }),
       );
 
-      await expect(service.refund(bookingId.toString())).rejects.toThrow(BadRequestException);
+      await expect(service.refund(bookingId.toString())).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when requested refund exceeds remaining', async () => {
@@ -250,13 +275,21 @@ describe('PaymentService', () => {
       );
 
       // Only 100_000 remaining, requesting 200_000
-      await expect(service.refund(bookingId.toString(), 200_000)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.refund(bookingId.toString(), 200_000),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('creates stripe refund and marks payment FULLY_REFUNDED', async () => {
-      const payment = makePayment({ amount: 500_000, refundedAmount: 0, status: PaymentStatus.SUCCEEDED });
+      const payment = makePayment({
+        amount: 500_000,
+        refundedAmount: 0,
+        status: PaymentStatus.SUCCEEDED,
+      });
       mockPaymentModel.findOne.mockResolvedValue(payment);
-      stripeModule.stripe.refunds.create.mockResolvedValue({ id: 're_test_123' });
+      stripeModule.stripe.refunds.create.mockResolvedValue({
+        id: 're_test_123',
+      });
 
       const result = await service.refund(bookingId.toString());
 
@@ -273,9 +306,15 @@ describe('PaymentService', () => {
     });
 
     it('marks payment REFUNDED (not FULLY_REFUNDED) for partial refund', async () => {
-      const payment = makePayment({ amount: 500_000, refundedAmount: 0, status: PaymentStatus.SUCCEEDED });
+      const payment = makePayment({
+        amount: 500_000,
+        refundedAmount: 0,
+        status: PaymentStatus.SUCCEEDED,
+      });
       mockPaymentModel.findOne.mockResolvedValue(payment);
-      stripeModule.stripe.refunds.create.mockResolvedValue({ id: 're_partial' });
+      stripeModule.stripe.refunds.create.mockResolvedValue({
+        id: 're_partial',
+      });
 
       await service.refund(bookingId.toString(), 200_000);
 

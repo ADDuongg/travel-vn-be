@@ -15,9 +15,7 @@ import {
 import { BlockSlotsDto } from './dto/block-slots.dto';
 import { ReleaseSlotsDto } from './dto/release-slots.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  NotificationEvent,
-} from 'src/notification/notification.constants';
+import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourInventoryNotificationEvent } from 'src/notification/events/tour-inventory-notification.event';
 
 @Injectable()
@@ -83,7 +81,7 @@ export class TourInventoryService {
       .lean();
 
     return list.map((inv) => ({
-      departureDate: (inv.departureDate as Date).toISOString().slice(0, 10),
+      departureDate: inv.departureDate.toISOString().slice(0, 10),
       availableSlots: inv.availableSlots,
       totalSlots: inv.totalSlots,
       status: inv.status,
@@ -127,13 +125,16 @@ export class TourInventoryService {
     if (prevStatus !== inv.status) {
       const event = new TourInventoryNotificationEvent(
         String(inv.tourId),
-        (departureDate as Date).toISOString().slice(0, 10),
+        departureDate.toISOString().slice(0, 10),
         inv.totalSlots,
         inv.availableSlots,
       );
 
       if (inv.status === TourInventoryStatus.FULL) {
-        this.eventEmitter.emit(NotificationEvent.TOUR_INVENTORY_SOLD_OUT, event);
+        this.eventEmitter.emit(
+          NotificationEvent.TOUR_INVENTORY_SOLD_OUT,
+          event,
+        );
       } else if (inv.status === TourInventoryStatus.LIMITED) {
         this.eventEmitter.emit(NotificationEvent.TOUR_INVENTORY_LOW, event);
       }
@@ -170,7 +171,7 @@ export class TourInventoryService {
     if (prevStatus !== inv.status) {
       const event = new TourInventoryNotificationEvent(
         String(inv.tourId),
-        (departureDate as Date).toISOString().slice(0, 10),
+        departureDate.toISOString().slice(0, 10),
         inv.totalSlots,
         inv.availableSlots,
       );

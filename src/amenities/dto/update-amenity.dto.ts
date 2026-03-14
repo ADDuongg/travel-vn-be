@@ -1,4 +1,10 @@
-import { IsBoolean, IsObject, IsOptional, IsString, Matches } from 'class-validator';
+import {
+  IsBoolean,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+} from 'class-validator';
 import { TransformValue } from 'src/utils/transform.util';
 
 export class UpdateAmenityDto {
@@ -6,7 +12,8 @@ export class UpdateAmenityDto {
   @IsOptional()
   @IsString()
   @Matches(/^[a-z][a-z0-9_]*$/, {
-    message: 'code must be lowercase letters, numbers, underscores only, starting with a letter',
+    message:
+      'code must be lowercase letters, numbers, underscores only, starting with a letter',
   })
   code?: string;
 

@@ -45,6 +45,7 @@ import { TourInventoryModule } from './tour-inventory/tour-inventory.module';
 import { TourBookingModule } from './tour-booking/tour-booking.module';
 import { TourGuideModule } from './tour-guide/tour-guide.module';
 import { NotificationModule } from './notification/notification.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -163,6 +164,7 @@ import { NotificationModule } from './notification/notification.module';
     TourBookingModule,
     TourGuideModule,
     NotificationModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

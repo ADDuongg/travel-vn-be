@@ -120,7 +120,9 @@ export class RoomInventoryService {
     const nights = buildNights(from, to);
     if (nights.length === 0) return [];
 
-    const result = await this.RoomInventoryModel.aggregate<{ _id: Types.ObjectId }>([
+    const result = await this.RoomInventoryModel.aggregate<{
+      _id: Types.ObjectId;
+    }>([
       { $match: { date: { $in: nights }, available: { $gt: 0 } } },
       { $group: { _id: '$roomId', count: { $sum: 1 } } },
       { $match: { count: nights.length } },

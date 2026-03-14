@@ -28,9 +28,7 @@ import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import {
-  NotificationEvent,
-} from 'src/notification/notification.constants';
+import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourBookingNotificationEvent } from 'src/notification/events/tour-booking-notification.event';
 
 @Injectable()

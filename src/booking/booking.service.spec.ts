@@ -8,7 +8,12 @@ import {
 import { Types } from 'mongoose';
 
 import { BookingService } from './booking.service';
-import { Booking, BookingPaymentStatus, BookingStatus, BookingType } from './schema/booking.schema';
+import {
+  Booking,
+  BookingPaymentStatus,
+  BookingStatus,
+  BookingType,
+} from './schema/booking.schema';
 import { RoomService } from '../room/room.service';
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -19,7 +24,12 @@ const roomId = new Types.ObjectId('000000000000000000000001');
 const mockRoom = {
   _id: roomId,
   capacity: { baseAdults: 2, baseChildren: 1, maxAdults: 3, maxChildren: 2 },
-  pricing: { basePrice: 1_000_000, currency: 'VND', extraAdultPrice: 200_000, extraChildPrice: 100_000 },
+  pricing: {
+    basePrice: 1_000_000,
+    currency: 'VND',
+    extraAdultPrice: 200_000,
+    extraChildPrice: 100_000,
+  },
   sale: { isActive: false },
   bookingConfig: { minNights: 1, maxNights: 14 },
   inventory: { totalRooms: 5 },
@@ -106,18 +116,22 @@ describe('BookingService', () => {
      Pricing helpers (tested through createRoomBooking)
   ═══════════════════════════════════════════════ */
   describe('calcRoomNightPrice via createRoomBooking', () => {
-
     it('throws NotFoundException when room does not exist', async () => {
       mockRoomService.findOne.mockResolvedValue(null);
 
-      await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(NotFoundException);
+      await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when checkIn === checkOut (0 nights)', async () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
 
       await expect(
-        service.createRoomBooking({ ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-10' }, 'uid'),
+        service.createRoomBooking(
+          { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-10' },
+          'uid',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -129,7 +143,10 @@ describe('BookingService', () => {
 
       // checkIn → checkOut = 2 nights, minNights = 3
       await expect(
-        service.createRoomBooking({ ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' }, 'uid'),
+        service.createRoomBooking(
+          { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
+          'uid',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -141,7 +158,10 @@ describe('BookingService', () => {
 
       // 2 nights but maxNights = 1
       await expect(
-        service.createRoomBooking({ ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' }, 'uid'),
+        service.createRoomBooking(
+          { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
+          'uid',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -149,7 +169,9 @@ describe('BookingService', () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
       mockRoomInventoryService.checkAvailability.mockResolvedValue(false);
 
-      await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(BadRequestException);
+      await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('calculates amount correctly: basePrice * nights for base capacity', async () => {
@@ -164,7 +186,9 @@ describe('BookingService', () => {
       await service.createRoomBooking(baseDto, '000000000000000000000002');
 
       // 2 adults within base (2), 0 children → price = 1_000_000 per night × 2 nights = 2_000_000
-      expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ amount: 2_000_000 }));
+      expect(ctor).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2_000_000 }),
+      );
     });
 
     it('adds extra adult charge when adults exceed base capacity', async () => {
@@ -179,7 +203,9 @@ describe('BookingService', () => {
       await service.createRoomBooking(dto, '000000000000000000000002');
 
       // 1 extra adult * 200_000 extra = 1_200_000 per night × 2 nights = 2_400_000
-      expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ amount: 2_400_000 }));
+      expect(ctor).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2_400_000 }),
+      );
     });
 
     it('throws BadRequestException when guests exceed max capacity', async () => {
@@ -188,7 +214,9 @@ describe('BookingService', () => {
       // maxAdults=3, maxChildren=2 → total=5; 4 adults already exceeds maxAdults
       const dto = { ...baseDto, rooms: [{ adults: 4, children: 0 }] };
 
-      await expect(service.createRoomBooking(dto, 'uid')).rejects.toThrow(BadRequestException);
+      await expect(service.createRoomBooking(dto, 'uid')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -215,10 +243,15 @@ describe('BookingService', () => {
       const ctor = makeModelConstructor(savedBooking);
       (service as any).bookingModel = ctor;
 
-      await service.createRoomBooking({ ...baseDto, rooms: [{ adults: 2, children: 0 }] }, '000000000000000000000002');
+      await service.createRoomBooking(
+        { ...baseDto, rooms: [{ adults: 2, children: 0 }] },
+        '000000000000000000000002',
+      );
 
       // 50% off 1_000_000 = 500_000 × 2 nights = 1_000_000
-      expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ amount: 1_000_000 }));
+      expect(ctor).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 1_000_000 }),
+      );
     });
 
     it('does not apply expired sale', async () => {
@@ -239,10 +272,15 @@ describe('BookingService', () => {
       const ctor = makeModelConstructor(savedBooking);
       (service as any).bookingModel = ctor;
 
-      await service.createRoomBooking({ ...baseDto, rooms: [{ adults: 2, children: 0 }] }, '000000000000000000000002');
+      await service.createRoomBooking(
+        { ...baseDto, rooms: [{ adults: 2, children: 0 }] },
+        '000000000000000000000002',
+      );
 
       // Sale expired → full price 1_000_000 × 2 nights = 2_000_000
-      expect(ctor).toHaveBeenCalledWith(expect.objectContaining({ amount: 2_000_000 }));
+      expect(ctor).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 2_000_000 }),
+      );
     });
   });
 
@@ -255,21 +293,27 @@ describe('BookingService', () => {
     it('throws NotFoundException when booking not found', async () => {
       mockBookingModel.findById.mockResolvedValue(null);
 
-      await expect(service.cancel('bookingId', ownerId)).rejects.toThrow(NotFoundException);
+      await expect(service.cancel('bookingId', ownerId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws ForbiddenException when requester is not owner or admin', async () => {
       const booking = makeBooking();
       mockBookingModel.findById.mockResolvedValue(booking);
 
-      await expect(service.cancel(booking._id.toString(), 'other_user_id')).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.cancel(booking._id.toString(), 'other_user_id'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('throws BadRequestException when booking is already paid', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
       mockBookingModel.findById.mockResolvedValue(booking);
 
-      await expect(service.cancel(booking._id.toString(), ownerId)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.cancel(booking._id.toString(), ownerId),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('cancels booking and rolls back future inventory', async () => {
@@ -277,18 +321,22 @@ describe('BookingService', () => {
       const futureCheckOut = new Date('2035-01-03');
 
       const booking = makeBooking({
-        rooms: [{ roomId, checkIn: futureCheckIn, checkOut: futureCheckOut, guests: { adults: 2, children: 0 } }],
+        rooms: [
+          {
+            roomId,
+            checkIn: futureCheckIn,
+            checkOut: futureCheckOut,
+            guests: { adults: 2, children: 0 },
+          },
+        ],
       });
       mockBookingModel.findById.mockResolvedValue(booking);
 
       await service.cancel(booking._id.toString(), ownerId);
 
-      expect(mockRoomInventoryService.rollbackInventoryRange).toHaveBeenCalledWith(
-        roomId,
-        futureCheckIn,
-        futureCheckOut,
-        1,
-      );
+      expect(
+        mockRoomInventoryService.rollbackInventoryRange,
+      ).toHaveBeenCalledWith(roomId, futureCheckIn, futureCheckOut, 1);
       expect(booking.status).toBe(BookingStatus.CANCELLED);
     });
 
@@ -297,13 +345,22 @@ describe('BookingService', () => {
       const pastCheckOut = new Date('2020-01-03');
 
       const booking = makeBooking({
-        rooms: [{ roomId, checkIn: pastCheckIn, checkOut: pastCheckOut, guests: { adults: 2, children: 0 } }],
+        rooms: [
+          {
+            roomId,
+            checkIn: pastCheckIn,
+            checkOut: pastCheckOut,
+            guests: { adults: 2, children: 0 },
+          },
+        ],
       });
       mockBookingModel.findById.mockResolvedValue(booking);
 
       await service.cancel(booking._id.toString(), ownerId);
 
-      expect(mockRoomInventoryService.rollbackInventoryRange).not.toHaveBeenCalled();
+      expect(
+        mockRoomInventoryService.rollbackInventoryRange,
+      ).not.toHaveBeenCalled();
     });
 
     it('allows admin to cancel any booking', async () => {
@@ -323,7 +380,9 @@ describe('BookingService', () => {
     it('throws NotFoundException when booking not found', async () => {
       mockBookingModel.findById.mockResolvedValue(null);
 
-      await expect(service.markAsPaid('invalid_id')).rejects.toThrow(NotFoundException);
+      await expect(service.markAsPaid('invalid_id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('sets status=CONFIRMED and paymentStatus=PAID', async () => {
@@ -345,7 +404,9 @@ describe('BookingService', () => {
     it('throws NotFoundException when booking not found', async () => {
       mockBookingModel.findById.mockResolvedValue(null);
 
-      await expect(service.markAsFailed('invalid_id')).rejects.toThrow(NotFoundException);
+      await expect(service.markAsFailed('invalid_id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('sets status=CANCELLED and paymentStatus=FAILED', async () => {
@@ -375,7 +436,9 @@ describe('BookingService', () => {
     it('throws NotFoundException when booking not found', async () => {
       mockBookingModel.findById.mockResolvedValue(null);
 
-      await expect(service.markAsRefunded('invalid_id', true)).rejects.toThrow(NotFoundException);
+      await expect(service.markAsRefunded('invalid_id', true)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('sets paymentStatus=REFUNDED for partial refund', async () => {
@@ -391,13 +454,22 @@ describe('BookingService', () => {
     it('sets CANCELLED and rolls back future inventory on full refund', async () => {
       const futureDate = new Date('2035-01-01');
       const booking = makeBooking({
-        rooms: [{ roomId, checkIn: futureDate, checkOut: new Date('2035-01-03'), guests: { adults: 2, children: 0 } }],
+        rooms: [
+          {
+            roomId,
+            checkIn: futureDate,
+            checkOut: new Date('2035-01-03'),
+            guests: { adults: 2, children: 0 },
+          },
+        ],
       });
       mockBookingModel.findById.mockResolvedValue(booking);
 
       await service.markAsRefunded(booking._id.toString(), true);
 
-      expect(mockRoomInventoryService.rollbackInventoryRange).toHaveBeenCalled();
+      expect(
+        mockRoomInventoryService.rollbackInventoryRange,
+      ).toHaveBeenCalled();
       expect(booking.status).toBe(BookingStatus.CANCELLED);
     });
   });
@@ -409,15 +481,18 @@ describe('BookingService', () => {
     it('throws NotFoundException when booking not found', async () => {
       mockBookingModel.findById.mockResolvedValue(null);
 
-      await expect(service.update('bad_id', {})).rejects.toThrow(NotFoundException);
+      await expect(service.update('bad_id', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('throws BadRequestException when booking is already PAID', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
       mockBookingModel.findById.mockResolvedValue(booking);
 
-      await expect(service.update(booking._id.toString(), {})).rejects.toThrow(BadRequestException);
+      await expect(service.update(booking._id.toString(), {})).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });
-

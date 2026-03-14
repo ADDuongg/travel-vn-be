@@ -2,10 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TourBookingController } from './tour-booking.controller';
 import { TourBookingService } from './tour-booking.service';
-import {
-  TourBooking,
-  TourBookingSchema,
-} from './schema/tour-booking.schema';
+import { TourBooking, TourBookingSchema } from './schema/tour-booking.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
 import {
   TourInventory,
@@ -16,7 +13,10 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { Payment, PaymentSchema } from 'src/payment/schema/payment.schema';
 import { TourBookingExpireService } from './tour-booking-expire.service';
 import { TourBookingReconcileService } from './tour-booking-reconcile.service';
-import { TourGuide, TourGuideSchema } from 'src/tour-guide/schema/tour-guide.schema';
+import {
+  TourGuide,
+  TourGuideSchema,
+} from 'src/tour-guide/schema/tour-guide.schema';
 
 @Module({
   imports: [

@@ -6,4 +6,3 @@ export class TourInventoryNotificationEvent {
     public readonly availableSlots: number,
   ) {}
 }
-

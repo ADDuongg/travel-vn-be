@@ -21,7 +21,10 @@ describe('IdempotencyService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         IdempotencyService,
-        { provide: getModelToken(Idempotency.name), useValue: mockIdempotencyModel },
+        {
+          provide: getModelToken(Idempotency.name),
+          useValue: mockIdempotencyModel,
+        },
       ],
     }).compile();
 
@@ -57,7 +60,9 @@ describe('IdempotencyService', () => {
 
       const handler = jest.fn();
 
-      await expect(service.execute(key, userId, endpoint, handler)).rejects.toThrow(ConflictException);
+      await expect(
+        service.execute(key, userId, endpoint, handler),
+      ).rejects.toThrow(ConflictException);
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -73,7 +78,12 @@ describe('IdempotencyService', () => {
 
       expect(result).toEqual(handlerResult);
       expect(mockIdempotencyModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ key, userId, endpoint, status: 'PROCESSING' }),
+        expect.objectContaining({
+          key,
+          userId,
+          endpoint,
+          status: 'PROCESSING',
+        }),
       );
       expect(mockIdempotencyModel.updateOne).toHaveBeenCalledWith(
         { key, userId },
@@ -87,8 +97,12 @@ describe('IdempotencyService', () => {
       mockIdempotencyModel.create.mockResolvedValue({});
       mockIdempotencyModel.updateOne.mockResolvedValue({});
 
-      const result1 = await service.execute('key-A', userId, endpoint, () => Promise.resolve('result-A'));
-      const result2 = await service.execute('key-B', userId, endpoint, () => Promise.resolve('result-B'));
+      const result1 = await service.execute('key-A', userId, endpoint, () =>
+        Promise.resolve('result-A'),
+      );
+      const result2 = await service.execute('key-B', userId, endpoint, () =>
+        Promise.resolve('result-B'),
+      );
 
       expect(result1).toBe('result-A');
       expect(result2).toBe('result-B');
@@ -99,9 +113,13 @@ describe('IdempotencyService', () => {
       mockIdempotencyModel.findOne.mockResolvedValue(null);
       mockIdempotencyModel.create.mockResolvedValue({});
 
-      const handler = jest.fn().mockRejectedValue(new Error('downstream failure'));
+      const handler = jest
+        .fn()
+        .mockRejectedValue(new Error('downstream failure'));
 
-      await expect(service.execute(key, userId, endpoint, handler)).rejects.toThrow('downstream failure');
+      await expect(
+        service.execute(key, userId, endpoint, handler),
+      ).rejects.toThrow('downstream failure');
       // updateOne should NOT have been called since handler threw
       expect(mockIdempotencyModel.updateOne).not.toHaveBeenCalled();
     });

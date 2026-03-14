@@ -14,8 +14,8 @@ export class AdminGuard implements CanActivate {
     const roles: string[] = Array.isArray(req.user?.roles)
       ? req.user.roles
       : req.user?.role
-      ? [req.user.role]
-      : [];
+        ? [req.user.role]
+        : [];
 
     const normalized = roles.map((r) => r.toLowerCase());
     const hasAdminRole = ADMIN_ROLES.some((r) =>

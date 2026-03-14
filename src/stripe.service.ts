@@ -5,7 +5,8 @@ let _instance: Stripe | null = null;
 function getInstance(): Stripe {
   if (!_instance) {
     const key = process.env.STRIPE_SECRET_KEY;
-    if (!key) throw new Error('STRIPE_SECRET_KEY is not defined in environment');
+    if (!key)
+      throw new Error('STRIPE_SECRET_KEY is not defined in environment');
     _instance = new Stripe(key);
   }
   return _instance;

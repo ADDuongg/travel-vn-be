@@ -14,7 +14,12 @@ export class EnvService {
     return !this.isProduction();
   }
 
-  get<K extends keyof EnvConfig>(key: K, defaultValue?: EnvConfig[K]): EnvConfig[K] {
-    return this.config.get(key, { infer: true }) ?? (defaultValue as EnvConfig[K]);
+  get<K extends keyof EnvConfig>(
+    key: K,
+    defaultValue?: EnvConfig[K],
+  ): EnvConfig[K] {
+    return (
+      this.config.get(key, { infer: true }) ?? (defaultValue as EnvConfig[K])
+    );
   }
 }

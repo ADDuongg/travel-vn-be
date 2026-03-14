@@ -30,9 +30,7 @@ export class TourBookingExpireService {
 
   @Cron('*/10 * * * *')
   async expirePendingTourBookings() {
-    const expiredAt = new Date(
-      Date.now() - EXPIRE_AFTER_MINUTES * 60 * 1000,
-    );
+    const expiredAt = new Date(Date.now() - EXPIRE_AFTER_MINUTES * 60 * 1000);
 
     const bookings = await this.tourBookingModel.find({
       status: TourBookingStatus.PENDING,

@@ -6,4 +6,3 @@ export class TourBookingNotificationEvent {
     public readonly tourName?: string,
   ) {}
 }
-

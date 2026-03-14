@@ -9,4 +9,3 @@ export class TourNotificationEvent {
     public readonly isActive?: boolean,
   ) {}
 }
-

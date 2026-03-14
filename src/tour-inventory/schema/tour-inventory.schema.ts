@@ -54,8 +54,7 @@ export class TourInventory {
   currency: string;
 }
 
-export const TourInventorySchema =
-  SchemaFactory.createForClass(TourInventory);
+export const TourInventorySchema = SchemaFactory.createForClass(TourInventory);
 
 TourInventorySchema.index({ tourId: 1, departureDate: 1 }, { unique: true });
 TourInventorySchema.index({ departureDate: 1, status: 1 });
