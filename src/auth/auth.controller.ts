@@ -16,10 +16,14 @@ import { AuthService } from './auth.service';
 import { ZodValidationPipe } from 'src/pipe/zod-validation.pipe';
 import { LoginDto, LoginDtoSchema } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import {
+  ForgotPasswordConfirmDto,
+  ForgotPasswordRequestDto,
+} from './dto/forgot-password-otp.dto';
 import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Response, Request } from 'express';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
@@ -108,6 +112,19 @@ export class AuthController {
   async register(@Body() registerDto: RegisterDto) {
     const user = await this.authService.register(registerDto);
     return user;
+  }
+
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
+  @Post('forgot-password/request')
+  async requestForgotPassword(@Body() dto: ForgotPasswordRequestDto) {
+    console.log(`REQUEST_FORGOT_PASSWORD identifier=${dto.identifier}`);
+
+    return this.authService.requestPasswordReset(dto.identifier);
+  }
+
+  @Post('forgot-password/confirm')
+  async confirmForgotPassword(@Body() dto: ForgotPasswordConfirmDto) {
+    return this.authService.resetPasswordWithToken(dto.token, dto.newPassword);
   }
 
   @Post('logout')

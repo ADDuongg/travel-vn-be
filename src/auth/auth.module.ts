@@ -13,6 +13,7 @@ import {
 } from './schema/refresh_token.schema';
 import { EnvService } from 'src/env/env.service';
 import { EnvModule } from 'src/env/env.module';
+import { OtpModule } from 'src/otp/otp.module';
 import {
   RouterRole,
   RouterRoleSchema,
@@ -20,6 +21,7 @@ import {
 import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
 import { PermissionService } from '../permission/permission.service';
 import { User, UserSchema } from 'src/user/schema/user.schema';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -33,7 +35,9 @@ import { User, UserSchema } from 'src/user/schema/user.schema';
       }),
     }),
     UserModule,
+    OtpModule,
     EnvModule,
+    MailModule,
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: RouterRole.name, schema: RouterRoleSchema },

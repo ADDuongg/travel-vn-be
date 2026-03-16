@@ -8,13 +8,17 @@ import { Model } from 'mongoose';
 import { Job } from 'bullmq';
 import { User, UserDocument } from 'src/user/schema/user.schema';
 import { NotificationService } from './notification.service';
-import { EmailService } from './email/email.service';
 import { NOTIFICATION_QUEUE, NotificationType } from './notification.constants';
 import {
   guideRegisteredTemplate,
   guideVerifiedTemplate,
 } from './email/templates/tour-guide-notification.templates';
+import {
+  genericOtpTemplate,
+  verifyEmailOtpTemplate,
+} from './email/templates/auth-notification.templates';
 import { EnvService } from 'src/env/env.service';
+import { MailService } from 'src/mail/mail.service';
 
 interface GuideRegisteredJobData {
   guideId: string;
@@ -31,13 +35,20 @@ interface GuideVerifiedJobData {
   isVerified: boolean;
 }
 
+interface OtpIssuedJobData {
+  purpose: string;
+  target: string;
+  code: string;
+  expiresAt: string;
+}
+
 @Processor(NOTIFICATION_QUEUE)
 export class NotificationProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationProcessor.name);
 
   constructor(
     private readonly notificationService: NotificationService,
-    private readonly emailService: EmailService,
+    private readonly mailService: MailService,
     private readonly envService: EnvService,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
@@ -45,7 +56,11 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<GuideRegisteredJobData | GuideVerifiedJobData | any>) {
+  async process(
+    job: Job<
+      GuideRegisteredJobData | GuideVerifiedJobData | OtpIssuedJobData | any
+    >,
+  ) {
     this.logger.log(`Processing job ${job.name} [${job.id}]`);
 
     switch (job.name) {
@@ -54,6 +69,9 @@ export class NotificationProcessor extends WorkerHost {
         break;
       case 'guide-verified':
         await this.handleGuideVerified(job.data as GuideVerifiedJobData);
+        break;
+      case 'auth-otp-issued':
+        await this.handleOtpIssued(job.data as OtpIssuedJobData);
         break;
       case 'tour-created':
         await this.handleTourCreatedOrUpdated(
@@ -167,7 +185,11 @@ export class NotificationProcessor extends WorkerHost {
 
     for (const email of emailRecipients) {
       try {
-        await this.emailService.send(email, template.subject, template.html);
+        await this.mailService.send({
+          to: email,
+          subject: template.subject,
+          html: template.html,
+        });
       } catch (error) {
         this.logger.error(`Failed to send email to ${email}: ${error.message}`);
       }
@@ -212,14 +234,58 @@ export class NotificationProcessor extends WorkerHost {
       });
 
       try {
-        await this.emailService.send(
-          data.userEmail,
-          template.subject,
-          template.html,
-        );
+        await this.mailService.send({
+          to: data.userEmail,
+          subject: template.subject,
+          html: template.html,
+        });
       } catch (error) {
         this.logger.error(`Failed to send email to user: ${error.message}`);
       }
+    }
+  }
+
+  private async handleOtpIssued(data: OtpIssuedJobData) {
+    const feBaseUrl = this.envService.get(
+      'FE_BASE_URL',
+      'http://localhost:5173',
+    );
+
+    let confirmUrl = feBaseUrl;
+    if (data.purpose === 'VERIFY_EMAIL') {
+      confirmUrl = `${feBaseUrl}/verify-email?target=${encodeURIComponent(data.target)}`;
+    }
+
+    const baseTemplateData = {
+      code: data.code,
+      expiresAt: data.expiresAt,
+      confirmUrl,
+    };
+
+    const template =
+      data.purpose === 'VERIFY_EMAIL'
+        ? verifyEmailOtpTemplate({
+            ...baseTemplateData,
+            purpose: 'VERIFY_EMAIL',
+          })
+        : genericOtpTemplate({
+            ...baseTemplateData,
+            purpose: data.purpose,
+          });
+
+    try {
+      await this.mailService.send({
+        to: data.target,
+        subject: template.subject,
+        html: template.html,
+      });
+      this.logger.log(
+        `OTP email sent to ${data.target} for purpose=${data.purpose}`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to send OTP email to ${data.target}: ${error?.message ?? error}`,
+      );
     }
   }
 

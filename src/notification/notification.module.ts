@@ -7,9 +7,9 @@ import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { NotificationListener } from './notification.listener';
 import { NotificationProcessor } from './notification.processor';
-import { EmailService } from './email/email.service';
 import { NOTIFICATION_QUEUE } from './notification.constants';
 import { EnvModule } from 'src/env/env.module';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -19,13 +19,13 @@ import { EnvModule } from 'src/env/env.module';
     ]),
     BullModule.registerQueue({ name: NOTIFICATION_QUEUE }),
     EnvModule,
+    MailModule,
   ],
   controllers: [NotificationController],
   providers: [
     NotificationService,
     NotificationListener,
     NotificationProcessor,
-    EmailService,
   ],
   exports: [NotificationService],
 })

@@ -3,6 +3,7 @@ export const NOTIFICATION_QUEUE = 'notification';
 export enum NotificationEvent {
   GUIDE_REGISTERED = 'guide.registered',
   GUIDE_VERIFIED = 'guide.verified',
+  OTP_ISSUED = 'auth.otp.issued',
   TOUR_CREATED = 'tour.created',
   TOUR_UPDATED = 'tour.updated',
   TOUR_DELETED = 'tour.deleted',

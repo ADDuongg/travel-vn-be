@@ -48,6 +48,12 @@ export const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),
   ADMIN_EMAIL: z.string().optional(),
+
+  // OpenAI
+  OPENAI_API_KEY: z.string().optional(),
+
+  // FE base URL (dùng trong email link reset password)
+  FE_BASE_URL: z.string().url().default('http://localhost:5173'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

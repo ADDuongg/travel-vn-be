@@ -284,4 +284,33 @@ export class NotificationListener {
       },
     );
   }
+
+  @OnEvent(NotificationEvent.OTP_ISSUED)
+  async onOtpIssued(event: {
+    purpose: string;
+    target: string;
+    code: string;
+    meta?: Record<string, unknown>;
+    expiresAt: string;
+  }) {
+    this.logger.log(
+      `OTP issued for purpose=${event.purpose} target=${event.target}`,
+    );
+
+    await this.notificationQueue.add(
+      'auth-otp-issued',
+      {
+        purpose: event.purpose,
+        target: event.target,
+        code: event.code,
+        expiresAt: event.expiresAt,
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1000 },
+        removeOnComplete: 100,
+        removeOnFail: 200,
+      },
+    );
+  }
 }

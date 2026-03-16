@@ -34,7 +34,7 @@ export class EmailService {
     try {
       await this.resend.emails.send({
         from: this.fromEmail,
-        to,
+        to: 'monbedehp1@gmail.com',
         subject,
         html,
       });

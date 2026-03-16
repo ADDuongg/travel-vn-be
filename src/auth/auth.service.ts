@@ -16,6 +16,9 @@ import { UserService } from 'src/user/user.service';
 import { RegisterDto } from './dto/register.dto';
 import { RefreshToken } from './schema/refresh_token.schema';
 import { EnvService } from 'src/env/env.service';
+import { OtpService } from 'src/otp/otp.service';
+import { MailService } from 'src/mail/mail.service';
+import { resetPasswordTemplate } from 'src/notification/email/templates/auth-notification.templates';
 
 import {
   AccessTokenPayload,
@@ -38,6 +41,8 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly env: EnvService,
     private readonly permissionService: PermissionService,
+    private readonly otpService: OtpService,
+    private readonly mailService: MailService,
   ) {}
 
   // =========================
@@ -128,6 +133,100 @@ export class AuthService {
         permissions,
       },
     };
+  }
+
+  // =========================
+  // Quên mật khẩu với token
+  // =========================
+  async requestPasswordReset(identifier: string) {
+    const user = await this.userModel
+      .findOne({
+        $or: [
+          { username: identifier },
+          { email: identifier },
+          { phone: identifier },
+        ],
+      })
+      .select('_id username email')
+      .lean();
+    console.log(
+      `RESET_PASSWORD identifier=${identifier} userEmail=${user?.email}`,
+    );
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const target = (user as any).email;
+    if (!target) {
+      throw new BadRequestException('User does not have an email');
+    }
+
+    const payload = {
+      sub: String(user._id),
+      typ: 'reset-password' as const,
+    };
+
+    const token = this.jwtService.sign(payload, {
+      secret: this.config.get<string>('JWT_SECRET')!,
+      expiresIn: '15m',
+      issuer: this.env.get('JWT_ISSUER', 'my-app'),
+      audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      jwtid: uuidv4(),
+    });
+
+    const feBaseUrl = this.env.get('FE_BASE_URL', 'http://localhost:5173');
+    const confirmUrl = `${feBaseUrl}/forgot-password/confirm?token=${encodeURIComponent(token)}`;
+
+    const template = resetPasswordTemplate({
+      username: (user as any).username,
+      confirmUrl,
+    });
+
+    await this.mailService.send({
+      to: target,
+      subject: template.subject,
+      html: template.html,
+    });
+
+    return { message: 'Password reset email sent' };
+  }
+
+  async resetPasswordWithToken(token: string, newPassword: string) {
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException('New password is too short');
+    }
+
+    let payload: { sub: string; typ?: string } | null = null;
+    try {
+      payload = this.jwtService.verify<{ sub: string; typ?: string }>(token, {
+        secret: this.config.get<string>('JWT_SECRET')!,
+        issuer: this.env.get('JWT_ISSUER', 'my-app'),
+        audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    if (!payload?.sub || payload.typ !== 'reset-password') {
+      throw new UnauthorizedException('Invalid reset token');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        payload.sub,
+        { $set: { password: hashedPassword } },
+        { new: true },
+      )
+      .select('_id username roles')
+      .lean<AuthUser | null>();
+
+    if (!updated) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return { message: 'Password has been reset successfully' };
   }
 
   // =========================
