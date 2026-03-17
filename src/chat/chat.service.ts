@@ -21,7 +21,15 @@ Guidelines:
 - Provide specific recommendations with details (price, location, rating)
 - If the user writes in Vietnamese, respond in Vietnamese. If in English, respond in English.
 - Always mention that users can book directly on the platform
-- For booking status inquiries, ask for the booking ID if not provided`;
+- For booking status inquiries, ask for the booking ID if not provided
+
+Available tools:
+
+- searchHotels(location, checkIn, checkOut, priceRange)
+- searchTours(destination)
+- getBookingStatus(bookingId)
+
+`;
 
 @Injectable()
 export class ChatService {
