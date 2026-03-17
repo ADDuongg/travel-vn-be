@@ -51,6 +51,14 @@ export const envSchema = z.object({
 
   // OpenAI
   OPENAI_API_KEY: z.string().optional(),
+  OPENAI_BASE_URL: z.string().optional(),
+  OPENAI_MODEL: z.string().optional(),
+
+  // LLM provider switching (OpenAI / Ollama / ...)
+  LLM_PROVIDER: z.enum(['openai', 'ollama']).optional(),
+  OLLAMA_BASE_URL: z.string().optional(),
+  OLLAMA_MODEL: z.string().optional(),
+  OLLAMA_API_KEY: z.string().optional(),
 
   // FE base URL (dùng trong email link reset password)
   FE_BASE_URL: z.string().url().default('http://localhost:5173'),

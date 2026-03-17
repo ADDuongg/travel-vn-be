@@ -6,13 +6,6 @@ import { TourService } from 'src/tour/tour.service';
 import { TourQueryDto } from 'src/tour/dto/tour-query.dto';
 import { HotelService } from 'src/hotel/hotel.service';
 import { BookingService } from 'src/booking/booking.service';
-import { chatTools } from './chat.tools';
-
-interface AGUIEvent {
-  type: string;
-  timestamp: number;
-  [key: string]: any;
-}
 
 const SYSTEM_PROMPT = `You are a friendly and knowledgeable Vietnamese travel assistant. Your name is "Travel VN Assistant".
 
@@ -33,6 +26,8 @@ Guidelines:
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
+  private model: string;
+  private provider: 'openai' | 'ollama';
   private openai: OpenAI;
 
   constructor(
@@ -41,9 +36,29 @@ export class ChatService {
     private readonly hotelService: HotelService,
     private readonly bookingService: BookingService,
   ) {
-    this.openai = new OpenAI({
-      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
-    });
+    const provider =
+      (this.configService.get<string>('LLM_PROVIDER') as 'openai' | 'ollama') ||
+      'openai';
+    this.provider = provider;
+
+    if (this.provider === 'ollama') {
+      const baseURL =
+        this.configService.get<string>('OLLAMA_BASE_URL') ||
+        'http://127.0.0.1:11434/v1';
+      const apiKey =
+        this.configService.get<string>('OLLAMA_API_KEY') || 'ollama';
+      this.model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
+      this.openai = new OpenAI({
+        apiKey,
+        baseURL,
+      });
+    } else {
+      this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
+      this.openai = new OpenAI({
+        apiKey: this.configService.get<string>('OPENAI_API_KEY') || '',
+        baseURL: this.configService.get<string>('OPENAI_BASE_URL') || undefined,
+      });
+    }
   }
 
   async streamChat(
@@ -51,37 +66,47 @@ export class ChatService {
     conversationId: string | undefined,
     res: Response,
   ) {
+    // TanStack AI SSE Protocol (text/event-stream)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    const runId = this.generateId();
     const messageId = this.generateId();
 
     try {
-      this.sendEvent(res, {
-        type: 'RUN_STARTED',
-        timestamp: Date.now(),
-        runId,
-        threadId: conversationId,
-      });
-
       const openaiMessages = this.convertToOpenAIMessages(messages);
 
-      await this.processWithToolLoop(res, openaiMessages, runId, messageId);
+      await this.processWithToolLoop(res, openaiMessages, messageId);
 
+      // Final done event for TanStack SSE protocol
+      this.writeChunk(res, {
+        type: 'done',
+        id: messageId,
+        model: this.model,
+        timestamp: Date.now(),
+        finishReason: 'stop',
+      });
+      // [DONE] marker so fetchServerSentEvents() knows to stop
       res.write('data: [DONE]\n\n');
       res.end();
     } catch (error) {
       this.logger.error('Chat stream error', error);
-      this.sendEvent(res, {
-        type: 'RUN_ERROR',
+      this.writeChunk(res, {
+        type: 'error',
+        id: messageId,
+        model: this.model,
         timestamp: Date.now(),
-        runId,
         error: {
           message: error instanceof Error ? error.message : 'An error occurred',
         },
+      });
+      this.writeChunk(res, {
+        type: 'done',
+        id: messageId,
+        model: this.model,
+        timestamp: Date.now(),
+        finishReason: 'error',
       });
       res.write('data: [DONE]\n\n');
       res.end();
@@ -91,51 +116,94 @@ export class ChatService {
   private async processWithToolLoop(
     res: Response,
     openaiMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-    runId: string,
     messageId: string,
     maxIterations = 5,
-  ) {
+  ): Promise<string> {
     let iteration = 0;
+    let fullText = '';
 
     while (iteration < maxIterations) {
       iteration++;
 
-      const stream = await this.openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...openaiMessages,
-        ],
-        tools: chatTools,
-        stream: true,
-      });
+      const params: OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming =
+        {
+          model: this.model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            ...openaiMessages,
+          ],
+          stream: true,
+        };
+
+      if (this.provider === 'openai') {
+        // Ollama hiện chưa hỗ trợ tools theo lỗi 400, nên chỉ OpenAI mới truyền tools
+        params.tools = [
+          {
+            type: 'function',
+            function: {
+              name: 'searchHotels',
+              description:
+                'Search for hotels by location, check-in/check-out dates, price range, and star rating',
+              parameters: {
+                type: 'object',
+                properties: {
+                  location: {
+                    type: 'string',
+                    description: 'City or province name in Vietnam',
+                  },
+                  checkIn: {
+                    type: 'string',
+                    description: 'Check-in date (YYYY-MM-DD)',
+                  },
+                  checkOut: {
+                    type: 'string',
+                    description: 'Check-out date (YYYY-MM-DD)',
+                  },
+                  minPrice: {
+                    type: 'number',
+                    description: 'Minimum price per night',
+                  },
+                  maxPrice: {
+                    type: 'number',
+                    description: 'Maximum price per night',
+                  },
+                  starRating: {
+                    type: 'number',
+                    description: 'Minimum star rating (1-5)',
+                  },
+                },
+                required: ['location'],
+              },
+            },
+          },
+        ];
+      }
+
+      const stream = await this.openai.chat.completions.create(params);
 
       let hasToolCalls = false;
       const toolCalls: Map<
         number,
         { id: string; name: string; arguments: string }
       > = new Map();
-      let textStarted = false;
 
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
         const finishReason = chunk.choices[0]?.finish_reason;
 
         if (delta?.content) {
-          if (!textStarted) {
-            this.sendEvent(res, {
-              type: 'TEXT_MESSAGE_START',
-              timestamp: Date.now(),
-              messageId,
-              role: 'assistant',
-            });
-            textStarted = true;
-          }
-          this.sendEvent(res, {
-            type: 'TEXT_MESSAGE_CONTENT',
+          const textDelta = String(delta.content);
+          fullText += textDelta;
+
+          // Stream text chunks in TanStack AI SSE format
+          this.writeChunk(res, {
+            type: 'content',
+            id: messageId,
+            model: this.model,
             timestamp: Date.now(),
-            messageId,
-            delta: delta.content,
+            delta: textDelta,
+            content: fullText,
+            role: 'assistant',
           });
         }
 
@@ -148,75 +216,27 @@ export class ChatService {
                 name: tc.function?.name || '',
                 arguments: '',
               });
-              if (tc.id) {
-                this.sendEvent(res, {
-                  type: 'TOOL_CALL_START',
-                  timestamp: Date.now(),
-                  toolCallId: tc.id,
-                  toolName: tc.function?.name || '',
-                });
-              }
             }
             const existing = toolCalls.get(tc.index)!;
             if (tc.id) existing.id = tc.id;
             if (tc.function?.name) existing.name = tc.function.name;
             if (tc.function?.arguments) {
               existing.arguments += tc.function.arguments;
-              this.sendEvent(res, {
-                type: 'TOOL_CALL_ARGS',
-                timestamp: Date.now(),
-                toolCallId: existing.id,
-                delta: tc.function.arguments,
-              });
             }
           }
         }
 
         if (finishReason === 'stop') {
-          if (textStarted) {
-            this.sendEvent(res, {
-              type: 'TEXT_MESSAGE_END',
-              timestamp: Date.now(),
-              messageId,
-            });
-          }
-          this.sendEvent(res, {
-            type: 'RUN_FINISHED',
-            timestamp: Date.now(),
-            runId,
-            finishReason: 'stop',
-            usage: chunk.usage
-              ? {
-                  promptTokens: chunk.usage.prompt_tokens,
-                  completionTokens: chunk.usage.completion_tokens,
-                  totalTokens: chunk.usage.total_tokens,
-                }
-              : undefined,
-          });
-          return;
+          return fullText;
         }
 
         if (finishReason === 'tool_calls') {
-          if (textStarted) {
-            this.sendEvent(res, {
-              type: 'TEXT_MESSAGE_END',
-              timestamp: Date.now(),
-              messageId,
-            });
-            textStarted = false;
-          }
           break;
         }
       }
 
       if (!hasToolCalls) {
-        this.sendEvent(res, {
-          type: 'RUN_FINISHED',
-          timestamp: Date.now(),
-          runId,
-          finishReason: 'stop',
-        });
-        return;
+        return fullText;
       }
 
       const toolCallArr = Array.from(toolCalls.values());
@@ -236,14 +256,6 @@ export class ChatService {
         const resultStr =
           typeof result === 'string' ? result : JSON.stringify(result);
 
-        this.sendEvent(res, {
-          type: 'TOOL_CALL_END',
-          timestamp: Date.now(),
-          toolCallId: tc.id,
-          toolName: tc.name,
-          result: resultStr,
-        });
-
         openaiMessages.push({
           role: 'tool',
           tool_call_id: tc.id,
@@ -252,12 +264,7 @@ export class ChatService {
       }
     }
 
-    this.sendEvent(res, {
-      type: 'RUN_FINISHED',
-      timestamp: Date.now(),
-      runId,
-      finishReason: 'stop',
-    });
+    return fullText;
   }
 
   private async executeTool(name: string, argsJson: string): Promise<any> {
@@ -445,8 +452,8 @@ export class ChatService {
       .filter(Boolean);
   }
 
-  private sendEvent(res: Response, event: AGUIEvent) {
-    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  private writeChunk(res: Response, chunk: any) {
+    res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   }
 
   private generateId(): string {
