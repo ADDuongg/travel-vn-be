@@ -1,5 +1,4 @@
 import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -10,6 +9,7 @@ import * as bodyParser from 'body-parser';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
+import { EnvService } from './env/env.service';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
 
@@ -25,17 +25,17 @@ async function bootstrap() {
     bodyParser.raw({ type: 'application/json' }),
   );
 
-  const configService = app.get(ConfigService);
-  const port = configService.get<number>('PORT') || 9001;
-  const isProduction = configService.get<string>('NODE_ENV') === 'production';
+  const env = app.get(EnvService);
+  const port = env.get('PORT', 9001);
+  const isProduction = env.isProduction();
 
   // Security headers
   app.use(helmet());
   app.use(cookieParser());
 
   // CORS from env (comma-separated origins, fallback to localhost for dev)
-  const corsOrigins = configService
-    .get<string>(
+  const corsOrigins = env
+    .get(
       'CORS_ORIGINS',
       'http://localhost:5173,http://localhost:5174,http://localhost:5175',
     )

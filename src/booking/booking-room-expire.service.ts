@@ -1,6 +1,6 @@
 // payment-expire.service.ts
 import { Injectable } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -19,7 +19,7 @@ export class ExpirePendingBookings {
     private readonly roomInventoryService: RoomInventoryService,
   ) {}
 
-  @Cron('*/10 * * * *')
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async expirePendingBookings() {
     const EXPIRE_AFTER_MINUTES = 60;
 

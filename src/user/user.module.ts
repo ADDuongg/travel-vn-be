@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from './schema/user.schema';
+
+import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { PermissionModule } from 'src/permission/permission.module';
+
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
-import { PermissionModule } from 'src/permission/permission.module';
-import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { User, UserSchema } from './schema/user.schema';
 
 @Module({
   controllers: [UserController],

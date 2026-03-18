@@ -19,6 +19,9 @@ export class User {
   })
   roles: string[];
 
+  @Prop({ default: 0 })
+  tokenVersion: number;
+
   @Prop({ unique: true, sparse: true })
   email?: string;
 

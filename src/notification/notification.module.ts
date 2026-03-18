@@ -22,11 +22,7 @@ import { MailModule } from 'src/mail/mail.module';
     MailModule,
   ],
   controllers: [NotificationController],
-  providers: [
-    NotificationService,
-    NotificationListener,
-    NotificationProcessor,
-  ],
+  providers: [NotificationService, NotificationListener, NotificationProcessor],
   exports: [NotificationService],
 })
 export class NotificationModule {}

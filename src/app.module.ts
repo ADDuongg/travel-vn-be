@@ -1,12 +1,13 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { validateEnv } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
+import { JwtModule } from '@nestjs/jwt';
 import { ApiPermissionModule } from './api-permission/api-permission.module';
 import { ApiRoleModule } from './api-role/api-role.module';
 import { AppController } from './app.controller';
@@ -46,34 +47,47 @@ import { TourBookingModule } from './tour-booking/tour-booking.module';
 import { TourGuideModule } from './tour-guide/tour-guide.module';
 import { NotificationModule } from './notification/notification.module';
 import { ChatModule } from './chat/chat.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { RedisModule } from './redis/redis.module';
+import { EnvService } from './env/env.service';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    RedisModule.forRootAsync({ isGlobal: true }),
+    JwtModule.registerAsync({
+      global: true,
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService) => ({
+        secret: env.get('JWT_SECRET', 'your_jwt_secret'),
+        signOptions: { expiresIn: '60m' },
+      }),
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
       validate: validateEnv,
     }),
     BullModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService) => ({
         connection: {
-          host: config.get<string>('REDIS_HOST', 'localhost'),
-          port: config.get<number>('REDIS_PORT', 6379),
-          password: config.get<string>('REDIS_PASSWORD') || undefined,
+          host: env.get('REDIS_HOST', 'localhost'),
+          port: env.get('REDIS_PORT', 6379),
+          password: env.get('REDIS_PASSWORD') || undefined,
         },
       }),
     }),
     LoggerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const isProduction = config.get<string>('NODE_ENV') === 'production';
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService) => {
+        const isProduction = env.isProduction();
         const logLevel =
-          config.get<string>('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
+          env.get('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
         return {
           pinoHttp: {
             level: logLevel,
@@ -121,10 +135,10 @@ import { ChatModule } from './chat/chat.module';
       },
     }),
     MongooseModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('DB_URI'),
+      imports: [EnvModule],
+      inject: [EnvService],
+      useFactory: (env: EnvService) => ({
+        uri: env.get('DB_URI'),
       }),
     }),
     ThrottlerModule.forRoot([
@@ -138,7 +152,6 @@ import { ChatModule } from './chat/chat.module';
     AuthModule,
     UploadModule,
     EventsModule,
-    EnvModule,
     SharedModule,
     RolesModule,
     RoutersModule,
@@ -165,6 +178,8 @@ import { ChatModule } from './chat/chat.module';
     TourGuideModule,
     NotificationModule,
     ChatModule,
+    AnalyticsModule,
+    EnvModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

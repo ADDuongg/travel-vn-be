@@ -44,6 +44,11 @@ export const envSchema = z.object({
   REDIS_PORT: z.coerce.number().default(6379),
   REDIS_PASSWORD: z.string().optional(),
 
+  // OTP
+  OTP_TTL_MINUTES: z.coerce.number().default(5),
+  OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
+  OTP_RESEND_WINDOW_SEC: z.coerce.number().default(60),
+
   // Resend (email)
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),

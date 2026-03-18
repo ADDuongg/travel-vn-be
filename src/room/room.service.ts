@@ -96,7 +96,6 @@ export class RoomService {
       provinceId,
       hotelIds,
     } = query;
-    console.log('query', query);
 
     const filter: any = {
       isActive: true,
@@ -150,12 +149,9 @@ export class RoomService {
     if (minRating != null && minRating > 0) {
       filter['ratingSummary.average'] = { $gte: minRating };
     }
-    console.log('amenities', amenities);
 
     if (amenities?.length) {
       const amenityIds = await this.amenitiesService.findIdsByCodes(amenities);
-      console.log('amenityIds', amenityIds);
-
       if (amenityIds.length) {
         filter.amenities = {
           $all: amenityIds.map((id) => new Types.ObjectId(id)),
@@ -243,7 +239,6 @@ export class RoomService {
     if (!room) throw new NotFoundException('Room not found');
     const inventoryCount =
       await this.roomInventoryService.countFutureInventories(id);
-    console.log('dto.totalRooms', dto.totalRooms);
 
     const isTotalRoomsChanged =
       dto.totalRooms !== undefined &&

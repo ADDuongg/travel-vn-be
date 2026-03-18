@@ -1,11 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Response } from 'express';
 import OpenAI from 'openai';
-import { TourService } from 'src/tour/tour.service';
-import { TourQueryDto } from 'src/tour/dto/tour-query.dto';
-import { HotelService } from 'src/hotel/hotel.service';
-import { BookingService } from 'src/booking/booking.service';
+import { ChatTools, chatTools } from './chat.tools';
+import { EnvService } from 'src/env/env.service';
 
 const SYSTEM_PROMPT = `You are a friendly and knowledgeable Vietnamese travel assistant. Your name is "Travel VN Assistant".
 
@@ -39,32 +36,27 @@ export class ChatService {
   private openai: OpenAI;
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly tourService: TourService,
-    private readonly hotelService: HotelService,
-    private readonly bookingService: BookingService,
+    private readonly env: EnvService,
+    private readonly chatTools: ChatTools,
   ) {
     const provider =
-      (this.configService.get<string>('LLM_PROVIDER') as 'openai' | 'ollama') ||
-      'openai';
+      (this.env.get('LLM_PROVIDER') as 'openai' | 'ollama') || 'openai';
     this.provider = provider;
 
     if (this.provider === 'ollama') {
       const baseURL =
-        this.configService.get<string>('OLLAMA_BASE_URL') ||
-        'http://127.0.0.1:11434/v1';
-      const apiKey =
-        this.configService.get<string>('OLLAMA_API_KEY') || 'ollama';
-      this.model = this.configService.get<string>('OLLAMA_MODEL') || 'llama3.1';
+        this.env.get('OLLAMA_BASE_URL') || 'http://127.0.0.1:11434/v1';
+      const apiKey = this.env.get('OLLAMA_API_KEY') || 'ollama';
+      this.model = this.env.get('OLLAMA_MODEL') || 'llama3.1';
       this.openai = new OpenAI({
         apiKey,
         baseURL,
       });
     } else {
-      this.model = this.configService.get<string>('OPENAI_MODEL') || 'gpt-4o';
+      this.model = this.env.get('OPENAI_MODEL') || 'gpt-4o';
       this.openai = new OpenAI({
-        apiKey: this.configService.get<string>('OPENAI_API_KEY') || '',
-        baseURL: this.configService.get<string>('OPENAI_BASE_URL') || undefined,
+        apiKey: this.env.get('OPENAI_API_KEY') || '',
+        baseURL: this.env.get('OPENAI_BASE_URL') || undefined,
       });
     }
   }
@@ -145,46 +137,7 @@ export class ChatService {
 
       if (this.provider === 'openai') {
         // Ollama hiện chưa hỗ trợ tools theo lỗi 400, nên chỉ OpenAI mới truyền tools
-        params.tools = [
-          {
-            type: 'function',
-            function: {
-              name: 'searchHotels',
-              description:
-                'Search for hotels by location, check-in/check-out dates, price range, and star rating',
-              parameters: {
-                type: 'object',
-                properties: {
-                  location: {
-                    type: 'string',
-                    description: 'City or province name in Vietnam',
-                  },
-                  checkIn: {
-                    type: 'string',
-                    description: 'Check-in date (YYYY-MM-DD)',
-                  },
-                  checkOut: {
-                    type: 'string',
-                    description: 'Check-out date (YYYY-MM-DD)',
-                  },
-                  minPrice: {
-                    type: 'number',
-                    description: 'Minimum price per night',
-                  },
-                  maxPrice: {
-                    type: 'number',
-                    description: 'Maximum price per night',
-                  },
-                  starRating: {
-                    type: 'number',
-                    description: 'Minimum star rating (1-5)',
-                  },
-                },
-                required: ['location'],
-              },
-            },
-          },
-        ];
+        params.tools = chatTools;
       }
 
       const stream = await this.openai.chat.completions.create(params);
@@ -281,21 +234,21 @@ export class ChatService {
 
       switch (name) {
         case 'searchHotels':
-          return this.searchHotels(
+          return this.chatTools.searchHotels(
             args as { location: string; starRating?: number },
           );
         case 'searchTours':
-          return this.searchTours(args as { destination: string });
+          return this.chatTools.searchTours(args as { destination: string });
         case 'searchFood':
-          return this.searchFood(
+          return this.chatTools.searchFood(
             args as { region?: string; dishName?: string },
           );
         case 'getBookingStatus':
-          return this.getBookingStatus(args as { bookingId: string });
+          return this.chatTools.getBookingStatus(args as { bookingId: string });
         case 'getHotelDetails':
-          return this.getHotelDetails(args as { hotelId: string });
+          return this.chatTools.getHotelDetails(args as { hotelId: string });
         case 'getTourDetails':
-          return this.getTourDetails(args as { tourId: string });
+          return this.chatTools.getTourDetails(args as { tourId: string });
         default:
           return { error: `Unknown tool: ${name}` };
       }
@@ -306,160 +259,6 @@ export class ChatService {
       };
     }
   }
-
-  private async searchHotels(args: { location: string; starRating?: number }) {
-    try {
-      const allHotels = await this.hotelService.findAllActive();
-      const keyword = args.location.toLowerCase();
-      const filtered = (allHotels as any[]).filter((h) => {
-        const provinceName =
-          h.provinceId?.name?.toLowerCase() ||
-          h.provinceId?.slug?.toLowerCase() ||
-          '';
-        const names = this.getAllTranslatedValues(
-          h.translations as Record<string, { name?: string }> | undefined,
-          'name',
-        );
-        return (
-          provinceName.includes(keyword) ||
-          names.some((n) => n.toLowerCase().includes(keyword))
-        );
-      });
-      return filtered
-        .slice(0, 5)
-        .map(
-          (h: {
-            _id?: { toString(): string };
-            translations?: Record<string, unknown>;
-            provinceId?: { name?: string };
-            starRating?: number;
-          }) => ({
-            id: h._id?.toString(),
-            name: this.getTranslated(h.translations, 'name') || 'Hotel',
-            location: h.provinceId?.name || args.location,
-            rating: h.starRating,
-          }),
-        );
-    } catch {
-      return { message: `No hotels found in ${args.location}` };
-    }
-  }
-
-  private async searchTours(args: { destination: string }) {
-    try {
-      const query: TourQueryDto = {
-        search: args.destination,
-        page: 1,
-        limit: 5,
-      };
-      const result = await this.tourService.findAll(query);
-      const items = result?.items || result || [];
-      type TourItem = {
-        _id?: { toString(): string };
-        translations?: Record<string, unknown>;
-        duration?: unknown;
-        price?: unknown;
-      };
-      return (Array.isArray(items) ? items : [])
-        .slice(0, 5)
-        .map((t: TourItem) => ({
-          id: t._id?.toString(),
-          name: this.getTranslated(t.translations, 'name') || 'Tour',
-          destination: args.destination,
-          duration: t.duration,
-          price: t.price,
-        }));
-    } catch {
-      return { message: `No tours found for ${args.destination}` };
-    }
-  }
-
-  private searchFood(args: { region?: string; dishName?: string }) {
-    return {
-      message: `Here are popular Vietnamese dishes${args.region ? ` from ${args.region}` : ''}`,
-      note: 'Food search will be connected to the food database soon',
-    };
-  }
-
-  private async getBookingStatus(args: { bookingId: string }) {
-    try {
-      const booking = await this.bookingService.findOne(args.bookingId);
-      if (!booking) return { error: 'Booking not found' };
-      return {
-        id: (booking as any)._id?.toString(),
-        status: (booking as any).status,
-        checkIn: (booking as any).checkInDate,
-        checkOut: (booking as any).checkOutDate,
-      };
-    } catch {
-      return { error: 'Booking not found or invalid ID' };
-    }
-  }
-
-  private async getHotelDetails(args: { hotelId: string }) {
-    try {
-      const hotel = await this.hotelService.findById(args.hotelId);
-      if (!hotel) return { error: 'Hotel not found' };
-      const hotelObj = hotel as {
-        _id?: { toString(): string };
-        translations?: Record<string, unknown>;
-        starRating?: number;
-      };
-      return {
-        id: hotelObj._id?.toString(),
-        name: this.getTranslated(hotelObj.translations, 'name'),
-        rating: hotelObj.starRating,
-        description: this.getTranslated(hotelObj.translations, 'description'),
-      };
-    } catch {
-      return { error: 'Hotel not found or invalid ID' };
-    }
-  }
-
-  private async getTourDetails(args: { tourId: string }) {
-    try {
-      const tour = await this.tourService.findById(args.tourId);
-      if (!tour) return { error: 'Tour not found' };
-      const tourObj = tour as {
-        _id?: { toString(): string };
-        translations?: Record<string, unknown>;
-        duration?: unknown;
-        price?: unknown;
-      };
-      return {
-        id: tourObj._id?.toString(),
-        name: this.getTranslated(tourObj.translations, 'name'),
-        duration: tourObj.duration,
-        price: tourObj.price,
-        description: this.getTranslated(tourObj.translations, 'description'),
-      };
-    } catch {
-      return { error: 'Tour not found or invalid ID' };
-    }
-  }
-
-  private getTranslated(
-    translations: Record<string, any> | undefined,
-    field: string,
-  ): string | undefined {
-    if (!translations) return undefined;
-    for (const lang of Object.keys(translations)) {
-      const value = translations[lang]?.[field];
-      if (value) return value;
-    }
-    return undefined;
-  }
-
-  private getAllTranslatedValues(
-    translations: Record<string, any> | undefined,
-    field: string,
-  ): string[] {
-    if (!translations) return [];
-    return Object.keys(translations)
-      .map((lang) => translations[lang]?.[field])
-      .filter(Boolean);
-  }
-
   private writeChunk(res: Response, chunk: any) {
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   }

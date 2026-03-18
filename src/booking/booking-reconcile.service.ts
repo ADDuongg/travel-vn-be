@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -30,7 +30,7 @@ export class BookingReconcileService {
   /*
     Reconcile payment success nhưng booking chưa confirm
    */
-  @Cron('*/10 * * * *')
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async reconcilePaidBookings() {
     const safeBefore = new Date(Date.now() - 2 * 60 * 1000);
 

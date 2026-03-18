@@ -1,23 +1,25 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
   ForbiddenException,
-  UnauthorizedException,
-  UseGuards,
+  Get,
+  Param,
+  Patch,
+  Post,
   Req,
-  UseInterceptors,
+  UnauthorizedException,
   UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UserService } from './user.service';
+
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { UserService } from './user.service';
 
 @Controller('api/v1/users')
 export class UserController {

@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationEvent } from 'src/notification/notification.constants';
+import { EnvService } from 'src/env/env.service';
 import { OtpRepository } from './otp.repository';
 import { OtpPurpose, OtpRecord } from './otp.types';
 
@@ -17,15 +17,12 @@ export class OtpService {
 
   constructor(
     private readonly repo: OtpRepository,
-    private readonly configService: ConfigService,
+    private readonly env: EnvService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.ttlMinutes =
-      Number(this.configService.get<string>('OTP_TTL_MINUTES')) || 5;
-    this.maxAttempts =
-      Number(this.configService.get<string>('OTP_MAX_ATTEMPTS')) || 5;
-    this.resendWindowSec =
-      Number(this.configService.get<string>('OTP_RESEND_WINDOW_SEC')) || 60;
+    this.ttlMinutes = this.env.get('OTP_TTL_MINUTES', 5);
+    this.maxAttempts = this.env.get('OTP_MAX_ATTEMPTS', 5);
+    this.resendWindowSec = this.env.get('OTP_RESEND_WINDOW_SEC', 60);
   }
 
   private generateCode(): string {

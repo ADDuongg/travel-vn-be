@@ -84,8 +84,6 @@ export class UserService {
     file?: Express.Multer.File,
   ) {
     const dto = { ...updateUserDto };
-    console.log('dto', dto);
-    console.log('file', file);
 
     if (file) {
       const current = await this.userModel

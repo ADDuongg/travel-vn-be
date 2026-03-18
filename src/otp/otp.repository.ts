@@ -1,19 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import { OtpPurpose, OtpRecord } from './otp.types';
+import { REDIS_CLIENT } from '../redis/redis.module';
 
 @Injectable()
 export class OtpRepository {
-  private readonly client: Redis;
-
-  constructor(private readonly configService: ConfigService) {
-    this.client = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD') || undefined,
-    });
-  }
+  constructor(@Inject(REDIS_CLIENT) private readonly client: Redis) {}
 
   private getKey(purpose: OtpPurpose, target: string): string {
     return `otp:${purpose}:${target}`;
@@ -71,4 +63,3 @@ export class OtpRepository {
     return parsed;
   }
 }
-

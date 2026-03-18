@@ -11,10 +11,11 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+
 import { CreateRoomDto } from './dto/create-room.dto';
+import { RoomQueryDto } from './dto/room-query.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomService } from './room.service';
-import { RoomQueryDto } from './dto/room-query.dto';
 
 @Controller('/api/v1/rooms')
 export class RoomController {
@@ -46,8 +47,6 @@ export class RoomController {
     @Body() updateRoomDto: UpdateRoomDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
-    console.log('updateRoomDto', updateRoomDto);
-
     return this.roomService.update(id, updateRoomDto, files);
   }
 

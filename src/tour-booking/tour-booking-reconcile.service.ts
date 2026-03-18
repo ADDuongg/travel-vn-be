@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -33,7 +33,7 @@ export class TourBookingReconcileService {
    * Reconcile: payment SUCCEEDED nhưng tour booking chưa được cập nhật PAID.
    * Gọi markAsPaid để đồng bộ lại.
    */
-  @Cron('*/10 * * * *')
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async reconcilePaidTourBookings() {
     const safeBefore = new Date(Date.now() - SAFE_BEFORE_MS);
 

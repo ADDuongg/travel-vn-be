@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Room, RoomDocument } from 'src/room/schema/room.schema';
@@ -22,7 +22,7 @@ export class RoomInventoryCronService {
    *
    * Chạy lúc 03:00 hàng ngày (giờ server).
    */
-  @Cron('0 3 * * *')
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async ensureRollingInventoryForActiveRooms() {
     try {
       const todayVN = todayInVietnam();
