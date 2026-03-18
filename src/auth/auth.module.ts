@@ -1,39 +1,30 @@
-// auth.module.ts
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { AuthService } from './auth.service';
-import { JwtStrategy } from 'src/jwt/jwt.strategy';
-import { AuthController } from './auth.controller';
-import { UserModule } from 'src/user/user.module';
 import { MongooseModule } from '@nestjs/mongoose';
-import {
-  RefreshToken,
-  RefreshTokenSchema,
-} from './schema/refresh_token.schema';
-import { EnvService } from 'src/env/env.service';
+import { PassportModule } from '@nestjs/passport';
+
+import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
 import { EnvModule } from 'src/env/env.module';
+import { MailModule } from 'src/mail/mail.module';
 import { OtpModule } from 'src/otp/otp.module';
 import {
   RouterRole,
   RouterRoleSchema,
 } from 'src/router-role/schema/router-role.schema';
-import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
-import { PermissionService } from '../permission/permission.service';
+import { UserModule } from 'src/user/user.module';
 import { User, UserSchema } from 'src/user/schema/user.schema';
-import { MailModule } from 'src/mail/mail.module';
+import { JwtStrategy } from 'src/jwt/jwt.strategy';
+import { PermissionService } from 'src/permission/permission.service';
+
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import {
+  RefreshToken,
+  RefreshTokenSchema,
+} from './schema/refresh_token.schema';
 
 @Module({
   imports: [
     PassportModule,
-    JwtModule.registerAsync({
-      imports: [EnvModule],
-      inject: [EnvService],
-      useFactory: (env: EnvService) => ({
-        secret: env.get('JWT_SECRET', 'your_jwt_secret'),
-        signOptions: { expiresIn: '60m' },
-      }),
-    }),
     UserModule,
     OtpModule,
     EnvModule,
@@ -47,6 +38,6 @@ import { MailModule } from 'src/mail/mail.module';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, PermissionService],
-  exports: [AuthService, JwtModule, PermissionService],
+  exports: [AuthService, PermissionService],
 })
 export class AuthModule {}

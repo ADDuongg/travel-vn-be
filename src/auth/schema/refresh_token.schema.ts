@@ -5,9 +5,15 @@ export class RefreshToken {
   @Prop({ required: true, unique: true, index: true }) jti: string;
   @Prop({ type: Types.ObjectId, ref: 'User', index: true, required: true })
   userId: Types.ObjectId;
+  @Prop({ index: true })
+  familyId?: string;
+  @Prop({ index: true })
+  tokenHash?: string;
   @Prop({ default: false, index: true }) isRevoked: boolean;
   @Prop({ type: Date, required: true, index: true }) expiresAt: Date;
   @Prop({ type: Date, index: true }) keepUntil?: Date;
+  @Prop() ip?: string;
+  @Prop() userAgent?: string;
 }
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
 

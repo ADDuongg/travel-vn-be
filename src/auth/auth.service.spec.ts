@@ -6,7 +6,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 
@@ -61,8 +60,9 @@ const mockJwtService = {
   decode: jest.fn(),
 };
 
-const mockConfigService = {
-  get: jest.fn((key: string) => {
+const mockEnvService = {
+  isProduction: jest.fn().mockReturnValue(false),
+  get: jest.fn((key: string, def?: string) => {
     const map: Record<string, string> = {
       JWT_SECRET: 'test_jwt_secret_minimum_16chars',
       JWT_REFRESH_SECRET: 'test_refresh_secret_min_16chars',
@@ -70,13 +70,8 @@ const mockConfigService = {
       JWT_ISSUER: 'test-app',
       JWT_AUDIENCE: 'test-clients',
     };
-    return map[key];
+    return map[key] ?? def;
   }),
-};
-
-const mockEnvService = {
-  isProduction: jest.fn().mockReturnValue(false),
-  get: jest.fn((key: string, def: string) => def),
 };
 
 const mockPermissionService = {
@@ -99,7 +94,6 @@ describe('AuthService', () => {
         { provide: getModelToken(User.name), useValue: mockUserModel },
         { provide: UserService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
-        { provide: ConfigService, useValue: mockConfigService },
         { provide: EnvService, useValue: mockEnvService },
         { provide: PermissionService, useValue: mockPermissionService },
       ],

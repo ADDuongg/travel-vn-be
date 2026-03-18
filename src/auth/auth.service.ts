@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import {
   BadRequestException,
   ConflictException,
@@ -6,8 +7,8 @@ import {
 } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
-import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { addDays } from 'date-fns';
@@ -24,6 +25,7 @@ import {
   AccessTokenPayload,
   JwtDecoded,
   RefreshTokenPayload,
+  ResetPasswordPayload,
 } from './interfaces/jwt-payload.interface';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { PermissionService } from '../permission/permission.service';
@@ -38,7 +40,6 @@ export class AuthService {
     private readonly userModel: Model<UserDocument>,
     private readonly usersService: UserService,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService,
     private readonly env: EnvService,
     private readonly permissionService: PermissionService,
     private readonly otpService: OtpService,
@@ -81,10 +82,10 @@ export class AuthService {
     };
 
     return this.jwtService.sign(payload, {
-      secret: this.config.get<string>('JWT_SECRET')!,
+      secret: this.env.get('JWT_SECRET', 'your_jwt_secret'),
       expiresIn,
-      issuer: this.env.get('JWT_ISSUER', 'my-app'),
-      audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+      audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
       jwtid: uuidv4(),
     });
   }
@@ -101,10 +102,10 @@ export class AuthService {
     };
 
     const options: JwtSignOptions = {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET')!,
-      expiresIn: this.config.get<string>('JWT_REFRESH_TTL') ?? '7d',
-      issuer: this.config.get('JWT_ISSUER') ?? 'my-app',
-      audience: this.config.get('JWT_AUDIENCE') ?? 'my-app-clients',
+      secret: this.env.get('JWT_REFRESH_SECRET', 'your_jwt_refresh_secret'),
+      expiresIn: this.env.get('JWT_REFRESH_TTL', '7d'),
+      issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+      audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
       jwtid: jti,
     };
 
@@ -112,17 +113,32 @@ export class AuthService {
     return { token, jti };
   }
 
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async revokeRefreshTokenFamily(familyId: string) {
+    await this.refreshTokenModel.updateMany(
+      { familyId },
+      { $set: { isRevoked: true, keepUntil: addDays(new Date(), 1) } },
+    );
+  }
+
   // =========================
   // Login
   // =========================
-  async login(user: AuthUser) {
+  async login(user: AuthUser, meta: { ip?: string; userAgent?: string } = {}) {
     const accessToken = this.signAccessToken(user);
     const { token: refreshToken, jti } = this.signRefreshToken(user);
 
-    await this.saveRefreshToken(user, refreshToken, jti);
-    const permissions = await this.permissionService.resolvePermissions(
-      user.roles || [],
-    );
+    await this.saveRefreshToken(user, refreshToken, jti, {
+      familyId: jti,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+    const permissions =
+      user.permissions ??
+      (await this.permissionService.resolvePermissions(user.roles || []));
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -139,6 +155,13 @@ export class AuthService {
   // Quên mật khẩu với token
   // =========================
   async requestPasswordReset(identifier: string) {
+    type ResetUser = {
+      _id: Types.ObjectId;
+      username: string;
+      email?: string;
+      tokenVersion?: number;
+    };
+
     const user = await this.userModel
       .findOne({
         $or: [
@@ -147,8 +170,8 @@ export class AuthService {
           { phone: identifier },
         ],
       })
-      .select('_id username email')
-      .lean();
+      .select('_id username email tokenVersion')
+      .lean<ResetUser | null>();
     console.log(
       `RESET_PASSWORD identifier=${identifier} userEmail=${user?.email}`,
     );
@@ -156,21 +179,22 @@ export class AuthService {
       throw new BadRequestException('User not found');
     }
 
-    const target = (user as any).email;
+    const target = user.email;
     if (!target) {
       throw new BadRequestException('User does not have an email');
     }
 
-    const payload = {
+    const payload: ResetPasswordPayload = {
       sub: String(user._id),
       typ: 'reset-password' as const,
+      tokenVersion: user.tokenVersion ?? 0,
     };
 
     const token = this.jwtService.sign(payload, {
-      secret: this.config.get<string>('JWT_SECRET')!,
+      secret: this.env.get('JWT_SECRET', 'your_jwt_secret'),
       expiresIn: '15m',
-      issuer: this.env.get('JWT_ISSUER', 'my-app'),
-      audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+      audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
       jwtid: uuidv4(),
     });
 
@@ -178,7 +202,7 @@ export class AuthService {
     const confirmUrl = `${feBaseUrl}/forgot-password/confirm?token=${encodeURIComponent(token)}`;
 
     const template = resetPasswordTemplate({
-      username: (user as any).username,
+      username: user.username,
       confirmUrl,
     });
 
@@ -196,43 +220,51 @@ export class AuthService {
       throw new BadRequestException('New password is too short');
     }
 
-    let payload: { sub: string; typ?: string } | null = null;
+    let payload: ResetPasswordPayload | null = null;
     try {
-      payload = this.jwtService.verify<{ sub: string; typ?: string }>(token, {
-        secret: this.config.get<string>('JWT_SECRET')!,
-        issuer: this.env.get('JWT_ISSUER', 'my-app'),
-        audience: this.env.get('JWT_AUDIENCE', 'my-app-clients'),
+      payload = this.jwtService.verify<ResetPasswordPayload>(token, {
+        secret: this.env.get('JWT_SECRET', 'your_jwt_secret'),
+        issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+        audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired reset token');
     }
 
-    if (!payload?.sub || payload.typ !== 'reset-password') {
+    if (
+      !payload?.sub ||
+      payload.typ !== 'reset-password' ||
+      typeof payload.tokenVersion !== 'number'
+    ) {
       throw new UnauthorizedException('Invalid reset token');
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     const updated = await this.userModel
-      .findByIdAndUpdate(
-        payload.sub,
-        { $set: { password: hashedPassword } },
+      .findOneAndUpdate(
+        { _id: payload.sub, tokenVersion: payload.tokenVersion },
+        { $set: { password: hashedPassword }, $inc: { tokenVersion: 1 } },
         { new: true },
       )
       .select('_id username roles')
       .lean<AuthUser | null>();
 
     if (!updated) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException('Invalid or already used reset token');
     }
 
+    await this.logoutAll(payload.sub);
     return { message: 'Password has been reset successfully' };
   }
 
   // =========================
   // Register
   // =========================
-  async register(dto: RegisterDto) {
+  async register(
+    dto: RegisterDto,
+    meta: { ip?: string; userAgent?: string } = {},
+  ) {
     if (dto.password !== dto.confirmPassword) {
       throw new BadRequestException('Password confirmation does not match');
     }
@@ -276,7 +308,11 @@ export class AuthService {
     const accessToken = this.signAccessToken(user);
     const { token: refreshToken, jti } = this.signRefreshToken(user);
 
-    await this.saveRefreshToken(user, refreshToken, jti);
+    await this.saveRefreshToken(user, refreshToken, jti, {
+      familyId: jti,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
 
     return {
       access_token: accessToken,
@@ -288,14 +324,17 @@ export class AuthService {
   // =========================
   // Refresh token (rotation)
   // =========================
-  async refresh(oldRefreshToken: string) {
+  async refresh(
+    oldRefreshToken: string,
+    meta: { ip?: string; userAgent?: string } = {},
+  ) {
     try {
       const payload = this.jwtService.verify<RefreshTokenPayload>(
         oldRefreshToken,
         {
-          secret: this.config.get<string>('JWT_REFRESH_SECRET')!,
-          issuer: this.config.get('JWT_ISSUER') ?? 'my-app',
-          audience: this.config.get('JWT_AUDIENCE') ?? 'my-app-clients',
+          secret: this.env.get('JWT_REFRESH_SECRET', 'your_jwt_refresh_secret'),
+          issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+          audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
         },
       );
 
@@ -306,12 +345,41 @@ export class AuthService {
       const existing = await this.refreshTokenModel.findOne({
         jti: payload.jti,
         userId: new Types.ObjectId(payload.sub),
-        isRevoked: false,
       });
 
       if (!existing) {
         throw new UnauthorizedException('Refresh token not found');
       }
+
+      if (existing.isRevoked) {
+        const familyId = existing.familyId || existing.jti;
+        if (!existing.familyId) {
+          (existing as any).familyId = familyId;
+          await (existing as any).save();
+        }
+        await this.revokeRefreshTokenFamily(familyId);
+        await this.logoutAll(payload.sub);
+        throw new UnauthorizedException('Token reuse detected');
+      }
+
+      const currentHash = this.hashToken(oldRefreshToken);
+      if (existing.tokenHash && existing.tokenHash !== currentHash) {
+        const familyId = existing.familyId || existing.jti;
+        if (!existing.familyId) {
+          (existing as any).familyId = familyId;
+          await (existing as any).save();
+        }
+        await this.revokeRefreshTokenFamily(familyId);
+        await this.logoutAll(payload.sub);
+        throw new UnauthorizedException('Token reuse detected');
+      }
+      if (!existing.tokenHash) {
+        (existing as any).tokenHash = currentHash;
+      }
+      if (!existing.familyId) {
+        (existing as any).familyId = existing.jti;
+      }
+      await (existing as any).save();
 
       if (existing.expiresAt < new Date()) {
         throw new UnauthorizedException('Refresh token expired');
@@ -319,6 +387,7 @@ export class AuthService {
 
       // revoke old token
       existing.isRevoked = true;
+      (existing as any).keepUntil = addDays(new Date(), 1);
       await existing.save();
 
       const user = await this.usersService.findOneById(payload.sub);
@@ -326,7 +395,11 @@ export class AuthService {
 
       const { token: newRefreshToken, jti } = this.signRefreshToken(user);
 
-      await this.saveRefreshToken(user, newRefreshToken, jti);
+      await this.saveRefreshToken(user, newRefreshToken, jti, {
+        familyId: (existing as any).familyId,
+        ip: meta.ip,
+        userAgent: meta.userAgent,
+      });
 
       const newAccessToken = this.signAccessToken(user);
       const permissions = await this.permissionService.resolvePermissions(
@@ -342,7 +415,10 @@ export class AuthService {
           permissions,
         },
       };
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -368,32 +444,45 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     const payload = this.jwtService.verify<RefreshTokenPayload>(refreshToken, {
-      secret: this.config.get<string>('JWT_REFRESH_SECRET')!,
-      issuer: this.config.get('JWT_ISSUER') ?? 'my-app',
-      audience: this.config.get('JWT_AUDIENCE') ?? 'my-app-clients',
+      secret: this.env.get('JWT_REFRESH_SECRET', 'your_jwt_refresh_secret'),
+      issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
+      audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
     });
 
     if (payload.typ !== 'refresh') {
       throw new UnauthorizedException('Invalid token type');
     }
 
-    const result = await this.refreshTokenModel.updateOne(
-      {
-        jti: payload.jti,
-        userId: new Types.ObjectId(payload.sub),
-        isRevoked: false,
-      },
-      {
-        $set: {
-          isRevoked: true,
-          keepUntil: addDays(new Date(), 1),
-        },
-      },
-    );
-
-    if (result.modifiedCount === 0) {
+    const existing = await this.refreshTokenModel.findOne({
+      jti: payload.jti,
+      userId: new Types.ObjectId(payload.sub),
+    });
+    if (!existing || existing.isRevoked) {
       throw new UnauthorizedException('Session already logged out');
     }
+
+    const currentHash = this.hashToken(refreshToken);
+    if (existing.tokenHash && existing.tokenHash !== currentHash) {
+      const familyId = existing.familyId || existing.jti;
+      if (!existing.familyId) {
+        (existing as any).familyId = familyId;
+        await (existing as any).save();
+      }
+      await this.revokeRefreshTokenFamily(familyId);
+      await this.logoutAll(payload.sub);
+      throw new UnauthorizedException('Token reuse detected');
+    }
+
+    if (!existing.tokenHash) {
+      (existing as any).tokenHash = currentHash;
+    }
+    if (!existing.familyId) {
+      (existing as any).familyId = existing.jti;
+    }
+
+    (existing as any).isRevoked = true;
+    (existing as any).keepUntil = addDays(new Date(), 1);
+    await (existing as any).save();
 
     return { message: 'Logged out successfully' };
   }
@@ -429,6 +518,7 @@ export class AuthService {
     user: AuthUser,
     token: string,
     jti: string,
+    options: { familyId?: string; ip?: string; userAgent?: string } = {},
   ): Promise<void> {
     function isJwtDecoded(payload: unknown): payload is JwtDecoded {
       return (
@@ -450,10 +540,13 @@ export class AuthService {
     await this.refreshTokenModel.create({
       jti,
       userId: user._id,
-      familyId: jti,
+      familyId: options.familyId,
+      tokenHash: this.hashToken(token),
       isRevoked: false,
       expiresAt,
       keepUntil: addDays(expiresAt, 1),
+      ip: options.ip,
+      userAgent: options.userAgent,
     });
   }
 }

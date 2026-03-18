@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-// auth.controller.ts
 import {
   Body,
   Controller,
@@ -9,26 +7,26 @@ import {
   Res,
   UnauthorizedException,
   UseGuards,
-  UsePipes,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Response, Request } from 'express';
+import { Throttle } from '@nestjs/throttler';
+import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EnvService } from 'src/env/env.service';
+
 import { AuthService } from './auth.service';
-import { ZodValidationPipe } from 'src/pipe/zod-validation.pipe';
-import { LoginDto, LoginDtoSchema } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import {
   ForgotPasswordConfirmDto,
   ForgotPasswordRequestDto,
 } from './dto/forgot-password-otp.dto';
-import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { Response, Request } from 'express';
-import { Throttle } from '@nestjs/throttler';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(
-    private authService: AuthService,
-    private configService: ConfigService,
+    private readonly authService: AuthService,
+    private readonly env: EnvService,
   ) {}
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @ApiBearerAuth('bearer')
@@ -42,10 +40,10 @@ export class AuthController {
       },
     },
   })
-  @UsePipes(new ZodValidationPipe(LoginDtoSchema))
   @Post('login')
   async login(
     @Body() dto: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const user = await this.authService.validateUser(
@@ -54,10 +52,15 @@ export class AuthController {
     );
 
     if (!user) throw new UnauthorizedException();
-    const result = await this.authService.login(user);
+    const userAgentHeader = req.headers['user-agent'];
+    const userAgent =
+      typeof userAgentHeader === 'string' ? userAgentHeader : undefined;
+    const result = await this.authService.login(user, {
+      ip: req.ip,
+      userAgent,
+    });
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.env.isProduction();
     res.cookie('refresh_token', result.refresh_token, {
       httpOnly: true,
       secure: isProduction,
@@ -71,6 +74,7 @@ export class AuthController {
     };
   }
 
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @Post('refresh')
   @ApiBody({
     schema: {
@@ -88,15 +92,20 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = req.cookies?.refresh_token;
-    if (!refreshToken) {
+    const refreshToken = req.cookies?.refresh_token as string | undefined;
+    if (!refreshToken || typeof refreshToken !== 'string') {
       throw new UnauthorizedException();
     }
 
-    const result = await this.authService.refresh(refreshToken);
+    const userAgentHeader = req.headers['user-agent'];
+    const userAgent =
+      typeof userAgentHeader === 'string' ? userAgentHeader : undefined;
+    const result = await this.authService.refresh(refreshToken, {
+      ip: req.ip,
+      userAgent,
+    });
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.env.isProduction();
     if (result.refresh_token) {
       res.cookie('refresh_token', result.refresh_token, {
         httpOnly: true,
@@ -108,36 +117,42 @@ export class AuthController {
 
     return result;
   }
+
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
-    const user = await this.authService.register(registerDto);
+  async register(@Body() registerDto: RegisterDto, @Req() req: Request) {
+    const userAgentHeader = req.headers['user-agent'];
+    const userAgent =
+      typeof userAgentHeader === 'string' ? userAgentHeader : undefined;
+    const user = await this.authService.register(registerDto, {
+      ip: req.ip,
+      userAgent,
+    });
     return user;
   }
 
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @Post('forgot-password/request')
   async requestForgotPassword(@Body() dto: ForgotPasswordRequestDto) {
-    console.log(`REQUEST_FORGOT_PASSWORD identifier=${dto.identifier}`);
-
     return this.authService.requestPasswordReset(dto.identifier);
   }
 
   @Post('forgot-password/confirm')
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   async confirmForgotPassword(@Body() dto: ForgotPasswordConfirmDto) {
     return this.authService.resetPasswordWithToken(dto.token, dto.newPassword);
   }
 
   @Post('logout')
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies.refresh_token;
-    if (!refreshToken) {
+    const refreshToken = req.cookies?.refresh_token as string | undefined;
+    if (!refreshToken || typeof refreshToken !== 'string') {
       return { message: 'Already logged out' };
     }
 
     await this.authService.logout(refreshToken);
 
-    const isProduction =
-      this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.env.isProduction();
     res.clearCookie('refresh_token', {
       httpOnly: true,
       secure: isProduction,
@@ -150,15 +165,23 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() req) {
+  me(@Req() req: Request & { user?: { userId: string } }) {
+    if (!req.user?.userId) {
+      throw new UnauthorizedException();
+    }
+
     return this.authService.me(req.user.userId);
   }
 
   @ApiBearerAuth('bearer')
   @UseGuards(JwtAuthGuard)
   @Post('logout-all')
-  async logoutAll(@Req() req: any) {
-    const userId = (req as { user: { userId: string } }).user.userId;
+  async logoutAll(@Req() req: Request & { user?: { userId: string } }) {
+    if (!req.user?.userId) {
+      throw new UnauthorizedException();
+    }
+
+    const userId = req.user.userId;
     return this.authService.logoutAll(userId);
   }
 }
