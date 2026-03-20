@@ -10,6 +10,7 @@ import { NotificationProcessor } from './notification.processor';
 import { NOTIFICATION_QUEUE } from './notification.constants';
 import { EnvModule } from 'src/env/env.module';
 import { MailModule } from 'src/mail/mail.module';
+import { IdempotencyModule } from 'src/idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { MailModule } from 'src/mail/mail.module';
     BullModule.registerQueue({ name: NOTIFICATION_QUEUE }),
     EnvModule,
     MailModule,
+    IdempotencyModule,
   ],
   controllers: [NotificationController],
   providers: [NotificationService, NotificationListener, NotificationProcessor],

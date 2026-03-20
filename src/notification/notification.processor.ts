@@ -3,10 +3,7 @@
 /* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { Job } from 'bullmq';
-import { User, UserDocument } from 'src/user/schema/user.schema';
 import { NotificationService } from './notification.service';
 import { NOTIFICATION_QUEUE, NotificationType } from './notification.constants';
 import {
@@ -19,19 +16,33 @@ import {
 } from './email/templates/auth-notification.templates';
 import { EnvService } from 'src/env/env.service';
 import { MailService } from 'src/mail/mail.service';
+import { IdempotencyService } from 'src/idempotency/idempotency.service';
 
-interface GuideRegisteredJobData {
+interface GuideRegisteredInAppJobData {
+  recipientId: string;
   guideId: string;
   userId: string;
-  userName: string;
-  userEmail?: string;
+  userName?: string;
 }
 
-interface GuideVerifiedJobData {
+interface GuideRegisteredEmailJobData {
+  to: string;
   guideId: string;
   userId: string;
-  userName: string;
-  userEmail?: string;
+  userName?: string;
+}
+
+interface GuideVerifiedInAppJobData {
+  recipientId: string;
+  guideId: string;
+  userName?: string;
+  isVerified: boolean;
+}
+
+interface GuideVerifiedEmailJobData {
+  to: string;
+  guideId: string;
+  userName?: string;
   isVerified: boolean;
 }
 
@@ -50,25 +61,59 @@ export class NotificationProcessor extends WorkerHost {
     private readonly notificationService: NotificationService,
     private readonly mailService: MailService,
     private readonly envService: EnvService,
-    @InjectModel(User.name)
-    private readonly userModel: Model<UserDocument>,
+    private readonly idempotencyService: IdempotencyService,
   ) {
     super();
   }
 
   async process(
     job: Job<
-      GuideRegisteredJobData | GuideVerifiedJobData | OtpIssuedJobData | any
+      | GuideRegisteredInAppJobData
+      | GuideRegisteredEmailJobData
+      | GuideVerifiedInAppJobData
+      | GuideVerifiedEmailJobData
+      | OtpIssuedJobData
+      | any
     >,
   ) {
     this.logger.log(`Processing job ${job.name} [${job.id}]`);
 
+    const jobId = String(job.id ?? job.name + '-' + JSON.stringify(job.data));
+    await this.idempotencyService.executeJobOnce(jobId, job.name, async () => {
+      await this.processJob(job);
+    });
+  }
+
+  private async processJob(
+    job: Job<
+      | GuideRegisteredInAppJobData
+      | GuideRegisteredEmailJobData
+      | GuideVerifiedInAppJobData
+      | GuideVerifiedEmailJobData
+      | OtpIssuedJobData
+      | any
+    >,
+  ): Promise<void> {
     switch (job.name) {
-      case 'guide-registered':
-        await this.handleGuideRegistered(job.data as GuideRegisteredJobData);
+      case 'guide-registered-inapp':
+        await this.handleGuideRegisteredInApp(
+          job.data as GuideRegisteredInAppJobData,
+        );
         break;
-      case 'guide-verified':
-        await this.handleGuideVerified(job.data as GuideVerifiedJobData);
+      case 'guide-registered-email':
+        await this.handleGuideRegisteredEmail(
+          job.data as GuideRegisteredEmailJobData,
+        );
+        break;
+      case 'guide-verified-inapp':
+        await this.handleGuideVerifiedInApp(
+          job.data as GuideVerifiedInAppJobData,
+        );
+        break;
+      case 'guide-verified-email':
+        await this.handleGuideVerifiedEmail(
+          job.data as GuideVerifiedEmailJobData,
+        );
         break;
       case 'auth-otp-issued':
         await this.handleOtpIssued(job.data as OtpIssuedJobData);
@@ -141,62 +186,31 @@ export class NotificationProcessor extends WorkerHost {
     }
   }
 
-  private async handleGuideRegistered(data: GuideRegisteredJobData) {
-    const adminUsers = await this.userModel
-      .find({ roles: 'ADMIN', isActive: true })
-      .select('_id email fullName')
-      .lean();
+  private async handleGuideRegisteredInApp(data: GuideRegisteredInAppJobData) {
+    await this.notificationService.create({
+      recipientId: data.recipientId,
+      type: NotificationType.GUIDE_REGISTRATION_PENDING,
+      title: 'notification.guide_registration_pending.title',
+      message: 'notification.guide_registration_pending.message',
+      metadata: { guideId: data.guideId, userId: data.userId },
+      link: `/admin/tour-guides/${data.guideId}`,
+    });
+  }
 
-    // In-app notifications for all admins
-    if (adminUsers.length > 0) {
-      const notifications = adminUsers.map((admin) => ({
-        recipientId: String(admin._id),
-        type: NotificationType.GUIDE_REGISTRATION_PENDING,
-        title: 'notification.guide_registration_pending.title',
-        message: 'notification.guide_registration_pending.message',
-        metadata: { guideId: data.guideId, userId: data.userId },
-        link: `/admin/tour-guides/${data.guideId}`,
-      }));
-
-      try {
-        await this.notificationService.createMany(notifications);
-        this.logger.log(
-          `Created ${notifications.length} in-app notifications for admins`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Failed to create in-app notifications: ${error.message}`,
-        );
-      }
-    }
-
-    // Email to admin(s)
-    const adminEmail = this.envService.get('ADMIN_EMAIL');
-    const emailRecipients = new Set<string>();
-    if (adminEmail) emailRecipients.add(adminEmail);
-    for (const admin of adminUsers) {
-      if (admin.email) emailRecipients.add(admin.email);
-    }
-
+  private async handleGuideRegisteredEmail(data: GuideRegisteredEmailJobData) {
     const template = guideRegisteredTemplate({
       guideName: data.userName || 'Không rõ tên',
       guideId: data.guideId,
     });
 
-    for (const email of emailRecipients) {
-      try {
-        await this.mailService.send({
-          to: email,
-          subject: template.subject,
-          html: template.html,
-        });
-      } catch (error) {
-        this.logger.error(`Failed to send email to ${email}: ${error.message}`);
-      }
-    }
+    await this.mailService.send({
+      to: data.to,
+      subject: template.subject,
+      html: template.html,
+    });
   }
 
-  private async handleGuideVerified(data: GuideVerifiedJobData) {
+  private async handleGuideVerifiedInApp(data: GuideVerifiedInAppJobData) {
     const type = data.isVerified
       ? NotificationType.GUIDE_VERIFIED
       : NotificationType.GUIDE_REJECTED;
@@ -209,40 +223,27 @@ export class NotificationProcessor extends WorkerHost {
       ? 'notification.guide_verified.message'
       : 'notification.guide_rejected.message';
 
-    // In-app notification for the user
-    try {
-      await this.notificationService.create({
-        recipientId: data.userId,
-        type,
-        title,
-        message,
-        metadata: { guideId: data.guideId },
-        link: '/guide/my-profile',
-      });
-      this.logger.log(`Created in-app notification for user ${data.userId}`);
-    } catch (error) {
-      this.logger.error(
-        `Failed to create in-app notification: ${error.message}`,
-      );
-    }
+    await this.notificationService.create({
+      recipientId: data.recipientId,
+      type,
+      title,
+      message,
+      metadata: { guideId: data.guideId },
+      link: '/guide/my-profile',
+    });
+  }
 
-    // Email to user
-    if (data.userEmail) {
-      const template = guideVerifiedTemplate({
-        guideName: data.userName || 'Bạn',
-        isVerified: data.isVerified,
-      });
+  private async handleGuideVerifiedEmail(data: GuideVerifiedEmailJobData) {
+    const template = guideVerifiedTemplate({
+      guideName: data.userName || 'Bạn',
+      isVerified: data.isVerified,
+    });
 
-      try {
-        await this.mailService.send({
-          to: data.userEmail,
-          subject: template.subject,
-          html: template.html,
-        });
-      } catch (error) {
-        this.logger.error(`Failed to send email to user: ${error.message}`);
-      }
-    }
+    await this.mailService.send({
+      to: data.to,
+      subject: template.subject,
+      html: template.html,
+    });
   }
 
   private async handleOtpIssued(data: OtpIssuedJobData) {
@@ -273,35 +274,24 @@ export class NotificationProcessor extends WorkerHost {
             purpose: data.purpose,
           });
 
-    try {
-      await this.mailService.send({
-        to: data.target,
-        subject: template.subject,
-        html: template.html,
-      });
-      this.logger.log(
-        `OTP email sent to ${data.target} for purpose=${data.purpose}`,
-      );
-    } catch (error: any) {
-      this.logger.error(
-        `Failed to send OTP email to ${data.target}: ${error?.message ?? error}`,
-      );
-    }
+    await this.mailService.send({
+      to: data.target,
+      subject: template.subject,
+      html: template.html,
+    });
   }
 
   private async handleTourCreatedOrUpdated(
-    data: { tourId: string; tourCode?: string; tourName?: string },
+    data: {
+      recipientId: string;
+      tourId: string;
+      tourCode?: string;
+      tourName?: string;
+    },
     type: NotificationType.TOUR_CREATED | NotificationType.TOUR_UPDATED,
   ) {
-    const adminUsers = await this.userModel
-      .find({ roles: 'ADMIN', isActive: true })
-      .select('_id')
-      .lean();
-
-    if (adminUsers.length === 0) return;
-
-    const notifications = adminUsers.map((admin) => ({
-      recipientId: String(admin._id),
+    await this.notificationService.create({
+      recipientId: data.recipientId,
       type,
       title:
         type === NotificationType.TOUR_CREATED
@@ -317,25 +307,17 @@ export class NotificationProcessor extends WorkerHost {
         tourName: data.tourName,
       },
       link: `/dashboard/tour/${data.tourId}/edit`,
-    }));
-
-    await this.notificationService.createMany(notifications);
+    });
   }
 
   private async handleTourDeleted(data: {
+    recipientId: string;
     tourId: string;
     tourCode?: string;
     tourName?: string;
   }) {
-    const adminUsers = await this.userModel
-      .find({ roles: 'ADMIN', isActive: true })
-      .select('_id')
-      .lean();
-
-    if (adminUsers.length === 0) return;
-
-    const notifications = adminUsers.map((admin) => ({
-      recipientId: String(admin._id),
+    await this.notificationService.create({
+      recipientId: data.recipientId,
       type: NotificationType.TOUR_DELETED,
       title: 'notification.tour_deleted.title',
       message: 'notification.tour_deleted.message',
@@ -345,13 +327,12 @@ export class NotificationProcessor extends WorkerHost {
         tourName: data.tourName,
       },
       link: `/dashboard/tour`,
-    }));
-
-    await this.notificationService.createMany(notifications);
+    });
   }
 
   private async handleTourInventoryEvent(
     data: {
+      recipientId: string;
       tourId: string;
       departureDate: string;
       totalSlots: number;
@@ -362,13 +343,6 @@ export class NotificationProcessor extends WorkerHost {
       | NotificationType.TOUR_INVENTORY_SOLD_OUT
       | NotificationType.TOUR_INVENTORY_RESTOCKED,
   ) {
-    const adminUsers = await this.userModel
-      .find({ roles: 'ADMIN', isActive: true })
-      .select('_id')
-      .lean();
-
-    if (adminUsers.length === 0) return;
-
     const baseKey =
       type === NotificationType.TOUR_INVENTORY_LOW
         ? 'notification.tour_inventory_low'
@@ -376,8 +350,8 @@ export class NotificationProcessor extends WorkerHost {
           ? 'notification.tour_inventory_sold_out'
           : 'notification.tour_inventory_restocked';
 
-    const notifications = adminUsers.map((admin) => ({
-      recipientId: String(admin._id),
+    await this.notificationService.create({
+      recipientId: data.recipientId,
       type,
       title: `${baseKey}.title`,
       message: `${baseKey}.message`,
@@ -388,13 +362,12 @@ export class NotificationProcessor extends WorkerHost {
         availableSlots: data.availableSlots,
       },
       link: `/dashboard/tour/inventory`,
-    }));
-
-    await this.notificationService.createMany(notifications);
+    });
   }
 
   private async handleTourBookingEvent(
     data: {
+      recipientId: string;
       bookingId: string;
       bookingCode: string;
       tourId: string;
@@ -407,13 +380,6 @@ export class NotificationProcessor extends WorkerHost {
       | NotificationType.TOUR_BOOKING_PAYMENT_FAILED
       | NotificationType.TOUR_BOOKING_OVERBOOKING,
   ) {
-    const adminUsers = await this.userModel
-      .find({ roles: 'ADMIN', isActive: true })
-      .select('_id')
-      .lean();
-
-    if (adminUsers.length === 0) return;
-
     let baseKey = '';
     switch (type) {
       case NotificationType.TOUR_BOOKING_CREATED:
@@ -433,8 +399,8 @@ export class NotificationProcessor extends WorkerHost {
         break;
     }
 
-    const notifications = adminUsers.map((admin) => ({
-      recipientId: String(admin._id),
+    await this.notificationService.create({
+      recipientId: data.recipientId,
       type,
       title: `${baseKey}.title`,
       message: `${baseKey}.message`,
@@ -445,9 +411,7 @@ export class NotificationProcessor extends WorkerHost {
         tourName: data.tourName,
       },
       link: `/dashboard/tour-bookings/${data.bookingId}`,
-    }));
-
-    await this.notificationService.createMany(notifications);
+    });
   }
 
   @OnWorkerEvent('failed')

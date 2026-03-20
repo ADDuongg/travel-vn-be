@@ -2,6 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { EnvService } from 'src/env/env.service';
+import { User, UserDocument } from 'src/user/schema/user.schema';
 import {
   NOTIFICATION_QUEUE,
   NotificationEvent,
@@ -17,25 +21,79 @@ export class NotificationListener {
 
   constructor(
     @InjectQueue(NOTIFICATION_QUEUE) private readonly notificationQueue: Queue,
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly envService: EnvService,
   ) {}
+
+  private getBullOpts() {
+    return {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 1000 },
+      removeOnComplete: 100,
+      removeOnFail: 200,
+    };
+  }
+
+  /** Run queue adds in parallel; log rejections but do not fail the whole batch. */
+  private async addJobsAllSettled<T>(
+    items: T[],
+    addOne: (item: T) => Promise<unknown>,
+  ): Promise<void> {
+    const results = await Promise.allSettled(items.map((item) => addOne(item)));
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        this.logger.warn(
+          `Notification queue add failed [${i}]: ${result.reason?.message ?? result.reason}`,
+        );
+      }
+    });
+  }
 
   @OnEvent(NotificationEvent.GUIDE_REGISTERED)
   async onGuideRegistered(event: TourGuideNotificationEvent) {
     this.logger.log(`Guide registered event: ${event.guideId}`);
-    await this.notificationQueue.add(
-      'guide-registered',
-      {
-        guideId: event.guideId,
-        userId: event.userId,
-        userName: event.userName,
-        userEmail: event.userEmail,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id email')
+      .lean();
+
+    if (adminUsers.length === 0) return;
+
+    // 1) In-app notifications (per recipient)
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'guide-registered-inapp',
+        {
+          recipientId: String(admin._id),
+          guideId: event.guideId,
+          userId: event.userId,
+          userName: event.userName,
+        },
+        this.getBullOpts(),
+      ),
+    );
+
+    // 2) Emails (per email recipient)
+    const emailRecipients = new Set<string>();
+    const adminEmail = this.envService.get('ADMIN_EMAIL');
+    if (adminEmail) emailRecipients.add(adminEmail);
+
+    for (const admin of adminUsers) {
+      if (admin.email) emailRecipients.add(admin.email);
+    }
+
+    await this.addJobsAllSettled([...emailRecipients], (to) =>
+      this.notificationQueue.add(
+        'guide-registered-email',
+        {
+          to,
+          guideId: event.guideId,
+          userId: event.userId,
+          userName: event.userName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
@@ -44,78 +102,101 @@ export class NotificationListener {
     this.logger.log(
       `Guide verified event: ${event.guideId}, verified=${event.isVerified}`,
     );
+
+    // In-app notification (single recipient)
     await this.notificationQueue.add(
-      'guide-verified',
+      'guide-verified-inapp',
       {
+        recipientId: event.userId,
         guideId: event.guideId,
-        userId: event.userId,
         userName: event.userName,
         userEmail: event.userEmail,
         isVerified: event.isVerified,
       },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+      this.getBullOpts(),
     );
+
+    // Email (single recipient, only if available)
+    if (event.userEmail) {
+      await this.notificationQueue.add(
+        'guide-verified-email',
+        {
+          to: event.userEmail,
+          guideId: event.guideId,
+          userName: event.userName,
+          isVerified: event.isVerified,
+        },
+        this.getBullOpts(),
+      );
+    }
   }
 
   @OnEvent(NotificationEvent.TOUR_CREATED)
   async onTourCreated(event: TourNotificationEvent) {
     this.logger.log(`Tour created event: ${event.tourId}`);
-    await this.notificationQueue.add(
-      'tour-created',
-      {
-        tourId: event.tourId,
-        tourCode: event.tourCode,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-created',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          tourCode: event.tourCode,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_UPDATED)
   async onTourUpdated(event: TourNotificationEvent) {
     this.logger.log(`Tour updated event: ${event.tourId}`);
-    await this.notificationQueue.add(
-      'tour-updated',
-      {
-        tourId: event.tourId,
-        tourCode: event.tourCode,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-updated',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          tourCode: event.tourCode,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_DELETED)
   async onTourDeleted(event: TourNotificationEvent) {
     this.logger.log(`Tour deleted event: ${event.tourId}`);
-    await this.notificationQueue.add(
-      'tour-deleted',
-      {
-        tourId: event.tourId,
-        tourCode: event.tourCode,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-deleted',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          tourCode: event.tourCode,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
@@ -124,20 +205,24 @@ export class NotificationListener {
     this.logger.log(
       `Tour inventory LOW: ${event.tourId} on ${event.departureDate}`,
     );
-    await this.notificationQueue.add(
-      'tour-inventory-low',
-      {
-        tourId: event.tourId,
-        departureDate: event.departureDate,
-        totalSlots: event.totalSlots,
-        availableSlots: event.availableSlots,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-inventory-low',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          departureDate: event.departureDate,
+          totalSlots: event.totalSlots,
+          availableSlots: event.availableSlots,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
@@ -146,20 +231,24 @@ export class NotificationListener {
     this.logger.log(
       `Tour inventory SOLD OUT: ${event.tourId} on ${event.departureDate}`,
     );
-    await this.notificationQueue.add(
-      'tour-inventory-sold-out',
-      {
-        tourId: event.tourId,
-        departureDate: event.departureDate,
-        totalSlots: event.totalSlots,
-        availableSlots: event.availableSlots,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-inventory-sold-out',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          departureDate: event.departureDate,
+          totalSlots: event.totalSlots,
+          availableSlots: event.availableSlots,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
@@ -168,120 +257,144 @@ export class NotificationListener {
     this.logger.log(
       `Tour inventory RESTOCKED: ${event.tourId} on ${event.departureDate}`,
     );
-    await this.notificationQueue.add(
-      'tour-inventory-restocked',
-      {
-        tourId: event.tourId,
-        departureDate: event.departureDate,
-        totalSlots: event.totalSlots,
-        availableSlots: event.availableSlots,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-inventory-restocked',
+        {
+          recipientId: String(admin._id),
+          tourId: event.tourId,
+          departureDate: event.departureDate,
+          totalSlots: event.totalSlots,
+          availableSlots: event.availableSlots,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CREATED)
   async onTourBookingCreated(event: TourBookingNotificationEvent) {
     this.logger.log(`Tour booking created: ${event.bookingId}`);
-    await this.notificationQueue.add(
-      'tour-booking-created',
-      {
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-booking-created',
+        {
+          recipientId: String(admin._id),
+          bookingId: event.bookingId,
+          bookingCode: event.bookingCode,
+          tourId: event.tourId,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CONFIRMED)
   async onTourBookingConfirmed(event: TourBookingNotificationEvent) {
     this.logger.log(`Tour booking confirmed: ${event.bookingId}`);
-    await this.notificationQueue.add(
-      'tour-booking-confirmed',
-      {
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-booking-confirmed',
+        {
+          recipientId: String(admin._id),
+          bookingId: event.bookingId,
+          bookingCode: event.bookingCode,
+          tourId: event.tourId,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CANCELLED)
   async onTourBookingCancelled(event: TourBookingNotificationEvent) {
     this.logger.log(`Tour booking cancelled: ${event.bookingId}`);
-    await this.notificationQueue.add(
-      'tour-booking-cancelled',
-      {
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-booking-cancelled',
+        {
+          recipientId: String(admin._id),
+          bookingId: event.bookingId,
+          bookingCode: event.bookingCode,
+          tourId: event.tourId,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_PAYMENT_FAILED)
   async onTourBookingPaymentFailed(event: TourBookingNotificationEvent) {
     this.logger.log(`Tour booking payment failed: ${event.bookingId}`);
-    await this.notificationQueue.add(
-      'tour-booking-payment-failed',
-      {
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-booking-payment-failed',
+        {
+          recipientId: String(admin._id),
+          bookingId: event.bookingId,
+          bookingCode: event.bookingCode,
+          tourId: event.tourId,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_OVERBOOKING)
   async onTourBookingOverbooking(event: TourBookingNotificationEvent) {
     this.logger.log(`Tour booking overbooking: ${event.bookingId}`);
-    await this.notificationQueue.add(
-      'tour-booking-overbooking',
-      {
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+
+    const adminUsers = await this.userModel
+      .find({ roles: 'ADMIN', isActive: true })
+      .select('_id')
+      .lean();
+
+    await this.addJobsAllSettled(adminUsers, (admin) =>
+      this.notificationQueue.add(
+        'tour-booking-overbooking',
+        {
+          recipientId: String(admin._id),
+          bookingId: event.bookingId,
+          bookingCode: event.bookingCode,
+          tourId: event.tourId,
+          tourName: event.tourName,
+        },
+        this.getBullOpts(),
+      ),
     );
   }
 

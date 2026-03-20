@@ -49,4 +49,49 @@ export class IdempotencyService {
 
     return result;
   }
+
+  /**
+   * Run a job handler at most once per (jobId, jobName).
+   * Used by Bull workers: on success mark COMPLETED so retries skip; on failure delete so retry can run again.
+   */
+  async executeJobOnce(
+    jobId: string,
+    jobName: string,
+    handler: () => Promise<void>,
+  ): Promise<void> {
+    const key = jobId;
+    const userId = 'bull-notification';
+    const endpoint = jobName;
+
+    const existing = await this.idempotencyModel.findOne({
+      key,
+      userId,
+      endpoint,
+    });
+
+    if (existing?.status === IdempotencyStatus.COMPLETED) {
+      return;
+    }
+    if (existing?.status === IdempotencyStatus.PROCESSING) {
+      return; // retry overlap, skip duplicate
+    }
+
+    await this.idempotencyModel.create({
+      key,
+      userId,
+      endpoint,
+      status: IdempotencyStatus.PROCESSING,
+    });
+
+    try {
+      await handler();
+      await this.idempotencyModel.updateOne(
+        { key, userId, endpoint },
+        { status: IdempotencyStatus.COMPLETED },
+      );
+    } catch (err) {
+      await this.idempotencyModel.deleteOne({ key, userId, endpoint });
+      throw err;
+    }
+  }
 }
