@@ -37,8 +37,12 @@ export class Idempotency {
 
   @Prop({ type: Object })
   response?: any;
+
+  @Prop({ type: Date, required: true })
+  expireAt: Date;
 }
 
 export const IdempotencySchema = SchemaFactory.createForClass(Idempotency);
 
 IdempotencySchema.index({ key: 1, userId: 1, endpoint: 1 }, { unique: true });
+IdempotencySchema.index({ expireAt: 1 }, { expireAfterSeconds: 0 });

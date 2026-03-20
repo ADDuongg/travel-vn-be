@@ -83,11 +83,16 @@ describe('IdempotencyService', () => {
           userId,
           endpoint,
           status: 'PROCESSING',
+          expireAt: expect.any(Date),
         }),
       );
       expect(mockIdempotencyModel.updateOne).toHaveBeenCalledWith(
         { key, userId },
-        { status: 'COMPLETED', response: handlerResult },
+        expect.objectContaining({
+          status: 'COMPLETED',
+          response: handlerResult,
+          expireAt: expect.any(Date),
+        }),
       );
     });
 

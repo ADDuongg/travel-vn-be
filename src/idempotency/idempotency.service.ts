@@ -6,6 +6,11 @@ import {
   IdempotencyDocument,
   IdempotencyStatus,
 } from './schema/idempotency.schema';
+import {
+  IDEMPOTENCY_HTTP_COMPLETED_TTL_MS,
+  IDEMPOTENCY_JOB_COMPLETED_TTL_MS,
+  IDEMPOTENCY_PROCESSING_MAX_MS,
+} from './idempotency.constants';
 
 @Injectable()
 export class IdempotencyService {
@@ -35,6 +40,7 @@ export class IdempotencyService {
       userId,
       endpoint,
       status: 'PROCESSING',
+      expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
     });
 
     const result = await handler();
@@ -44,6 +50,7 @@ export class IdempotencyService {
       {
         status: 'COMPLETED',
         response: result,
+        expireAt: new Date(Date.now() + IDEMPOTENCY_HTTP_COMPLETED_TTL_MS),
       },
     );
 
@@ -81,13 +88,17 @@ export class IdempotencyService {
       userId,
       endpoint,
       status: IdempotencyStatus.PROCESSING,
+      expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
     });
 
     try {
       await handler();
       await this.idempotencyModel.updateOne(
         { key, userId, endpoint },
-        { status: IdempotencyStatus.COMPLETED },
+        {
+          status: IdempotencyStatus.COMPLETED,
+          expireAt: new Date(Date.now() + IDEMPOTENCY_JOB_COMPLETED_TTL_MS),
+        },
       );
     } catch (err) {
       await this.idempotencyModel.deleteOne({ key, userId, endpoint });
