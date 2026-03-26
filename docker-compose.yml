@@ -1,30 +1,71 @@
-version: '3.9'
+# API + MongoDB + Redis. Mongo/Redis không publish port ra host (an toàn trên VPS).
+# Cần kết nối MongoDB/Redis từ máy local: docker compose -f docker-compose.yml -f docker-compose.dev-ports.yml up -d
+#
+# Trong .env (hoặc env_file) khi chạy trong Compose, đặt:
+#   DB_URI=mongodb://mongo:27017/<tên_db>
+#   REDIS_HOST=redis
+#   REDIS_PORT=6379
+#   PORT=9001
 
 services:
   api:
     build: .
+    container_name: nestjs-tours-api
+    restart: unless-stopped
     ports:
-      - '${PORT-9001}:9001'
+      # Host:container — cú pháp Compose: ${VAR:-default}
+      - "${API_PUBLISH_PORT:-9001}:9001"
     env_file:
       - .env
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - tours-network
 
   mongo:
     image: mongo:7
-    restart: always
-    ports:
-      - '27017:27017'
+    container_name: nestjs-tours-mongo
+    restart: unless-stopped
     volumes:
       - mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "mongodb://127.0.0.1:27017/test",
+          "--eval",
+          "db.runCommand({ ping: 1 }).ok",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - tours-network
 
   redis:
     image: redis:7-alpine
-    restart: always
-    ports:
-      - '6379:6379'
+    container_name: nestjs-tours-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tours-network
 
 volumes:
   mongo-data:
 
+networks:
+  tours-network:
+    driver: bridge
