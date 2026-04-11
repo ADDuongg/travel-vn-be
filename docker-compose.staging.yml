@@ -1,0 +1,128 @@
+# =============================================================================
+# DOCKER COMPOSE -- STAGING ENVIRONMENT
+# =============================================================================
+#
+# Stack: NestJS API + MongoDB + Redis (tat ca chay trong container, khong can cai
+# Mongo/Redis truc tiep tren VPS).
+#
+# Cach chay:
+#   docker compose -f docker-compose.staging.yml up -d
+#
+# Luu y:
+#   - Image backend: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} (mac dinh :staging)
+#   - Dat CI_REGISTRY_IMAGE + IMAGE_TAG trong .env cung thu muc (xem .env.example).
+#   - mongo + redis dung image public; lan dau chay se pull tu Docker Hub.
+#   - DB_URI / REDIS_* trong .env phai tro toi ten service: mongo, redis (xem .env.example).
+#
+# =============================================================================
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: backend-staging-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - travel-vn-dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test:
+        ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 }).ok']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  redis:
+    image: redis:7-alpine
+    container_name: backend-staging-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - travel-vn-dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  backend-staging:
+    image: "${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}"
+    container_name: backend-staging
+    ports:
+      - '127.0.0.1:3001:9001'
+    env_file:
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-verbose',
+          '--tries=1',
+          '--spider',
+          'http://127.0.0.1:9001/api',
+        ]
+      interval: 30s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+    networks:
+      - travel-vn-dev-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  travel-vn-dev-network:
+    name: travel-vn-dev-network
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:

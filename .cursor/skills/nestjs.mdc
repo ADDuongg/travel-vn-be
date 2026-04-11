@@ -1,0 +1,215 @@
+---
+alwaysApply: true
+---
+
+# NestJS Senior Engineering Rules (Clean Architecture First)
+
+## 🎯 Core Principles
+
+- Prioritize **clarity over cleverness**
+- Follow **Clean Architecture** strictly
+- Write code that is **easy to read, test, and maintain**
+- Avoid tight coupling at all costs
+- Think in **layers, not files**
+
+---
+
+## 🧱 Architecture (MANDATORY)
+
+### Layer Separation
+
+- Controller → handles HTTP only
+- Service → business logic only
+- Repository/Data layer → database interaction only
+
+NEVER:
+
+- Put business logic in controllers
+- Access database directly from controllers
+- Mix HTTP concerns inside services
+
+---
+
+### Dependency Direction
+
+- Outer layers depend on inner layers
+- NEVER reverse dependency
+
+Example:
+
+- Controller → Service → Repository ✅
+- Service → Controller ❌
+
+---
+
+### Module Design
+
+- Each feature = 1 module
+- Modules must be **independent and cohesive**
+- Avoid cross-module imports unless necessary
+
+---
+
+## 🧠 Service Design (CRITICAL)
+
+- Services contain **pure business logic**
+- Keep functions **small and focused**
+- One function = one responsibility
+
+### DO:
+
+- Extract reusable logic into private methods
+- Use meaningful method names
+
+### DON'T:
+
+- Write long functions (>30 lines)
+- Mix multiple responsibilities
+
+---
+
+## 📦 DTO & Validation
+
+- ALWAYS validate input using `class-validator`
+- NEVER trust incoming data
+
+### Rules:
+
+- Use `CreateXDto`, `UpdateXDto`
+- Use `PartialType` for update DTO
+- Keep DTOs minimal and explicit
+
+---
+
+## 🧾 Naming Conventions
+
+- Use **intention-revealing names**
+- Avoid abbreviations
+
+Examples:
+
+- `getUserById` ✅
+- `getUsr` ❌
+
+---
+
+## 🧹 Clean Code Rules
+
+### Functions
+
+- Max 20–30 lines
+- Max 3 parameters
+- No nested logic > 2 levels
+
+### Conditions
+
+- Avoid deep nesting
+- Use early return
+
+### Variables
+
+- Use descriptive names
+- Avoid magic numbers → use constants
+
+---
+
+## 🧯 Error Handling
+
+- Use `HttpException` or custom exceptions
+- NEVER return raw errors
+
+### Pattern:
+
+- Validate → Throw → Handle globally
+
+---
+
+## 🗄️ Database Layer
+
+- Use repository pattern or service abstraction
+- NEVER leak database schema to controller
+
+---
+
+## 🔄 API Response Format
+
+Always return consistent structure:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "optional"
+}
+```
+
+---
+
+## 🧪 Testing Mindset
+
+- Write code that is **testable by design**
+- Avoid side effects
+- Inject dependencies properly
+
+---
+
+## ⚙️ Performance & Scalability
+
+- Avoid unnecessary DB calls
+- Use pagination for large data
+- Use caching when needed
+
+---
+
+## 🔐 Security
+
+- Validate all inputs
+- Sanitize data
+- Never expose internal errors
+
+---
+
+## 🧩 Code Structure Example
+
+```
+/user
+  user.module.ts
+  user.controller.ts
+  user.service.ts
+  dto/
+    create-user.dto.ts
+    update-user.dto.ts
+```
+
+---
+
+## 🚫 Anti-Patterns (STRICTLY FORBIDDEN)
+
+- Fat controllers
+- God services
+- Business logic in DTO
+- Direct DB calls in controller
+- Inconsistent naming
+- Copy-paste code
+
+---
+
+## 🧠 Senior Mindset
+
+Before writing code, always ask:
+
+- Is this easy to understand in 6 months?
+- Can this be tested easily?
+- Is this scalable?
+
+---
+
+## 🎯 Output Expectation (IMPORTANT)
+
+When generating NestJS code:
+
+- Follow clean architecture strictly
+- Use DTO validation
+- Separate layers clearly
+- Write production-ready code
+- Keep code minimal, readable, and maintainable

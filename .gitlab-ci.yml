@@ -1,0 +1,250 @@
+# =============================================================================
+# GITLAB CI/CD PIPELINE -- NestJS API Backend
+# =============================================================================
+#
+# Pipeline nay tu dong: lint, test, build Docker image, deploy len VPS.
+#
+# 4 STAGES:
+#   1. validate  -- Lint code (chay tren MOI branch)
+#   2. test      -- Unit tests (chay tren MOI branch)
+#   3. build     -- Build Docker image + push len GitLab Container Registry
+#                   (chi branch staging hoac production)
+#   4. deploy    -- Pull image moi, restart container tren VPS
+#                   (chi branch staging hoac production)
+#
+# BRANCH STRATEGY:
+#   - Branch "staging"    → build + deploy len staging  (127.0.0.1:3001 → container :9001)
+#   - Branch "production" → build + deploy len production (127.0.0.1:3002 → container :9001)
+#   - Cac branch khac     → chi chay validate + test (khong deploy)
+#
+# KHAC BIET VOI FE:
+#   - Khong can --build-arg (env vars la runtime, truyen qua docker-compose env_file)
+#   - Health check goi API endpoint thay vi static file
+#   - NestJS can nhieu thoi gian khoi dong hon nginx (sleep 15s)
+#
+# GITLAB CI VARIABLES (Settings > CI/CD > Variables):
+#   - CI_REGISTRY, CI_REGISTRY_USER, CI_REGISTRY_PASSWORD, CI_REGISTRY_IMAGE (GitLab tu cung cap)
+#   - Image day du: $CI_REGISTRY_IMAGE:staging | $CI_REGISTRY_IMAGE:production (+ tag theo SHA)
+#   - App secrets: .env tren VPS (gom CI_REGISTRY_IMAGE + IMAGE_TAG cho docker compose)
+#
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# STAGES -- Dinh nghia thu tu chay cua pipeline
+# ---------------------------------------------------------------------------
+stages:
+  - validate
+  - test
+  - build
+  - deploy
+
+# ---------------------------------------------------------------------------
+# GLOBAL VARIABLES
+# ---------------------------------------------------------------------------
+variables:
+  NODE_IMAGE: node:20-alpine
+  DOCKER_TLS_CERTDIR: '/certs'
+
+# ---------------------------------------------------------------------------
+# GLOBAL CACHE -- Cache node_modules giua cac job
+# ---------------------------------------------------------------------------
+cache:
+  key:
+    files:
+      - yarn.lock
+  paths:
+    - node_modules/
+  policy: pull
+
+# ===========================================================================
+# STAGE 1: VALIDATE -- Lint code
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Job: lint
+# ---------------------------------------------------------------------------
+# Chay ESLint de kiem tra code style, best practices, potential bugs.
+# Chay tren MOI branch (khong gioi han).
+lint:
+  stage: validate
+  image: $NODE_IMAGE
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+    policy: pull-push
+  script:
+    - yarn install --frozen-lockfile
+    - yarn lint
+  tags:
+    - travel-staging
+
+# ===========================================================================
+# STAGE 2: TEST -- Unit tests
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Job: test
+# ---------------------------------------------------------------------------
+# Chay Jest unit tests voi coverage report.
+test:
+  stage: test
+  image: $NODE_IMAGE
+  script:
+    - yarn install --frozen-lockfile
+    - yarn test --coverage --passWithNoTests
+  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+  artifacts:
+    when: always
+    paths:
+      - coverage/
+    expire_in: 7 days
+  tags:
+    - travel-staging
+
+# ===========================================================================
+# STAGE 3: BUILD -- Docker build + push to registry
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Job: build:staging
+# ---------------------------------------------------------------------------
+# Build Docker image cho STAGING environment.
+# Chi chay khi push/merge vao branch "staging".
+# Khong can --build-arg vi env vars truyen runtime qua docker-compose.
+build:staging:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - >
+      docker build
+      -t $CI_REGISTRY_IMAGE:staging
+      -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+      .
+    - docker push $CI_REGISTRY_IMAGE:staging
+    - docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+  environment:
+    name: staging
+  tags:
+    - travel-staging
+
+# ---------------------------------------------------------------------------
+# Job: build:production
+# ---------------------------------------------------------------------------
+# Build Docker image cho PRODUCTION environment.
+# Chi chay khi push/merge vao branch "production".
+build:production:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: '/certs'
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - >
+      docker build
+      -t $CI_REGISTRY_IMAGE:production
+      -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
+      .
+    - docker push $CI_REGISTRY_IMAGE:production
+    - docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "production"'
+  environment:
+    name: production
+  tags:
+    - travel-production
+
+# ===========================================================================
+# STAGE 4: DEPLOY -- Pull image moi, restart container tren VPS
+# ===========================================================================
+# Runner la shell executor chay truc tiep tren VPS (giong FE).
+# Flow:
+#   1. cd vao thu muc deploy tren VPS
+#   2. Login vao GitLab Registry
+#   3. Set IMAGE_TAG
+#   4. Pull image moi
+#   5. Restart container (force-recreate de dung image moi)
+#   6. Doi 15 giay cho NestJS khoi dong
+#   7. Health check bang curl
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Job: deploy:staging
+# ---------------------------------------------------------------------------
+# Deploy image staging len VPS (127.0.0.1:3001 -> container :9001).
+# Domain: staging.travel-vn.site/api (Host Nginx proxy vao 127.0.0.1:3001)
+deploy:staging:
+  stage: deploy
+  script:
+    - cd /opt/travel-be/staging
+    - echo "Login registry..."
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+    - echo "Set registry + tag for compose (image :staging)..."
+    - export IMAGE_TAG=staging
+
+    - echo "Pull backend image..."
+    - docker compose -f docker-compose.staging.yml pull backend-staging
+
+    - echo "Ensure Mongo + Redis are up, then recreate backend only..."
+    - docker compose -f docker-compose.staging.yml up -d mongo redis
+    - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
+
+    - echo "Wait for NestJS to start..."
+    - sleep 15
+
+    - echo "Health check..."
+    - curl -f http://127.0.0.1:3001/api || exit 1
+
+    - echo "Deploy staging success!"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+  environment:
+    name: staging
+    url: https://staging.travel-vn.site/api
+  tags:
+    - travel-staging
+
+# ---------------------------------------------------------------------------
+# Job: deploy:production
+# ---------------------------------------------------------------------------
+# Deploy image production len VPS (127.0.0.1:3002 -> container :9001).
+deploy:production:
+  stage: deploy
+  script:
+    - cd /opt/travel-be/production
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+    - export IMAGE_TAG=production
+
+    - docker compose -f docker-compose.production.yml pull backend-production
+    - docker compose -f docker-compose.production.yml up -d mongo redis
+    - docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate backend-production
+
+    - echo "Wait for NestJS to start..."
+    - sleep 15
+
+    - echo "Health check..."
+    - curl -f http://127.0.0.1:3002/api || exit 1
+
+    - echo "Deploy production success!"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "production"'
+  environment:
+    name: production
+    url: https://travel-vn.site/api
+  tags:
+    - travel-production
