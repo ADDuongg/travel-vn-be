@@ -177,8 +177,7 @@ build:production:
 #   3. Set IMAGE_TAG
 #   4. Pull image moi
 #   5. Restart container (force-recreate de dung image moi)
-#   6. Doi 15 giay cho NestJS khoi dong
-#   7. Health check bang curl
+#   6. Retry curl GET /health (Swagger /api chi khi NODE_ENV != production)
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
@@ -203,11 +202,18 @@ deploy:staging:
     - docker compose -f docker-compose.staging.yml up -d mongo redis
     - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
 
-    - echo "Wait for NestJS to start..."
-    - sleep 15
-
-    - echo "Health check..."
-    - curl -f http://127.0.0.1:3001/api || exit 1
+    - echo "Wait for NestJS (GET /health; /api is Swagger only when NODE_ENV!=production)..."
+    - |
+      for i in $(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+          echo "Health OK (attempt $$i)"
+          exit 0
+        fi
+        echo "Attempt $$i failed, sleep 2s..."
+        sleep 2
+      done
+      echo "Health check failed after 30 attempts"
+      exit 1
 
     - echo "Deploy staging success!"
   rules:
@@ -234,11 +240,18 @@ deploy:production:
     - docker compose -f docker-compose.production.yml up -d mongo redis
     - docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate backend-production
 
-    - echo "Wait for NestJS to start..."
-    - sleep 15
-
-    - echo "Health check..."
-    - curl -f http://127.0.0.1:3002/api || exit 1
+    - echo "Wait for NestJS (GET /health)..."
+    - |
+      for i in $(seq 1 30); do
+        if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
+          echo "Health OK (attempt $$i)"
+          exit 0
+        fi
+        echo "Attempt $$i failed, sleep 2s..."
+        sleep 2
+      done
+      echo "Health check failed after 30 attempts"
+      exit 1
 
     - echo "Deploy production success!"
   rules:
