@@ -80,6 +80,10 @@ services:
     container_name: backend-staging
     ports:
       - '127.0.0.1:3001:9001'
+    # Must match Docker service name (not localhost). Overrides wrong REDIS_HOST in .env.
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
     env_file:
       - .env
     depends_on:
