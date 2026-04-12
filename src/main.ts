@@ -81,4 +81,8 @@ async function bootstrap() {
 
   await app.listen(port);
 }
-void bootstrap();
+bootstrap().catch((err) => {
+  // Ensure the error is visible even when bufferLogs swallows NestJS output
+  console.error('Bootstrap failed:', err);
+  process.exit(1);
+});

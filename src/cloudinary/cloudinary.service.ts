@@ -9,13 +9,22 @@ type CloudinaryClient = typeof cloudinary;
 export class CloudinaryService {
   constructor(
     @Inject('CLOUDINARY')
-    private readonly cloudinary: CloudinaryClient,
+    private readonly cloudinary: CloudinaryClient | null,
   ) {}
+
+  private assertConfigured(): asserts this is { cloudinary: CloudinaryClient } {
+    if (!this.cloudinary) {
+      throw new Error(
+        'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.',
+      );
+    }
+  }
 
   uploadFile(
     file: Express.Multer.File,
     options?: { folder?: string; public_id?: string },
   ): Promise<CloudinaryResponse> {
+    this.assertConfigured();
     return new Promise((resolve, reject) => {
       const uploadStream = this.cloudinary.uploader.upload_stream(
         {
@@ -61,10 +70,12 @@ export class CloudinaryService {
   }
 
   async deleteFile(publicId: string): Promise<void> {
+    this.assertConfigured();
     await this.cloudinary.uploader.destroy(publicId);
   }
 
   async deleteFiles(publicIds: string[]) {
+    this.assertConfigured();
     await Promise.all(
       publicIds.map((id) => this.cloudinary.uploader.destroy(id)),
     );
