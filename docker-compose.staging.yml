@@ -28,7 +28,7 @@ services:
       MONGO_USER: ${MONGO_USER}
       MONGO_PASSWORD: ${MONGO_PASSWORD}
     volumes:
-      - mongo_data:/data/db
+      - mongo_staging_data:/data/db
     # Chi loopback VPS: SSH tunnel tu may local -L 27017:127.0.0.1:27017
     ports:
       - '127.0.0.1:27017:27017'
@@ -64,7 +64,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - redis_staging_data:/data
     networks:
       - travel-vn-dev-network
     deploy:
@@ -88,7 +88,7 @@ services:
         max-file: '3'
 
   backend-staging:
-    image: "${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}"
+    image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}'
     container_name: backend-staging
     ports:
       - '127.0.0.1:3001:9001'
@@ -146,5 +146,5 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_data:
-  redis_data:
+  mongo_staging_data:
+  redis_staging_data:
