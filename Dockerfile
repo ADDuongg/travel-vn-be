@@ -61,12 +61,8 @@ COPY --from=builder /app/dist ./dist
 # Tren host: staging 127.0.0.1:3001, production 127.0.0.1:3002 (xem docker-compose).
 EXPOSE 9001
 
-# HEALTHCHECK: Docker tu dong kiem tra container con song khong
-# - interval=30s: kiem tra moi 30 giay
-# - timeout=3s: neu khong tra loi trong 3 giay thi coi la fail
-# - start-period=15s: cho 15 giay sau khi start truoc khi bat dau check (NestJS can thoi gian khoi dong)
-# - retries=3: fail 3 lan lien tiep thi danh dau container "unhealthy"
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
+# HEALTHCHECK (compose file may override). Nest can take >60s to listen on slow VPS.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:9001/health || exit 1
 
 # Chay NestJS app

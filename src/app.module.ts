@@ -169,7 +169,6 @@ import { EnvService } from './env/env.service';
     AmenitiesModule,
     ReviewModule,
     PaymentModule,
-    OrdersModule,
     BookingModule,
     HotelModule,
     RoomInventoryModule,
