@@ -9,27 +9,28 @@ type CloudinaryClient = typeof cloudinary;
 export class CloudinaryService {
   constructor(
     @Inject('CLOUDINARY')
-    private readonly cloudinary: CloudinaryClient | null,
+    private readonly client: CloudinaryClient | null,
   ) {}
 
-  private assertConfigured(): asserts this is { cloudinary: CloudinaryClient } {
-    if (!this.cloudinary) {
+  private getClient(): CloudinaryClient {
+    if (!this.client) {
       throw new Error(
         'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.',
       );
     }
+    return this.client;
   }
 
   uploadFile(
     file: Express.Multer.File,
     options?: { folder?: string; public_id?: string },
   ): Promise<CloudinaryResponse> {
-    this.assertConfigured();
+    const cli = this.getClient();
     return new Promise((resolve, reject) => {
-      const uploadStream = this.cloudinary.uploader.upload_stream(
+      const uploadStream = cli.uploader.upload_stream(
         {
-          folder: options?.folder, // 👈 có thì dùng
-          public_id: options?.public_id, // 👈 optional
+          folder: options?.folder,
+          public_id: options?.public_id,
         },
         (error: unknown, result) => {
           if (error) {
@@ -58,26 +59,20 @@ export class CloudinaryService {
 
   async uploadFiles(
     files: Express.Multer.File[],
-    // folder?: string,
   ): Promise<CloudinaryResponse[]> {
     if (!files || files.length === 0) {
       return [];
     }
 
-    return Promise.all(
-      files.map((file) => this.uploadFile(file /* , folder */)),
-    );
+    return Promise.all(files.map((file) => this.uploadFile(file)));
   }
 
   async deleteFile(publicId: string): Promise<void> {
-    this.assertConfigured();
-    await this.cloudinary.uploader.destroy(publicId);
+    await this.getClient().uploader.destroy(publicId);
   }
 
   async deleteFiles(publicIds: string[]) {
-    this.assertConfigured();
-    await Promise.all(
-      publicIds.map((id) => this.cloudinary.uploader.destroy(id)),
-    );
+    const cli = this.getClient();
+    await Promise.all(publicIds.map((id) => cli.uploader.destroy(id)));
   }
 }
