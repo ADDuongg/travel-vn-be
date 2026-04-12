@@ -29,9 +29,10 @@ services:
       MONGO_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongo_data:/data/db
-    # Chi loopback VPS: SSH tunnel tu may local -L 27017:127.0.0.1:27017
+    # Chi loopback VPS. Dung port host KHAC staging (staging dung 27017) neu ca hai
+    # cung chay tren mot VPS. Vi du SSH tunnel: -L 27018:127.0.0.1:27018
     ports:
-      - '127.0.0.1:27017:27017'
+      - '127.0.0.1:27018:27017'
     networks:
       - travel-vn-network
     deploy:
