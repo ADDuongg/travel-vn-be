@@ -1,0 +1,55 @@
+# docker-compose.local.yml
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: backend-local-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017' # expose ra ngoài để dùng Compass
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - travel-vn-local-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: backend-local-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379' # expose để debug nếu cần
+    volumes:
+      - redis_data:/data
+    networks:
+      - travel-vn-local-network
+
+  backend-local:
+    build:
+      context: . # build từ source thay vì pull image
+    container_name: backend-local
+    ports:
+      - '9001:9001'
+    environment:
+      NODE_ENV: development
+      PORT: '9001'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ''
+    env_file:
+      - .env.local # dùng .env riêng cho local
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - travel-vn-local-network
+    volumes:
+      - .:/app # hot reload
+      - /app/node_modules
+
+networks:
+  travel-vn-local-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:
