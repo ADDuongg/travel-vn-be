@@ -28,7 +28,7 @@ services:
       MONGO_USER: ${MONGO_USER}
       MONGO_PASSWORD: ${MONGO_PASSWORD}
     volumes:
-      - mongo_production_data:/data/db
+      - mongo_data:/data/db
     # Chi loopback VPS. Dung port host KHAC staging (staging dung 27017) neu ca hai
     # cung chay tren mot VPS. Vi du SSH tunnel: -L 27018:127.0.0.1:27018
     ports:
@@ -65,7 +65,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
-      - redis_production_data:/data
+      - redis_data:/data
     networks:
       - travel-vn-network
     deploy:
@@ -143,5 +143,5 @@ networks:
     driver: bridge
 
 volumes:
-  mongo_production_data:
-  redis_production_data:
+  mongo_data:
+  redis_data:
