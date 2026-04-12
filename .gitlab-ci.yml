@@ -202,18 +202,29 @@ deploy:staging:
     - docker compose -f docker-compose.staging.yml up -d mongo redis
     - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
 
-    - echo "Wait for NestJS (GET /health; /api is Swagger only when NODE_ENV!=production)..."
+    # Host curl + docker exec wget (no $$ in strings — bash $$ is shell PID)
     - |
-      for i in $(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
-          echo "Health OK (attempt $$i)"
-          exit 0
+      HEALTH_OK=0
+      for _ in $(seq 1 30); do
+        if curl -fsS --connect-timeout 2 http://127.0.0.1:3001/health >/dev/null 2>&1; then
+          echo "Health OK (host:3001 -> container:9001)"
+          HEALTH_OK=1
+          break
         fi
-        echo "Attempt $$i failed, sleep 2s..."
+        if docker exec backend-staging wget -qO- --timeout=2 http://127.0.0.1:9001/health >/dev/null 2>&1; then
+          echo "Health OK via docker exec (check host port publish if curl failed earlier)"
+          HEALTH_OK=1
+          break
+        fi
+        echo "Waiting for NestJS..."
         sleep 2
       done
-      echo "Health check failed after 30 attempts"
-      exit 1
+      if [ "$$HEALTH_OK" != "1" ]; then
+        echo "Health check failed — backend-staging logs:"
+        docker logs backend-staging --tail 120 2>&1 || true
+        docker compose -f docker-compose.staging.yml ps -a || true
+        exit 1
+      fi
 
     - echo "Deploy staging success!"
   rules:
@@ -240,18 +251,28 @@ deploy:production:
     - docker compose -f docker-compose.production.yml up -d mongo redis
     - docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate backend-production
 
-    - echo "Wait for NestJS (GET /health)..."
     - |
-      for i in $(seq 1 30); do
-        if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
-          echo "Health OK (attempt $$i)"
-          exit 0
+      HEALTH_OK=0
+      for _ in $(seq 1 30); do
+        if curl -fsS --connect-timeout 2 http://127.0.0.1:3002/health >/dev/null 2>&1; then
+          echo "Health OK (host:3002)"
+          HEALTH_OK=1
+          break
         fi
-        echo "Attempt $$i failed, sleep 2s..."
+        if docker exec backend-production wget -qO- --timeout=2 http://127.0.0.1:9001/health >/dev/null 2>&1; then
+          echo "Health OK via docker exec"
+          HEALTH_OK=1
+          break
+        fi
+        echo "Waiting for NestJS..."
         sleep 2
       done
-      echo "Health check failed after 30 attempts"
-      exit 1
+      if [ "$$HEALTH_OK" != "1" ]; then
+        echo "Health check failed — backend-production logs:"
+        docker logs backend-production --tail 120 2>&1 || true
+        docker compose -f docker-compose.production.yml ps -a || true
+        exit 1
+      fi
 
     - echo "Deploy production success!"
   rules:

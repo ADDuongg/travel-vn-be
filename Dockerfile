@@ -67,7 +67,7 @@ EXPOSE 9001
 # - start-period=15s: cho 15 giay sau khi start truoc khi bat dau check (NestJS can thoi gian khoi dong)
 # - retries=3: fail 3 lan lien tiep thi danh dau container "unhealthy"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:9001/api || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:9001/health || exit 1
 
 # Chay NestJS app
 CMD ["node", "dist/src/main.js"]
