@@ -112,14 +112,15 @@ services:
         [
           'CMD',
           'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
+          '-q',
+          '-O',
+          '/dev/null',
+          '--timeout=5',
           'http://127.0.0.1:9001/health',
         ]
       interval: 15s
-      timeout: 5s
-      start_period: 120s
+      timeout: 8s
+      start_period: 180s
       retries: 5
     networks:
       - travel-vn-network

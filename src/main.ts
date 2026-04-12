@@ -14,9 +14,13 @@ import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter'
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
 
 async function bootstrap() {
+  // stderr so logs appear even if Nest bufferLogs never flushes (startup hang/crash)
+  const mark = (msg: string) => console.error(`[bootstrap] ${msg}`);
+  mark('NestFactory.create…');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
+  mark('NestFactory.create OK');
 
   app.useLogger(app.get(Logger));
 
@@ -79,7 +83,9 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(port);
+  mark(`listen(${port}, 0.0.0.0)…`);
+  await app.listen(port, '0.0.0.0');
+  mark(`listening on 0.0.0.0:${port}`);
 }
 bootstrap().catch((err) => {
   // Ensure the error is visible even when bufferLogs swallows NestJS output

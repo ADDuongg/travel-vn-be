@@ -61,9 +61,9 @@ COPY --from=builder /app/dist ./dist
 # Tren host: staging 127.0.0.1:3001, production 127.0.0.1:3002 (xem docker-compose).
 EXPOSE 9001
 
-# HEALTHCHECK (compose file may override). Nest can take >60s to listen on slow VPS.
-HEALTHCHECK --interval=15s --timeout=5s --start-period=120s --retries=5 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:9001/health || exit 1
+# HEALTHCHECK (compose file may override). GET /health — not --spider (HEAD).
+HEALTHCHECK --interval=15s --timeout=8s --start-period=180s --retries=5 \
+  CMD wget -q -O /dev/null --timeout=5 http://127.0.0.1:9001/health || exit 1
 
 # Chay NestJS app
 CMD ["node", "dist/src/main.js"]

@@ -188,6 +188,8 @@ build:production:
 deploy:staging:
   stage: deploy
   script:
+    # Keep compose in sync with repo (VPS path is not the Git checkout)
+    - cp "$CI_PROJECT_DIR/docker-compose.staging.yml" /opt/travel-be/staging/docker-compose.staging.yml
     - cd /opt/travel-be/staging
     - echo "Login registry..."
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
@@ -202,9 +204,9 @@ deploy:staging:
     - docker compose -f docker-compose.staging.yml up -d mongo redis
     - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
 
-    # Nest only listens after Mongo/Bull/etc. init — allow up to ~3 min (avoid CI var clashes: use exit 0 in-loop)
+    # Nest + BullMQ + Mongo can exceed 3 min on a small VPS — allow up to ~6 min
     - |
-      for _ in $(seq 1 90); do
+      for _ in $(seq 1 180); do
         if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:3001/health >/dev/null 2>&1; then
           echo "Health OK (host:3001)"
           exit 0
@@ -217,7 +219,7 @@ deploy:staging:
         sleep 2
       done
       echo "Health check failed — backend-staging logs:"
-      docker logs backend-staging --tail 200 2>&1 || true
+      docker logs backend-staging --tail 400 2>&1 || true
       docker compose -f docker-compose.staging.yml ps -a || true
       exit 1
 
@@ -237,6 +239,7 @@ deploy:staging:
 deploy:production:
   stage: deploy
   script:
+    - cp "$CI_PROJECT_DIR/docker-compose.production.yml" /opt/travel-be/production/docker-compose.production.yml
     - cd /opt/travel-be/production
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
@@ -247,7 +250,7 @@ deploy:production:
     - docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate backend-production
 
     - |
-      for _ in $(seq 1 90); do
+      for _ in $(seq 1 180); do
         if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:3002/health >/dev/null 2>&1; then
           echo "Health OK (host:3002)"
           exit 0
@@ -260,7 +263,7 @@ deploy:production:
         sleep 2
       done
       echo "Health check failed — backend-production logs:"
-      docker logs backend-production --tail 200 2>&1 || true
+      docker logs backend-production --tail 400 2>&1 || true
       docker compose -f docker-compose.production.yml ps -a || true
       exit 1
 

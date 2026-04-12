@@ -78,6 +78,8 @@ import { EnvService } from './env/env.service';
           host: env.get('REDIS_HOST', 'localhost'),
           port: env.get('REDIS_PORT', 6379),
           password: env.get('REDIS_PASSWORD') || undefined,
+          // Required for BullMQ + ioredis (see BullMQ connection docs)
+          maxRetriesPerRequest: null,
         },
       }),
     }),
@@ -142,6 +144,8 @@ import { EnvService } from './env/env.service';
       inject: [EnvService],
       useFactory: (env: EnvService) => ({
         uri: env.get('DB_URI'),
+        serverSelectionTimeoutMS: 25_000,
+        socketTimeoutMS: 45_000,
       }),
     }),
     ThrottlerModule.forRoot([

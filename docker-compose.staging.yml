@@ -81,11 +81,13 @@ services:
     ports:
       - '127.0.0.1:3001:9001'
     # Override .env mistakes: NODE_ENV (pino-pretty), Redis, port.
+    # Clear REDIS_PASSWORD when Redis has no auth (avoids ioredis warnings / odd retries).
     environment:
       NODE_ENV: production
       PORT: '9001'
       REDIS_HOST: redis
       REDIS_PORT: '6379'
+      REDIS_PASSWORD: ''
     env_file:
       - .env
     depends_on:
@@ -98,23 +100,25 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 512M
+          memory: 768M
         reservations:
           cpus: '0.1'
           memory: 128M
     healthcheck:
+      # GET (not wget --spider / HEAD): matches Nest route reliably
       test:
         [
           'CMD',
           'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
+          '-q',
+          '-O',
+          '/dev/null',
+          '--timeout=5',
           'http://127.0.0.1:9001/health',
         ]
       interval: 15s
-      timeout: 5s
-      start_period: 120s
+      timeout: 8s
+      start_period: 180s
       retries: 5
     networks:
       - travel-vn-dev-network
