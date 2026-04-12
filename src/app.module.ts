@@ -88,15 +88,18 @@ import { EnvService } from './env/env.service';
         const isProduction = env.isProduction();
         const logLevel =
           env.get('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
+        // pino-pretty is devDependency — only use for local NODE_ENV=development.
+        // Docker/production images must not load it (would crash: "unable to determine transport target").
+        const usePinoPretty = env.get('NODE_ENV') === 'development';
         return {
           pinoHttp: {
             level: logLevel,
-            transport: isProduction
-              ? undefined
-              : {
+            transport: usePinoPretty
+              ? {
                   target: 'pino-pretty',
                   options: { colorize: true, singleLine: true },
-                },
+                }
+              : undefined,
             redact: [
               'req.headers.authorization',
               'req.headers.cookie',

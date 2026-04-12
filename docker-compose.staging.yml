@@ -80,8 +80,9 @@ services:
     container_name: backend-staging
     ports:
       - '127.0.0.1:3001:9001'
-    # Override .env mistakes: Redis host, listen port (must match ports: "3001:9001").
+    # Override .env mistakes: NODE_ENV (pino-pretty), Redis, port.
     environment:
+      NODE_ENV: production
       PORT: '9001'
       REDIS_HOST: redis
       REDIS_PORT: '6379'
