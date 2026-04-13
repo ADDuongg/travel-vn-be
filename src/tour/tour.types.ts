@@ -31,7 +31,7 @@ export interface TourItineraryDay {
 }
 
 export interface TourDestination {
-  provinceId: string | any;
+  provinceId: string;
   isMainDestination: boolean;
 }
 
@@ -97,7 +97,7 @@ export interface Tour {
   tourType: 'DOMESTIC' | 'INTERNATIONAL' | 'DAILY';
   duration: TourDuration;
   destinations: TourDestination[];
-  departureProvinceId: string | any;
+  departureProvinceId: string;
   translations: Record<string, TourTranslation>;
   itinerary: TourItineraryDay[];
   capacity: TourCapacity;

@@ -11,7 +11,7 @@ import { ZodSchema } from 'zod';
 export class ZodValidationPipe implements PipeTransform {
   constructor(private schema: ZodSchema<any>) {}
 
-  transform(value: any, metadata: ArgumentMetadata) {
+  transform(value: any, _metadata: ArgumentMetadata) {
     const result = this.schema.safeParse(value);
     if (!result.success) {
       const errors = result.error.issues.map(

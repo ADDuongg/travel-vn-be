@@ -60,7 +60,7 @@ export class TourBookingExpireService {
       await booking.save();
 
       this.logger.log(
-        `Expired tour booking ${booking._id} (${booking.bookingCode})`,
+        `Expired tour booking ${String(booking._id)} (${String(booking.bookingCode ?? '')})`,
       );
     }
   }

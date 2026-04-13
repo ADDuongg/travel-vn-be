@@ -66,18 +66,103 @@ $ yarn run test:e2e
 $ yarn run test:cov
 ```
 
-## Deployment
+## Deployment (GitLab CI/CD)
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Project duoc deploy tu dong qua GitLab CI/CD pipeline khi push vao branch `staging` hoac `production`.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Pipeline stages
+
+1. **validate** -- lint (moi branch)
+2. **test** -- unit tests (moi branch)
+3. **build** -- Docker build + push len GitLab Container Registry (chi staging/production)
+4. **deploy** -- Pull image + restart container tren VPS (chi staging/production)
+
+### Ten image tren registry
+
+- Staging: `registry.gitlab.com/<group>/<project>:staging` (them tag `staging-<sha>` de luu lich su)
+- Production: `...:production` (them tag `production-<sha>`)
+
+`CI_REGISTRY_IMAGE` trong GitLab = `registry.gitlab.com/<group>/<project>` (khong co them path con). Trong `.env` tren VPS: `CI_REGISTRY_IMAGE` + `IMAGE_TAG` (`staging` / `production`).
+
+### Build & push thu cong (khong qua CI)
 
 ```bash
-$ yarn install -g @nestjs/mau
-$ mau deploy
+docker login registry.gitlab.com
+
+# Staging
+docker build -t registry.gitlab.com/nvduong2302/travel-vn-be:staging .
+docker push registry.gitlab.com/nvduong2302/travel-vn-be:staging
+
+# Production
+docker build -t registry.gitlab.com/nvduong2302/travel-vn-be:production .
+docker push registry.gitlab.com/nvduong2302/travel-vn-be:production
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Tech stack (runtime)
+
+| Thanh phan          | Vai tro                                                                        |
+| ------------------- | ------------------------------------------------------------------------------ |
+| **NestJS**          | API (`PORT` mac dinh 9001)                                                     |
+| **MongoDB**         | Du lieu chinh (Mongoose) — service `mongo` trong compose                       |
+| **Redis**           | BullMQ (notification queue), ioredis (OTP, permission cache) — service `redis` |
+| **OpenAI / Ollama** | LLM tuy chon (`LLM_PROVIDER`, `OPENAI_*`, `OLLAMA_*`)                          |
+
+Mongo va Redis **khong** can cai tren host: chung la service trong `docker-compose.*.yml`, du lieu nam trong volume `mongo_data` / `redis_data`.
+
+### Cau truc tren VPS
+
+```
+/opt/travel-be/
+├── staging/
+│   ├── docker-compose.staging.yml   # backend + mongo + redis
+│   └── .env
+└── production/
+    ├── docker-compose.production.yml
+    └── .env
+```
+
+### Setup VPS lan dau
+
+```bash
+# 1. Tao thu muc
+sudo mkdir -p /opt/travel-be/staging /opt/travel-be/production
+
+# 2. Copy docker-compose files vao VPS
+cp docker-compose.staging.yml /opt/travel-be/staging/
+cp docker-compose.production.yml /opt/travel-be/production/
+
+# 3. Tao .env (DB_URI, REDIS_HOST, JWT; va image compose: CI_REGISTRY_IMAGE + IMAGE_TAG)
+cp .env.example /opt/travel-be/staging/.env
+cp .env.example /opt/travel-be/production/.env
+# Staging: IMAGE_TAG=staging  |  Production: IMAGE_TAG=production
+# Image day du: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG}
+# Sua JWT_SECRET, JWT_REFRESH_SECRET, CORS_ORIGINS, ...
+
+# 4. Lan dau: khoi dong ca stack (Mongo + Redis + backend)
+cd /opt/travel-be/staging
+docker compose -f docker-compose.staging.yml up -d
+```
+
+Trong `.env` khi dung compose: `DB_URI=mongodb://mongo:27017/travel-vn`, `REDIS_HOST=redis`.
+
+### Port mapping (chi API ra ngoai host)
+
+| Environment | API (host)                      | Mongo / Redis                                 |
+| ----------- | ------------------------------- | --------------------------------------------- |
+| Staging     | 127.0.0.1:3001 → container 9001 | Chi trong mang Docker (khong mo port ra host) |
+| Production  | 127.0.0.1:3002 → container 9001 | Tuong tu                                      |
+
+### Deploy CI (GitLab)
+
+Pipeline chi **pull + recreate** container backend; Mongo va Redis giu nguyen, tranh restart DB moi lan deploy.
+
+## Ollama (LLM local, tuy chon)
+
+Compose hien tai **chua** gom Ollama (ton RAM/GPU). Ban co the:
+
+- Dung **OpenAI** (`LLM_PROVIDER=openai`, `OPENAI_API_KEY=...`), hoac
+- Cai Ollama tren host (`curl -fsSL https://ollama.com/install.sh | sh`, `ollama pull llama3.1`) va dat `OLLAMA_BASE_URL=http://host.docker.internal:11434` — tren Linux host can cau hinh them de container goi duoc host, hoac
+- Tu them service `ollama` vao compose (image `ollama/ollama`) cung network, roi `OLLAMA_BASE_URL=http://ollama:11434`, `LLM_PROVIDER=ollama`, `OLLAMA_MODEL=llama3.1`.
 
 ## Resources
 

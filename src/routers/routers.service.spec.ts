@@ -1,15 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RoutersService } from './routers.service';
+import { getModelToken } from '@nestjs/mongoose';
+import { RouterService } from './routers.service';
+import { Router } from './schemas/router.schema';
 
-describe('RoutersService', () => {
-  let service: RoutersService;
+describe('RouterService', () => {
+  let service: RouterService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RoutersService],
+      providers: [
+        RouterService,
+        {
+          provide: getModelToken(Router.name),
+          useValue: {},
+        },
+      ],
     }).compile();
 
-    service = module.get<RoutersService>(RoutersService);
+    service = module.get<RouterService>(RouterService);
   });
 
   it('should be defined', () => {

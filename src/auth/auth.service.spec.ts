@@ -14,6 +14,8 @@ import { RefreshToken } from './schema/refresh_token.schema';
 import { User } from 'src/user/schema/user.schema';
 import { UserService } from 'src/user/user.service';
 import { EnvService } from 'src/env/env.service';
+import { OtpService } from 'src/otp/otp.service';
+import { MailService } from 'src/mail/mail.service';
 import { PermissionService } from '../permission/permission.service';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 
@@ -78,6 +80,15 @@ const mockPermissionService = {
   resolvePermissions: jest.fn().mockResolvedValue({ apis: [], routers: [] }),
 };
 
+const mockOtpService = {
+  requestOtp: jest.fn(),
+  verifyOtp: jest.fn(),
+};
+
+const mockMailService = {
+  send: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
@@ -96,6 +107,8 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: EnvService, useValue: mockEnvService },
         { provide: PermissionService, useValue: mockPermissionService },
+        { provide: OtpService, useValue: mockOtpService },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
@@ -298,7 +311,10 @@ describe('AuthService', () => {
         sub: '000000000000000000000001',
         jti: 'j1',
       });
-      mockRefreshTokenModel.updateOne.mockResolvedValue({ modifiedCount: 0 });
+      mockRefreshTokenModel.findOne.mockResolvedValue({
+        jti: 'j1',
+        isRevoked: true,
+      });
 
       await expect(service.logout('token')).rejects.toThrow(
         UnauthorizedException,
@@ -311,7 +327,13 @@ describe('AuthService', () => {
         sub: '000000000000000000000001',
         jti: 'j1',
       });
-      mockRefreshTokenModel.updateOne.mockResolvedValue({ modifiedCount: 1 });
+      mockRefreshTokenModel.findOne.mockResolvedValue({
+        jti: 'j1',
+        isRevoked: false,
+        tokenHash: undefined,
+        familyId: undefined,
+        save: jest.fn().mockResolvedValue(undefined),
+      });
 
       const result = await service.logout('token');
 

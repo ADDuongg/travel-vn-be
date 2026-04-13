@@ -8,7 +8,15 @@ describe('RoomInventoryController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RoomInventoryController],
-      providers: [RoomInventoryService],
+      providers: [
+        {
+          provide: RoomInventoryService,
+          useValue: {
+            ensureInventoryExists: jest.fn(),
+            getMaxRoomsCanBook: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<RoomInventoryController>(RoomInventoryController);

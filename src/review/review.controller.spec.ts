@@ -8,7 +8,19 @@ describe('ReviewController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ReviewController],
-      providers: [ReviewService],
+      providers: [
+        {
+          provide: ReviewService,
+          useValue: {
+            findPublicReviews: jest.fn(),
+            findMyReview: jest.fn(),
+            adminFindAll: jest.fn(),
+            upsertReview: jest.fn(),
+            approveReview: jest.fn(),
+            removeReview: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<ReviewController>(ReviewController);

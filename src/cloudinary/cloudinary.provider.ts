@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { EnvService } from 'src/env/env.service';
 
@@ -10,7 +11,11 @@ export const CloudinaryProvider = {
     const apiSecret = env.get('CLOUDINARY_API_SECRET');
 
     if (!cloudName || !apiKey || !apiSecret) {
-      throw new Error('Missing Cloudinary environment variables111');
+      Logger.warn(
+        'Cloudinary env vars not set — upload features will be unavailable',
+        'CloudinaryProvider',
+      );
+      return null;
     }
 
     cloudinary.config({

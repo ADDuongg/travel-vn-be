@@ -58,11 +58,12 @@ export class TourBookingReconcileService {
           payment.chargeId ?? payment.intentId,
         );
         this.logger.warn(
-          `Reconciled tour booking ${tourBookingId} from payment ${payment._id}`,
+          `Reconciled tour booking ${String(tourBookingId)} from payment ${String(payment._id)}`,
         );
-      } catch (err) {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
         this.logger.error(
-          `Reconcile failed tour ${tourBookingId} payment ${payment._id}: ${err}`,
+          `Reconcile failed tour ${String(tourBookingId)} payment ${String(payment._id)}: ${msg}`,
         );
       }
     }

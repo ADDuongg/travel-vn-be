@@ -9,13 +9,6 @@ import { BookingService } from '../booking/booking.service';
 import { TourBookingService } from '../tour-booking/tour-booking.service';
 import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
 
-/* ────────── mock stripe module ────────── */
-const mockStripe = {
-  paymentIntents: { create: jest.fn() },
-  webhooks: { constructEvent: jest.fn() },
-  refunds: { create: jest.fn() },
-};
-
 jest.mock('../stripe.service', () => ({
   stripe: {
     paymentIntents: { create: jest.fn() },

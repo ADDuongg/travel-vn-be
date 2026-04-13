@@ -1,17 +1,28 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { RoutersController } from './routers.controller';
-import { RoutersService } from './routers.service';
+import { RouterController } from './routers.controller';
+import { RouterService } from './routers.service';
 
-describe('RoutersController', () => {
-  let controller: RoutersController;
+describe('RouterController', () => {
+  let controller: RouterController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [RoutersController],
-      providers: [RoutersService],
+      controllers: [RouterController],
+      providers: [
+        {
+          provide: RouterService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findOne: jest.fn(),
+            update: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
-    controller = module.get<RoutersController>(RoutersController);
+    controller = module.get<RouterController>(RouterController);
   });
 
   it('should be defined', () => {

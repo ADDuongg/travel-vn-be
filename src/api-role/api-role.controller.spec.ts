@@ -8,7 +8,18 @@ describe('ApiRoleController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ApiRoleController],
-      providers: [ApiRoleService],
+      providers: [
+        {
+          provide: ApiRoleService,
+          useValue: {
+            create: jest.fn(),
+            findAll: jest.fn(),
+            findByRole: jest.fn(),
+            remove: jest.fn(),
+            replaceByRole: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<ApiRoleController>(ApiRoleController);

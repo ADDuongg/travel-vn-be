@@ -18,4 +18,3 @@ export interface OtpRecord {
   maxAttempts: number;
   meta?: Record<string, unknown>;
 }
-

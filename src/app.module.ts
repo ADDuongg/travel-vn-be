@@ -78,6 +78,8 @@ import { EnvService } from './env/env.service';
           host: env.get('REDIS_HOST', 'localhost'),
           port: env.get('REDIS_PORT', 6379),
           password: env.get('REDIS_PASSWORD') || undefined,
+          // Required for BullMQ + ioredis (see BullMQ connection docs)
+          maxRetriesPerRequest: null,
         },
       }),
     }),
@@ -88,15 +90,18 @@ import { EnvService } from './env/env.service';
         const isProduction = env.isProduction();
         const logLevel =
           env.get('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
+        // pino-pretty is devDependency — only use for local NODE_ENV=development.
+        // Docker/production images must not load it (would crash: "unable to determine transport target").
+        const usePinoPretty = env.get('NODE_ENV') === 'development';
         return {
           pinoHttp: {
             level: logLevel,
-            transport: isProduction
-              ? undefined
-              : {
+            transport: usePinoPretty
+              ? {
                   target: 'pino-pretty',
                   options: { colorize: true, singleLine: true },
-                },
+                }
+              : undefined,
             redact: [
               'req.headers.authorization',
               'req.headers.cookie',
@@ -139,6 +144,8 @@ import { EnvService } from './env/env.service';
       inject: [EnvService],
       useFactory: (env: EnvService) => ({
         uri: env.get('DB_URI'),
+        serverSelectionTimeoutMS: 25_000,
+        socketTimeoutMS: 45_000,
       }),
     }),
     ThrottlerModule.forRoot([
@@ -166,7 +173,6 @@ import { EnvService } from './env/env.service';
     AmenitiesModule,
     ReviewModule,
     PaymentModule,
-    OrdersModule,
     BookingModule,
     HotelModule,
     RoomInventoryModule,

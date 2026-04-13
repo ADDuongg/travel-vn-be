@@ -1,16 +1,7 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { TourInventoryService } from './tour-inventory.service';
 import { BlockSlotsDto } from './dto/block-slots.dto';
 import { ReleaseSlotsDto } from './dto/release-slots.dto';
-import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('api/v1/tour-inventory')
 export class TourInventoryController {

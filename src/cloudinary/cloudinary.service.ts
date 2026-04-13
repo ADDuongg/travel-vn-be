@@ -9,26 +9,40 @@ type CloudinaryClient = typeof cloudinary;
 export class CloudinaryService {
   constructor(
     @Inject('CLOUDINARY')
-    private readonly cloudinary: CloudinaryClient,
+    private readonly client: CloudinaryClient | null,
   ) {}
+
+  private getClient(): CloudinaryClient {
+    if (!this.client) {
+      throw new Error(
+        'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET.',
+      );
+    }
+    return this.client;
+  }
 
   uploadFile(
     file: Express.Multer.File,
     options?: { folder?: string; public_id?: string },
   ): Promise<CloudinaryResponse> {
+    const cli = this.getClient();
     return new Promise((resolve, reject) => {
-      const uploadStream = this.cloudinary.uploader.upload_stream(
+      const uploadStream = cli.uploader.upload_stream(
         {
-          folder: options?.folder, // 👈 có thì dùng
-          public_id: options?.public_id, // 👈 optional
+          folder: options?.folder,
+          public_id: options?.public_id,
         },
-        (error, result) => {
+        (error: unknown, result) => {
           if (error) {
-            return reject(
+            const err =
               error instanceof Error
                 ? error
-                : new Error('Cloudinary upload failed'),
-            );
+                : new Error(
+                    typeof error === 'string'
+                      ? error
+                      : 'Cloudinary upload failed',
+                  );
+            return reject(err);
           }
 
           if (!result) {
@@ -45,24 +59,20 @@ export class CloudinaryService {
 
   async uploadFiles(
     files: Express.Multer.File[],
-    // folder?: string,
   ): Promise<CloudinaryResponse[]> {
     if (!files || files.length === 0) {
       return [];
     }
 
-    return Promise.all(
-      files.map((file) => this.uploadFile(file /* , folder */)),
-    );
+    return Promise.all(files.map((file) => this.uploadFile(file)));
   }
 
   async deleteFile(publicId: string): Promise<void> {
-    await this.cloudinary.uploader.destroy(publicId);
+    await this.getClient().uploader.destroy(publicId);
   }
 
   async deleteFiles(publicIds: string[]) {
-    await Promise.all(
-      publicIds.map((id) => this.cloudinary.uploader.destroy(id)),
-    );
+    const cli = this.getClient();
+    await Promise.all(publicIds.map((id) => cli.uploader.destroy(id)));
   }
 }

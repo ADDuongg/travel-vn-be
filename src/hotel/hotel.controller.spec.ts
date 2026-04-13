@@ -8,7 +8,17 @@ describe('HotelController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [HotelController],
-      providers: [HotelService],
+      providers: [
+        {
+          provide: HotelService,
+          useValue: {
+            create: jest.fn(),
+            findAllActive: jest.fn(),
+            findById: jest.fn(),
+            update: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
     controller = module.get<HotelController>(HotelController);

@@ -1,71 +1,55 @@
-# API + MongoDB + Redis. Mongo/Redis không publish port ra host (an toàn trên VPS).
-# Cần kết nối MongoDB/Redis từ máy local: docker compose -f docker-compose.yml -f docker-compose.dev-ports.yml up -d
-#
-# Trong .env (hoặc env_file) khi chạy trong Compose, đặt:
-#   DB_URI=mongodb://mongo:27017/<tên_db>
-#   REDIS_HOST=redis
-#   REDIS_PORT=6379
-#   PORT=9001
-
+# docker-compose.local.yml
 services:
-  api:
-    build: .
-    container_name: nestjs-tours-api
+  mongo:
+    image: mongo:7.0
+    container_name: backend-local-mongo
     restart: unless-stopped
     ports:
-      # Host:container — cú pháp Compose: ${VAR:-default}
-      - "${API_PUBLISH_PORT:-9001}:9001"
-    env_file:
-      - .env
-    environment:
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
-    depends_on:
-      mongo:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - tours-network
-
-  mongo:
-    image: mongo:7
-    container_name: nestjs-tours-mongo
-    restart: unless-stopped
+      - '27017:27017' # expose ra ngoài để dùng Compass
     volumes:
-      - mongo-data:/data/db
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "mongosh",
-          "--quiet",
-          "mongodb://127.0.0.1:27017/test",
-          "--eval",
-          "db.runCommand({ ping: 1 }).ok",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
+      - mongo_data:/data/db
     networks:
-      - tours-network
+      - travel-vn-local-network
 
   redis:
     image: redis:7-alpine
-    container_name: nestjs-tours-redis
+    container_name: backend-local-redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379' # expose để debug nếu cần
+    volumes:
+      - redis_data:/data
     networks:
-      - tours-network
+      - travel-vn-local-network
 
-volumes:
-  mongo-data:
+  backend-local:
+    build:
+      context: . # build từ source thay vì pull image
+    container_name: backend-local
+    ports:
+      - '9001:9001'
+    environment:
+      NODE_ENV: development
+      PORT: '9001'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ''
+    env_file:
+      - .env.local # dùng .env riêng cho local
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - travel-vn-local-network
+    volumes:
+      - .:/app # hot reload
+      - /app/node_modules
 
 networks:
-  tours-network:
+  travel-vn-local-network:
     driver: bridge
+
+volumes:
+  mongo_data:
+  redis_data:

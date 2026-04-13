@@ -7,7 +7,6 @@ import {
   Booking,
   BookingDocument,
   BookingStatus,
-  BookingPaymentStatus,
 } from 'src/booking/schema/booking.schema';
 import {
   Payment,

@@ -85,7 +85,6 @@ const mockCloudinaryService = { uploadFile: jest.fn() };
 
 describe('BookingService', () => {
   let service: BookingService;
-  let bookingModelCtor: any;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -101,7 +100,6 @@ describe('BookingService', () => {
     }).compile();
 
     service = module.get<BookingService>(BookingService);
-    bookingModelCtor = module.get(getModelToken(Booking.name));
   });
 
   /* ────────── shared DTO fixture ────────── */

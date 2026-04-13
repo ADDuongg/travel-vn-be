@@ -1,0 +1,150 @@
+# =============================================================================
+# DOCKER COMPOSE -- STAGING ENVIRONMENT
+# =============================================================================
+#
+# Stack: NestJS API + MongoDB + Redis (tat ca chay trong container, khong can cai
+# Mongo/Redis truc tiep tren VPS).
+#
+# Cach chay:
+#   docker compose -f docker-compose.staging.yml up -d
+#
+# Luu y:
+#   - Image backend: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} (mac dinh :staging)
+#   - Dat CI_REGISTRY_IMAGE + IMAGE_TAG trong .env cung thu muc (xem .env.example).
+#   - mongo + redis dung image public; lan dau chay se pull tu Docker Hub.
+#   - DB_URI / REDIS_* trong .env phai tro toi ten service: mongo, redis (xem .env.example).
+#   - Mongo auth: MONGO_USER + MONGO_PASSWORD trong .env (trung user/pass da tao trong admin);
+#     DB_URI co dang mongodb://USER:PASS@mongo:27017/TEN_DB?authSource=admin (PASS URL-encode neu co @).
+#
+# =============================================================================
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: backend-staging-mongo
+    restart: unless-stopped
+    command: ['mongod', '--auth']
+    environment:
+      MONGO_USER: ${MONGO_USER}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_staging_data:/data/db
+    # Chi loopback VPS: SSH tunnel tu may local -L 27017:127.0.0.1:27017
+    ports:
+      - '127.0.0.1:27017:27017'
+    networks:
+      - travel-vn-dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mongosh --quiet -u "$$MONGO_USER" -p "$$MONGO_PASSWORD" --authenticationDatabase admin mongodb://127.0.0.1:27017/admin --eval "String(db.runCommand({ ping: 1 }).ok)"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  redis:
+    image: redis:7-alpine
+    container_name: backend-staging-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_staging_data:/data
+    networks:
+      - travel-vn-dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.05'
+          memory: 32M
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  backend-staging:
+    image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}'
+    container_name: backend-staging
+    ports:
+      - '127.0.0.1:3001:9001'
+    # Override .env mistakes: NODE_ENV (pino-pretty), Redis, port.
+    # Clear REDIS_PASSWORD when Redis has no auth (avoids ioredis warnings / odd retries).
+    environment:
+      NODE_ENV: production
+      PORT: '9001'
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ''
+    env_file:
+      - .env
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    healthcheck:
+      # GET (not wget --spider / HEAD): matches Nest route reliably
+      test:
+        [
+          'CMD',
+          'wget',
+          '-q',
+          '-O',
+          '/dev/null',
+          '--timeout=5',
+          'http://127.0.0.1:9001/health',
+        ]
+      interval: 15s
+      timeout: 8s
+      start_period: 180s
+      retries: 5
+    networks:
+      - travel-vn-dev-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  travel-vn-dev-network:
+    name: travel-vn-dev-network
+    driver: bridge
+
+volumes:
+  mongo_staging_data:
+  redis_staging_data:

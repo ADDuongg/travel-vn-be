@@ -20,8 +20,6 @@ import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { IsString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TourGuide } from 'src/tour-guide/schema/tour-guide.schema';
-
 class AssignGuideDto {
   @IsString()
   @Type(() => String)

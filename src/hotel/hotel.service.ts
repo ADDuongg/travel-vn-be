@@ -60,7 +60,7 @@ export class HotelService {
       })
       .select('_id')
       .lean();
-    return hotels.map((h) => String(h._id));
+    return hotels.map((h) => (h._id as Types.ObjectId).toString());
   }
 
   /**

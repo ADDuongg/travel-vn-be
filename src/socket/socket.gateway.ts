@@ -22,11 +22,11 @@ export class EventsGateway
   @WebSocketServer()
   server: Server;
 
-  afterInit(server: Server) {
+  afterInit(_server: Server) {
     this.logger.log('Initialized');
   }
 
-  handleConnection(client: Socket, ...args: any[]) {
+  handleConnection(client: Socket, ..._args: unknown[]) {
     this.logger.log(`Client connected: ${client.id}`);
     console.log('Client connected:', client.id);
   }
@@ -48,7 +48,7 @@ export class EventsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() roomId: string,
   ) {
-    client.join(roomId);
+    void client.join(roomId);
     client.emit('joined-room', roomId);
     this.server
       .to(roomId)
@@ -60,7 +60,7 @@ export class EventsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() roomId: string,
   ) {
-    client.leave(roomId);
+    void client.leave(roomId);
     client.emit('left-room', roomId);
   }
 

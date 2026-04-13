@@ -22,4 +22,3 @@ export class DashboardQueryDto {
   @IsString()
   to?: string;
 }
-

@@ -46,19 +46,17 @@ export class RoomInventoryCronService {
             from,
             to,
           );
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
           this.logger.error(
-            `Failed to ensure inventory for room ${room._id}: ${
-              error?.message ?? error
-            }`,
+            `Failed to ensure inventory for room ${(room._id as Types.ObjectId).toString()}: ${msg}`,
           );
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `RoomInventoryCronService.ensureRollingInventoryForActiveRooms failed: ${
-          error?.message ?? error
-        }`,
+        `RoomInventoryCronService.ensureRollingInventoryForActiveRooms failed: ${msg}`,
       );
     }
   }

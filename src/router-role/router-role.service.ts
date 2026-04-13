@@ -16,7 +16,7 @@ export class RouterRoleService {
     try {
       const rr = new this.routerRoleModel(dto);
       return await rr.save();
-    } catch (err) {
+    } catch {
       throw new BadRequestException('Router already assigned to role');
     }
   }
