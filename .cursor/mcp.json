@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "mcp-server-memory",
+      "env": {
+        "MEMORY_FILE_PATH": "/Users/duongnv/Desktop/phx-project/vn-tours/nestjs-tours/.cursor/memory.jsonl"
+      }
+    }
+  }
+}

@@ -100,12 +100,12 @@ docker push registry.gitlab.com/nvduong2302/travel-vn-be:production
 
 ### Tech stack (runtime)
 
-| Thanh phan | Vai tro |
-|------------|---------|
-| **NestJS** | API (`PORT` mac dinh 9001) |
-| **MongoDB** | Du lieu chinh (Mongoose) — service `mongo` trong compose |
-| **Redis** | BullMQ (notification queue), ioredis (OTP, permission cache) — service `redis` |
-| **OpenAI / Ollama** | LLM tuy chon (`LLM_PROVIDER`, `OPENAI_*`, `OLLAMA_*`) |
+| Thanh phan          | Vai tro                                                                        |
+| ------------------- | ------------------------------------------------------------------------------ |
+| **NestJS**          | API (`PORT` mac dinh 9001)                                                     |
+| **MongoDB**         | Du lieu chinh (Mongoose) — service `mongo` trong compose                       |
+| **Redis**           | BullMQ (notification queue), ioredis (OTP, permission cache) — service `redis` |
+| **OpenAI / Ollama** | LLM tuy chon (`LLM_PROVIDER`, `OPENAI_*`, `OLLAMA_*`)                          |
 
 Mongo va Redis **khong** can cai tren host: chung la service trong `docker-compose.*.yml`, du lieu nam trong volume `mongo_data` / `redis_data`.
 
@@ -147,10 +147,10 @@ Trong `.env` khi dung compose: `DB_URI=mongodb://mongo:27017/travel-vn`, `REDIS_
 
 ### Port mapping (chi API ra ngoai host)
 
-| Environment | API (host) | Mongo / Redis |
-|-------------|------------|----------------|
+| Environment | API (host)                      | Mongo / Redis                                 |
+| ----------- | ------------------------------- | --------------------------------------------- |
 | Staging     | 127.0.0.1:3001 → container 9001 | Chi trong mang Docker (khong mo port ra host) |
-| Production  | 127.0.0.1:3002 → container 9001 | Tuong tu |
+| Production  | 127.0.0.1:3002 → container 9001 | Tuong tu                                      |
 
 ### Deploy CI (GitLab)
 

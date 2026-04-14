@@ -3,7 +3,13 @@ services:
   mongo:
     image: mongo:7.0
     container_name: backend-local-mongo
+    command: ['mongod', '--auth', '--bind_ip_all']
     restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: duongnv
+      MONGO_INITDB_ROOT_PASSWORD: Duong@88999
     ports:
       - '27017:27017' # expose ra ngoài để dùng Compass
     volumes:
@@ -23,28 +29,28 @@ services:
     networks:
       - travel-vn-local-network
 
-  backend-local:
-    build:
-      context: . # build từ source thay vì pull image
-    container_name: backend-local
-    ports:
-      - '9001:9001'
-    environment:
-      NODE_ENV: development
-      PORT: '9001'
-      REDIS_HOST: redis
-      REDIS_PORT: '6379'
-      REDIS_PASSWORD: ''
-    env_file:
-      - .env.local # dùng .env riêng cho local
-    depends_on:
-      - mongo
-      - redis
-    networks:
-      - travel-vn-local-network
-    volumes:
-      - .:/app # hot reload
-      - /app/node_modules
+  # backend-local:
+  #   build:
+  #     context: .
+  #   container_name: backend-local
+  #   ports:
+  #     - '9001:9001'
+  #   environment:
+  #     NODE_ENV: development
+  #     PORT: '9001'
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: '6379'
+  #     REDIS_PASSWORD: ''
+  #   env_file:
+  #     - .env #
+  #   depends_on:
+  #     - mongo
+  #     - redis
+  #   networks:
+  #     - travel-vn-local-network
+  #   volumes:
+  #     - .:/app # hot reload
+  #     - /app/node_modules
 
 networks:
   travel-vn-local-network:
