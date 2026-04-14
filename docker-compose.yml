@@ -3,12 +3,13 @@ services:
   mongo:
     image: mongo:7.0
     container_name: backend-local-mongo
+    command: ['mongod', '--auth', '--bind_ip_all']
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: duongnv
+      MONGO_INITDB_ROOT_PASSWORD: Duong@88999
     ports:
       - '27017:27017' # expose ra ngoài để dùng Compass
     volumes:
