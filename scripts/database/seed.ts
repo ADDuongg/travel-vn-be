@@ -40,7 +40,9 @@ async function main() {
     });
     log.success('Migrations applied.');
   } catch {
-    log.warn('Migration step had issues (may be okay if no pending migrations).');
+    log.warn(
+      'Migration step had issues (may be okay if no pending migrations).',
+    );
   }
 
   // Step 3: Seed data
@@ -49,13 +51,19 @@ async function main() {
 
   if (hasSeedData(realisticDir)) {
     log.step('Seeding from realistic data (staging snapshot)...');
-    mongorestore(config.mongoUriLocal, realisticDir, config.dbLocal, { drop: false });
+    mongorestore(config.mongoUriLocal, realisticDir, config.dbLocal, {
+      drop: false,
+    });
   } else if (hasSeedData(baseDir)) {
     log.step('Seeding from base seed data...');
-    mongorestore(config.mongoUriLocal, baseDir, config.dbLocal, { drop: false });
+    mongorestore(config.mongoUriLocal, baseDir, config.dbLocal, {
+      drop: false,
+    });
   } else {
     log.warn('No seed data found in seeds/realistic/ or seeds/base/.');
-    log.info('Run "npm run db:seed:from-staging" first to generate realistic seeds,');
+    log.info(
+      'Run "npm run db:seed:from-staging" first to generate realistic seeds,',
+    );
     log.info('or add base seed data to seeds/base/.');
   }
 
@@ -65,7 +73,9 @@ async function main() {
   const collections = await mongoose.connection.db!.listCollections().toArray();
   const counts: Record<string, string | number> = {};
   for (const col of collections) {
-    const count = await mongoose.connection.db!.collection(col.name).countDocuments();
+    const count = await mongoose.connection
+      .db!.collection(col.name)
+      .countDocuments();
     counts[col.name] = count;
   }
   await mongoose.disconnect();

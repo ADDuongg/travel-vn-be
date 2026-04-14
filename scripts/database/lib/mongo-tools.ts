@@ -34,7 +34,9 @@ export function mongodump(uri: string, outputDir: string): void {
     outputDir,
   ];
 
-  log.info(`Dumping database "${parsed.database}" from ${parsed.host}:${parsed.port}`);
+  log.info(
+    `Dumping database "${parsed.database}" from ${parsed.host}:${parsed.port}`,
+  );
   execSync(args.join(' '), { stdio: 'inherit' });
   log.success(`Dump saved to ${outputDir}`);
 }
@@ -57,7 +59,9 @@ export function mongorestore(
     dumpDbDir,
   ];
 
-  log.info(`Restoring to database "${targetDb}" on ${parsed.host}:${parsed.port}`);
+  log.info(
+    `Restoring to database "${targetDb}" on ${parsed.host}:${parsed.port}`,
+  );
   execSync(args.join(' '), { stdio: 'inherit' });
   log.success(`Restored to "${targetDb}"`);
 }

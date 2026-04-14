@@ -43,9 +43,7 @@ export const log = {
   header(title: string) {
     console.log('');
     log.divider();
-    console.log(
-      `${COLORS.bold}${COLORS.magenta}  ${title}${COLORS.reset}`,
-    );
+    console.log(`${COLORS.bold}${COLORS.magenta}  ${title}${COLORS.reset}`);
     log.divider();
   },
 

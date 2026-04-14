@@ -13,11 +13,15 @@ async function main() {
 
   if (!config.mongoUriStaging) {
     log.error('MONGO_URI_STAGING is not set in .env');
-    log.info('Set it and ensure SSH tunnel is open before running this command.');
+    log.info(
+      'Set it and ensure SSH tunnel is open before running this command.',
+    );
     process.exit(1);
   }
 
-  log.info(`Staging URI: ${config.mongoUriStaging.replace(/\/\/.*@/, '//***:***@')}`);
+  log.info(
+    `Staging URI: ${config.mongoUriStaging.replace(/\/\/.*@/, '//***:***@')}`,
+  );
   log.info(`Debug DB target: ${config.dbDebug}`);
   log.warn('This is RAW staging data (no sanitization). For debugging only.');
 
@@ -58,7 +62,9 @@ async function main() {
     });
     log.success('Migrations applied.');
   } catch {
-    log.warn('Migration step had issues (may be okay if no pending migrations).');
+    log.warn(
+      'Migration step had issues (may be okay if no pending migrations).',
+    );
   }
 
   // Step 5: Print summary
@@ -67,7 +73,9 @@ async function main() {
   const collections = await mongoose.connection.db!.listCollections().toArray();
   const counts: Record<string, string | number> = {};
   for (const col of collections) {
-    const count = await mongoose.connection.db!.collection(col.name).countDocuments();
+    const count = await mongoose.connection
+      .db!.collection(col.name)
+      .countDocuments();
     counts[col.name] = count;
   }
   await mongoose.disconnect();
@@ -76,7 +84,9 @@ async function main() {
   log.table(counts);
   log.divider();
   log.success(`Raw staging data restored to "${config.dbDebug}".`);
-  log.info(`Connect with: DB_URI=<your-local-uri>/${config.dbDebug}?authSource=admin`);
+  log.info(
+    `Connect with: DB_URI=<your-local-uri>/${config.dbDebug}?authSource=admin`,
+  );
 }
 
 main().catch((err) => {
