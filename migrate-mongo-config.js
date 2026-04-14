@@ -12,10 +12,7 @@ const config = {
   mongodb: {
     url: uri,
     databaseName: dbName,
-    options: {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    },
+    options: {},
   },
   migrationsDir: 'migrations',
   changelogCollectionName: 'changelog',

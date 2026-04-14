@@ -67,7 +67,21 @@ export class User {
   @Prop({ default: true })
   isActive: boolean;
 
+  /** Soft-delete: thời điểm xóa (null/undefined = còn hiệu lực) */
+  @Prop({ type: Date })
+  deletedAt?: Date;
+
+  /** User thực hiện xóa (admin / hệ thống) */
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+  })
+  deletedBy?: Types.ObjectId;
+
   readonly _id: string | Types.ObjectId;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.index({ deletedAt: 1 }, { sparse: true });
+UserSchema.index({ deletedBy: 1 }, { sparse: true });
