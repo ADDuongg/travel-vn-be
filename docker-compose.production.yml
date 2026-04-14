@@ -47,7 +47,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          'mongosh --quiet -u "$$MONGO_USER" -p "$$MONGO_PASSWORD" --authenticationDatabase admin mongodb://127.0.0.1:27017/admin --eval "String(db.runCommand({ ping: 1 }).ok)"',
+          'mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin mongodb://127.0.0.1:27017/admin --eval "String(db.runCommand({ ping: 1 }).ok)"',
         ]
       interval: 10s
       timeout: 5s

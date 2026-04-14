@@ -141,3 +141,14 @@ scp -r e-commerce user@VPS_IP:/opt/travel-be/staging/
 <!-- ssh tunnel cho mongo do không expose port -->
 
 ssh -N -L 27117:127.0.0.1:27017 username@vps_id
+
+<!-- check spaces vps -->
+
+df -h
+docker system df
+
+<!-- cleanup unused and old docker -->
+
+docker image prune -a -f
+docker container prune -f
+docker builder prune -a -f
