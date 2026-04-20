@@ -2,7 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class RefreshToken {
-  @Prop({ required: true, unique: true, index: true }) jti: string;
+  @Prop({ required: true, unique: true }) jti: string;
   @Prop({ type: Types.ObjectId, ref: 'User', index: true, required: true })
   userId: Types.ObjectId;
   @Prop({ index: true })
@@ -11,7 +11,7 @@ export class RefreshToken {
   tokenHash?: string;
   @Prop({ default: false, index: true }) isRevoked: boolean;
   @Prop({ type: Date, required: true, index: true }) expiresAt: Date;
-  @Prop({ type: Date, index: true }) keepUntil?: Date;
+  @Prop({ type: Date }) keepUntil?: Date;
   @Prop() ip?: string;
   @Prop() userAgent?: string;
 }

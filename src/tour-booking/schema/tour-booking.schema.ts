@@ -60,10 +60,10 @@ export class TourBooking {
   })
   tourInventoryId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+  @Prop({ type: Types.ObjectId, ref: 'User' })
   userId?: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: TourGuide.name, index: true })
+  @Prop({ type: Types.ObjectId, ref: TourGuide.name })
   guideId?: Types.ObjectId;
 
   @Prop({ type: TourBookingGuestSchema, required: true })

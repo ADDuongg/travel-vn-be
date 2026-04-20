@@ -11,7 +11,6 @@ export class TourGuide {
     ref: 'User',
     required: true,
     unique: true,
-    index: true,
   })
   userId: Types.ObjectId;
 
@@ -102,7 +101,6 @@ export class TourGuide {
 
 export const TourGuideSchema = SchemaFactory.createForClass(TourGuide);
 
-TourGuideSchema.index({ userId: 1 }, { unique: true });
 TourGuideSchema.index({ isActive: 1 });
 TourGuideSchema.index({ isVerified: 1 });
 TourGuideSchema.index({ isAvailable: 1 });

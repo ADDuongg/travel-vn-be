@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import type { Connection } from 'mongoose';
 import { validateEnv } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
@@ -53,6 +54,12 @@ import { EnvService } from './env/env.service';
 
 @Module({
   imports: [
+    // Load .env + validate before Redis/JWT/Bull so EnvService reads real values (not Docker-only defaults).
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+      validate: validateEnv,
+    }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     RedisModule.forRootAsync({ isGlobal: true }),
@@ -64,11 +71,6 @@ import { EnvService } from './env/env.service';
         secret: env.get('JWT_SECRET', 'your_jwt_secret'),
         signOptions: { expiresIn: '60m' },
       }),
-    }),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-      validate: validateEnv,
     }),
     BullModule.forRootAsync({
       imports: [EnvModule],
@@ -146,6 +148,19 @@ import { EnvService } from './env/env.service';
         uri: env.get('DB_URI'),
         serverSelectionTimeoutMS: 25_000,
         socketTimeoutMS: 45_000,
+        connectionFactory: (connection: Connection) => {
+          // stderr: visible even when Nest bufferLogs / Pino hasn't attached yet
+          console.error(
+            '[bootstrap] Mongoose: opening connection (if this stalls, check MongoDB is up and DB_URI is reachable)',
+          );
+          connection.on('connected', () =>
+            console.error('[bootstrap] Mongoose: MongoDB connection ready'),
+          );
+          connection.on('error', (err: Error) =>
+            console.error('[bootstrap] Mongoose: error', err?.message ?? err),
+          );
+          return connection;
+        },
       }),
     }),
     ThrottlerModule.forRoot([

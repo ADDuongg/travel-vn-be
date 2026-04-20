@@ -126,7 +126,6 @@ export class Tour {
     type: Types.ObjectId,
     ref: Province.name,
     required: true,
-    index: true,
   })
   departureProvinceId: Types.ObjectId;
 
@@ -320,8 +319,6 @@ export const TourSchema = SchemaFactory.createForClass(Tour);
 
 /* ================= INDEXES ================= */
 
-TourSchema.index({ slug: 1 }, { unique: true });
-TourSchema.index({ code: 1 }, { unique: true });
 TourSchema.index({ isActive: 1 });
 TourSchema.index({ tourType: 1 });
 TourSchema.index({ 'destinations.provinceId': 1 });

@@ -26,8 +26,8 @@ export class Payment {
   @Prop({ required: true, unique: true })
   intentId: string;
 
-  /** Id tham chiếu từ provider (Stripe intentId, etc.). Dùng cho unique index, tránh duplicate key khi null. */
-  @Prop({ index: true })
+  /** Id tham chiếu từ provider (Stripe intentId, etc.). Index unique + partial ở cuối schema. */
+  @Prop()
   providerRef?: string;
 
   @Prop({ required: true })

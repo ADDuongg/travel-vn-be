@@ -44,7 +44,6 @@ export class Room {
     type: Types.ObjectId,
     ref: Hotel.name,
     required: true,
-    index: true,
   })
   hotelId: Types.ObjectId;
 
@@ -197,8 +196,6 @@ export class Room {
 
 export const RoomSchema = SchemaFactory.createForClass(Room);
 
-RoomSchema.index({ code: 1 }, { unique: true });
-RoomSchema.index({ slug: 1 }, { unique: true });
 RoomSchema.index({ isActive: 1 });
 RoomSchema.index({ 'pricing.basePrice': 1 });
 RoomSchema.index({ hotelId: 1 });

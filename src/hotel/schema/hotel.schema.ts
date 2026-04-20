@@ -59,7 +59,6 @@ export class Hotel {
     type: Types.ObjectId,
     ref: Province.name,
     required: true,
-    index: true,
   })
   provinceId: Types.ObjectId;
 
@@ -140,7 +139,6 @@ export const HotelSchema = SchemaFactory.createForClass(Hotel);
 
 /* ================= INDEX ================= */
 
-HotelSchema.index({ slug: 1 }, { unique: true });
 HotelSchema.index({ provinceId: 1 });
 HotelSchema.index({ isActive: 1 });
 HotelSchema.index({ provinceId: 1, isActive: 1 });
