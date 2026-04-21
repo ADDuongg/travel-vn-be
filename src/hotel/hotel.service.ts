@@ -98,7 +98,10 @@ export class HotelService {
   /**
    * Find hotel by ID.
    */
-  async findById(id: string, userId?: string): Promise<any | null> {
+  async findById(
+    id: string,
+    userId?: string,
+  ): Promise<Record<string, unknown> | null> {
     if (!Types.ObjectId.isValid(id)) return null;
     const hotel = await this.hotelModel
       .findById(id)
@@ -106,7 +109,7 @@ export class HotelService {
       .populate('amenities')
       .exec();
     if (!hotel) return null;
-    const obj = hotel.toObject();
+    const obj = hotel.toObject() as Record<string, unknown>;
     if (!userId) return obj;
     const isFavorited = await this.favoriteService.isFavorited({
       userId,
