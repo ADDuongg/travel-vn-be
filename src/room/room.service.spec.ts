@@ -6,6 +6,7 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { HotelService } from 'src/hotel/hotel.service';
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 import { AmenitiesService } from 'src/amenities/amenities.service';
+import { FavoriteService } from 'src/favorite/favorite.service';
 
 describe('RoomService', () => {
   let service: RoomService;
@@ -25,6 +26,7 @@ describe('RoomService', () => {
           provide: AmenitiesService,
           useValue: { findIdsByCodes: jest.fn() },
         },
+        { provide: FavoriteService, useValue: {} },
       ],
     }).compile();
 

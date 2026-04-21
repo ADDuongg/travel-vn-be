@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { HotelService } from './hotel.service';
 import { Hotel } from './schema/hotel.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
+import { FavoriteService } from 'src/favorite/favorite.service';
 
 describe('HotelService', () => {
   let service: HotelService;
@@ -16,6 +17,7 @@ describe('HotelService', () => {
           provide: ProvincesService,
           useValue: { findAllForDropdown: jest.fn().mockResolvedValue([]) },
         },
+        { provide: FavoriteService, useValue: {} },
       ],
     }).compile();
 
