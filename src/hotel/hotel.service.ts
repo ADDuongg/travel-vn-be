@@ -10,6 +10,8 @@ import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { Hotel, HotelDocument } from './schema/hotel.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
+import { FavoriteService } from 'src/favorite/favorite.service';
+import { FavoriteEntityType } from 'src/favorite/favorite.types';
 
 @Injectable()
 export class HotelService {
@@ -17,6 +19,7 @@ export class HotelService {
     @InjectModel(Hotel.name)
     private readonly hotelModel: Model<HotelDocument>,
     private readonly provincesService: ProvincesService,
+    private readonly favoriteService: FavoriteService,
   ) {}
 
   /**
@@ -67,29 +70,50 @@ export class HotelService {
    * Find all active hotels for dropdown/options.
    * Returns minimal fields: _id, slug, translations, provinceId
    */
-  findAllActive(provinceId?: string) {
+  async findAllActive(provinceId?: string, userId?: string) {
     const filter: Record<string, unknown> = { isActive: true };
     if (provinceId && Types.ObjectId.isValid(provinceId)) {
       filter.provinceId = new Types.ObjectId(provinceId);
     }
-    return this.hotelModel
+    const items = await this.hotelModel
       .find(filter)
       .select('_id slug translations provinceId')
       .populate('provinceId', 'name code slug')
       .sort({ 'translations.vi.name': 1 })
       .lean();
+    if (!userId) return items;
+    const favSet = await this.favoriteService.existsByUserAndEntities({
+      userId,
+      pairs: items.map((h: any) => ({
+        entityType: FavoriteEntityType.HOTEL,
+        entityId: String(h._id),
+      })),
+    });
+    return items.map((h: any) => ({
+      ...h,
+      isFavorited: favSet.has(`${FavoriteEntityType.HOTEL}:${String(h._id)}`),
+    }));
   }
 
   /**
    * Find hotel by ID.
    */
-  async findById(id: string): Promise<Hotel | null> {
+  async findById(id: string, userId?: string): Promise<any | null> {
     if (!Types.ObjectId.isValid(id)) return null;
-    return this.hotelModel
+    const hotel = await this.hotelModel
       .findById(id)
       .populate('provinceId', 'name code slug fullName')
       .populate('amenities')
       .exec();
+    if (!hotel) return null;
+    const obj = hotel.toObject();
+    if (!userId) return obj;
+    const isFavorited = await this.favoriteService.isFavorited({
+      userId,
+      entityType: FavoriteEntityType.HOTEL,
+      entityId: id,
+    });
+    return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
   /**

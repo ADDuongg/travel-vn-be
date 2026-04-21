@@ -16,6 +16,8 @@ import { ReviewEntityType } from 'src/review/schema/ewview.schema';
 import { ReviewService } from 'src/review/review.service';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourGuideNotificationEvent } from 'src/notification/events/tour-guide-notification.event';
+import { FavoriteService } from 'src/favorite/favorite.service';
+import { FavoriteEntityType } from 'src/favorite/favorite.types';
 
 const USER_POPULATE = {
   path: 'userId',
@@ -38,10 +40,11 @@ export class TourGuideService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly reviewService: ReviewService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly favoriteService: FavoriteService,
   ) {}
 
   /** Public + admin: list guides (mặc định chỉ isActive: true). */
-  async findAll(query: TourGuideQueryDto) {
+  async findAll(query: TourGuideQueryDto, userId?: string) {
     const {
       page = 1,
       limit = 12,
@@ -110,8 +113,23 @@ export class TourGuideService {
       this.tourGuideModel.countDocuments(filter),
     ]);
 
+    let enrichedItems: any[] = items;
+    if (userId) {
+      const favSet = await this.favoriteService.existsByUserAndEntities({
+        userId,
+        pairs: items.map((g: any) => ({
+          entityType: FavoriteEntityType.GUIDE,
+          entityId: String(g._id),
+        })),
+      });
+      enrichedItems = items.map((g: any) => ({
+        ...g,
+        isFavorited: favSet.has(`${FavoriteEntityType.GUIDE}:${String(g._id)}`),
+      }));
+    }
+
     return {
-      items,
+      items: enrichedItems,
       pagination: {
         page,
         limit,
@@ -122,7 +140,7 @@ export class TourGuideService {
   }
 
   /** Public: chi tiết 1 guide (populate user + provinces). */
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string) {
     const guide = await this.tourGuideModel
       .findById(id)
       .populate(USER_POPULATE)
@@ -130,7 +148,13 @@ export class TourGuideService {
       .lean();
     if (!guide) throw new NotFoundException('Tour guide not found');
     if (!guide.isActive) throw new NotFoundException('Tour guide not found');
-    return guide;
+    if (!userId) return guide;
+    const isFavorited = await this.favoriteService.isFavorited({
+      userId,
+      entityType: FavoriteEntityType.GUIDE,
+      entityId: id,
+    });
+    return { ...guide, isFavorited: isFavorited.isFavorited };
   }
 
   /** Admin: tạo guide cho user (truyền userId trong body) + optional CV + gallery (upload Cloudinary). */

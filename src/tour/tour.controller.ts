@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TourService } from './tour.service';
@@ -17,6 +19,7 @@ import { CreateTourDto } from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto } from './dto/tour-query.dto';
 import { ParseFormDataJsonPipe } from 'src/common/pipes/parse-form-data-json.pipe';
+import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
 
 @Controller('api/v1/tours')
 export class TourController {
@@ -35,8 +38,9 @@ export class TourController {
   }
 
   @Get()
-  findAll(@Query() query: TourQueryDto) {
-    return this.tourService.findAll(query);
+  @UseGuards(JwtOptionalAuthGuard)
+  findAll(@Query() query: TourQueryDto, @Req() req: { user?: { userId: string } }) {
+    return this.tourService.findAll(query, req.user?.userId);
   }
 
   @Get('options')
@@ -45,13 +49,18 @@ export class TourController {
   }
 
   @Get('featured')
-  getFeatured(@Query('limit') limit?: number) {
-    return this.tourService.findFeatured(limit);
+  @UseGuards(JwtOptionalAuthGuard)
+  getFeatured(
+    @Query('limit') limit?: number,
+    @Req() req?: { user?: { userId: string } },
+  ) {
+    return this.tourService.findFeatured(limit, req?.user?.userId);
   }
 
   @Get('slug/:slug')
-  findBySlug(@Param('slug') slug: string) {
-    return this.tourService.findBySlug(slug);
+  @UseGuards(JwtOptionalAuthGuard)
+  findBySlug(@Param('slug') slug: string, @Req() req: { user?: { userId: string } }) {
+    return this.tourService.findBySlug(slug, req.user?.userId);
   }
 
   @Get(':id/availability')
@@ -61,8 +70,9 @@ export class TourController {
   }
 
   @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.tourService.findById(id);
+  @UseGuards(JwtOptionalAuthGuard)
+  findById(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
+    return this.tourService.findById(id, req.user?.userId);
   }
 
   @Patch(':id')

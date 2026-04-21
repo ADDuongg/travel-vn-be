@@ -6,6 +6,7 @@ import { TourGuideService } from './tour-guide.service';
 import { UserModule } from 'src/user/user.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { ReviewModule } from 'src/review/review.module';
+import { FavoriteModule } from 'src/favorite/favorite.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ReviewModule } from 'src/review/review.module';
     UserModule,
     CloudinaryModule,
     ReviewModule,
+    FavoriteModule,
   ],
   controllers: [TourGuideController],
   providers: [TourGuideService],

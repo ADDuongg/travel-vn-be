@@ -152,3 +152,7 @@ docker system df
 docker image prune -a -f
 docker container prune -f
 docker builder prune -a -f
+
+<!-- stripe  test local -->
+
+stripe listen --forward-to localhost:9001/payments/webhook/stripe

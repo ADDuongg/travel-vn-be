@@ -6,6 +6,7 @@ import { Tour, TourSchema } from './schema/tour.schema';
 import { ProvincesModule } from 'src/provinces/provinces.module';
 import { TourInventoryModule } from 'src/tour-inventory/tour-inventory.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { FavoriteModule } from 'src/favorite/favorite.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     ProvincesModule,
     TourInventoryModule,
     CloudinaryModule,
+    FavoriteModule,
   ],
   controllers: [TourController],
   providers: [TourService],

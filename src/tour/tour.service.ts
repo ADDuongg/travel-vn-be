@@ -15,6 +15,8 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourNotificationEvent } from 'src/notification/events/tour-notification.event';
+import { FavoriteService } from 'src/favorite/favorite.service';
+import { FavoriteEntityType } from 'src/favorite/favorite.types';
 
 /* interface PaginatedResult<T> {
   items: T[];
@@ -34,6 +36,7 @@ export class TourService {
     private readonly provincesService: ProvincesService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly favoriteService: FavoriteService,
   ) {}
 
   /**
@@ -123,7 +126,7 @@ export class TourService {
   /**
    * Find all tours with filters and pagination
    */
-  async findAll(query: TourQueryDto) {
+  async findAll(query: TourQueryDto, userId?: string) {
     const {
       page = 1,
       limit = 12,
@@ -222,8 +225,23 @@ export class TourService {
       this.tourModel.countDocuments(filter),
     ]);
 
+    let enrichedItems: any[] = items;
+    if (userId) {
+      const favSet = await this.favoriteService.existsByUserAndEntities({
+        userId,
+        pairs: items.map((t: any) => ({
+          entityType: FavoriteEntityType.TOUR,
+          entityId: String(t._id),
+        })),
+      });
+      enrichedItems = items.map((t: any) => ({
+        ...t,
+        isFavorited: favSet.has(`${FavoriteEntityType.TOUR}:${String(t._id)}`),
+      }));
+    }
+
     return {
-      items,
+      items: enrichedItems,
       pagination: {
         page,
         limit,
@@ -236,7 +254,7 @@ export class TourService {
   /**
    * Find tour by ID
    */
-  async findById(id: string): Promise<Tour> {
+  async findById(id: string, userId?: string): Promise<any> {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid tour ID');
     }
@@ -252,13 +270,20 @@ export class TourService {
       throw new NotFoundException('Tour not found');
     }
 
-    return tour;
+    const obj = tour.toObject();
+    if (!userId) return obj;
+    const isFavorited = await this.favoriteService.isFavorited({
+      userId,
+      entityType: FavoriteEntityType.TOUR,
+      entityId: id,
+    });
+    return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
   /**
    * Find tour by slug
    */
-  async findBySlug(slug: string): Promise<Tour> {
+  async findBySlug(slug: string, userId?: string): Promise<any> {
     const tour = await this.tourModel
       .findOne({ slug, isActive: true })
       .populate('destinations.provinceId', 'name code slug fullName')
@@ -270,7 +295,14 @@ export class TourService {
       throw new NotFoundException('Tour not found');
     }
 
-    return tour;
+    const obj = tour.toObject();
+    if (!userId) return obj;
+    const isFavorited = await this.favoriteService.isFavorited({
+      userId,
+      entityType: FavoriteEntityType.TOUR,
+      entityId: String(tour._id),
+    });
+    return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
   /**
@@ -432,14 +464,26 @@ export class TourService {
   /**
    * Find featured tours
    */
-  async findFeatured(limit: number = 6): Promise<Tour[]> {
-    return this.tourModel
+  async findFeatured(limit: number = 6, userId?: string): Promise<any[]> {
+    const items = await this.tourModel
       .find({ isActive: true })
       .sort({ 'ratingSummary.average': -1, 'ratingSummary.total': -1 })
       .limit(limit)
       .populate('destinations.provinceId', 'name code slug')
       .populate('departureProvinceId', 'name code slug')
       .lean();
+    if (!userId) return items;
+    const favSet = await this.favoriteService.existsByUserAndEntities({
+      userId,
+      pairs: items.map((t: any) => ({
+        entityType: FavoriteEntityType.TOUR,
+        entityId: String(t._id),
+      })),
+    });
+    return items.map((t: any) => ({
+      ...t,
+      isFavorited: favSet.has(`${FavoriteEntityType.TOUR}:${String(t._id)}`),
+    }));
   }
 
   private async uploadGallery(files?: Express.Multer.File[]) {

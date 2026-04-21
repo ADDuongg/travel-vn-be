@@ -7,8 +7,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFiles,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 
@@ -16,6 +18,7 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { RoomQueryDto } from './dto/room-query.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomService } from './room.service';
+import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
 
 @Controller('/api/v1/rooms')
 export class RoomController {
@@ -31,13 +34,15 @@ export class RoomController {
   }
 
   @Get()
-  findAll(@Query() query: RoomQueryDto) {
-    return this.roomService.findAll(query);
+  @UseGuards(JwtOptionalAuthGuard)
+  findAll(@Query() query: RoomQueryDto, @Req() req: { user?: { userId: string } }) {
+    return this.roomService.findAll(query, req.user?.userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.roomService.findOne(id);
+  @UseGuards(JwtOptionalAuthGuard)
+  findOne(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
+    return this.roomService.findOne(id, req.user?.userId);
   }
 
   @Patch(':id')

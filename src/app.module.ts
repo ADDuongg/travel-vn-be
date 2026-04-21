@@ -51,6 +51,7 @@ import { ChatModule } from './chat/chat.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RedisModule } from './redis/redis.module';
 import { EnvService } from './env/env.service';
+import { FavoriteModule } from './favorite/favorite.module';
 
 @Module({
   imports: [
@@ -197,6 +198,7 @@ import { EnvService } from './env/env.service';
     TourInventoryModule,
     TourBookingModule,
     TourGuideModule,
+    FavoriteModule,
     NotificationModule,
     ChatModule,
     AnalyticsModule,

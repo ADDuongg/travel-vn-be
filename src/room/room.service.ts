@@ -15,6 +15,8 @@ import { CreateRoomDto } from './dto/create-room.dto';
 import { RoomQueryDto, RoomSortBy } from './dto/room-query.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { Room, RoomDocument } from './schema/room.schema';
+import { FavoriteService } from 'src/favorite/favorite.service';
+import { FavoriteEntityType } from 'src/favorite/favorite.types';
 
 @Injectable()
 export class RoomService {
@@ -25,6 +27,7 @@ export class RoomService {
     private readonly hotelService: HotelService,
     private readonly roomInventoryService: RoomInventoryService,
     private readonly amenitiesService: AmenitiesService,
+    private readonly favoriteService: FavoriteService,
   ) {}
 
   // ===== CREATE =====
@@ -77,7 +80,7 @@ export class RoomService {
     });
   }
 
-  async findAll(query: RoomQueryDto) {
+  async findAll(query: RoomQueryDto, userId?: string) {
     const {
       page,
       limit,
@@ -210,8 +213,23 @@ export class RoomService {
       this.roomModel.countDocuments(filter),
     ]);
 
+    let enrichedItems: any[] = items;
+    if (userId) {
+      const favSet = await this.favoriteService.existsByUserAndEntities({
+        userId,
+        pairs: items.map((r: any) => ({
+          entityType: FavoriteEntityType.ROOM,
+          entityId: String(r._id),
+        })),
+      });
+      enrichedItems = items.map((r: any) => ({
+        ...r,
+        isFavorited: favSet.has(`${FavoriteEntityType.ROOM}:${String(r._id)}`),
+      }));
+    }
+
     return {
-      items,
+      items: enrichedItems,
       pagination: {
         page,
         limit,
@@ -221,7 +239,7 @@ export class RoomService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId?: string) {
     const room = await this.roomModel
       .findById(id)
       .populate({
@@ -231,7 +249,14 @@ export class RoomService {
       })
       .populate('amenities');
     if (!room) throw new NotFoundException('Room not found');
-    return room;
+    const obj = room.toObject();
+    if (!userId) return obj;
+    const isFavorited = await this.favoriteService.isFavorited({
+      userId,
+      entityType: FavoriteEntityType.ROOM,
+      entityId: id,
+    });
+    return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
   async update(id: string, dto: UpdateRoomDto, files?: Express.Multer.File[]) {

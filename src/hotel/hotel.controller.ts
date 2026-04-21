@@ -6,10 +6,13 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { HotelService } from './hotel.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
 
 @Controller('api/v1/hotels')
 export class HotelController {
@@ -21,18 +24,27 @@ export class HotelController {
   }
 
   @Get('options')
-  getOptions(@Query('provinceId') provinceId?: string) {
-    return this.hotelService.findAllActive(provinceId);
+  @UseGuards(JwtOptionalAuthGuard)
+  getOptions(
+    @Query('provinceId') provinceId?: string,
+    @Req() req?: { user?: { userId: string } },
+  ) {
+    return this.hotelService.findAllActive(provinceId, req?.user?.userId);
   }
 
   @Get()
-  findAll(@Query('provinceId') provinceId?: string) {
-    return this.hotelService.findAllActive(provinceId);
+  @UseGuards(JwtOptionalAuthGuard)
+  findAll(
+    @Query('provinceId') provinceId?: string,
+    @Req() req?: { user?: { userId: string } },
+  ) {
+    return this.hotelService.findAllActive(provinceId, req?.user?.userId);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.hotelService.findById(id);
+  @UseGuards(JwtOptionalAuthGuard)
+  findOne(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
+    return this.hotelService.findById(id, req.user?.userId);
   }
 
   @Patch(':id')

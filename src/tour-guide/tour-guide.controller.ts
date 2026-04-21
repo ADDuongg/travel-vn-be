@@ -19,14 +19,16 @@ import { CreateTourGuideDto } from './dto/create-tour-guide.dto';
 import { UpdateTourGuideDto } from './dto/update-tour-guide.dto';
 import { TourGuideQueryDto } from './dto/tour-guide-query.dto';
 import { VerifyTourGuideDto } from './dto/verify-tour-guide.dto';
+import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
 
 @Controller('api/v1/tour-guides')
 export class TourGuideController {
   constructor(private readonly tourGuideService: TourGuideService) {}
 
   @Get()
-  findAll(@Query() query: TourGuideQueryDto) {
-    return this.tourGuideService.findAll(query);
+  @UseGuards(JwtOptionalAuthGuard)
+  findAll(@Query() query: TourGuideQueryDto, @Req() req: { user?: { userId: string } }) {
+    return this.tourGuideService.findAll(query, req.user?.userId);
   }
 
   @Get(':id/reviews')
@@ -43,8 +45,9 @@ export class TourGuideController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.tourGuideService.findOne(id);
+  @UseGuards(JwtOptionalAuthGuard)
+  findOne(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
+    return this.tourGuideService.findOne(id, req.user?.userId);
   }
 
   /** User tự đăng ký làm tour guide - chỉ cần JWT (đặt trước @Post() để route /register match đúng) */
