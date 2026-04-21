@@ -109,7 +109,7 @@ export class HotelService {
       .populate('amenities')
       .exec();
     if (!hotel) return null;
-    const obj = hotel.toObject() as Record<string, unknown>;
+    const obj = hotel.toObject() as unknown as Record<string, unknown>;
     if (!userId) return obj;
     const isFavorited = await this.favoriteService.isFavorited({
       userId,
