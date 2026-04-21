@@ -11,6 +11,13 @@ export enum ReviewEntityType {
   GUIDE = 'GUIDE',
 }
 
+export enum ReviewStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  HIDDEN = 'HIDDEN',
+}
+
 @Schema({
   collection: 'reviews',
   timestamps: true,
@@ -41,16 +48,54 @@ export class Review {
   @Prop({ default: false })
   isAnonymous: boolean;
 
-  @Prop({ default: false })
-  isApproved: boolean;
+  @Prop({
+    required: true,
+    enum: ReviewStatus,
+    default: ReviewStatus.PENDING,
+  })
+  status: ReviewStatus;
 
   @Prop()
   approvedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  approvedBy?: Types.ObjectId;
+
+  @Prop()
+  rejectedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  rejectedBy?: Types.ObjectId;
+
+  @Prop()
+  rejectReason?: string;
+
+  @Prop()
+  hiddenAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  hiddenBy?: Types.ObjectId;
+
+  @Prop()
+  hiddenReason?: string;
+
+  @Prop({ type: Date })
+  deletedAt?: Date;
 }
 
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
 ReviewSchema.index({ entityType: 1, entityId: 1 });
 ReviewSchema.index({ userId: 1 });
-ReviewSchema.index({ isApproved: 1 });
+ReviewSchema.index({ status: 1 });
 ReviewSchema.index({ createdAt: -1 });
+ReviewSchema.index({ deletedAt: 1 });
+ReviewSchema.index(
+  { entityType: 1, entityId: 1, userId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      userId: { $exists: true, $type: 'objectId' },
+    },
+  },
+);

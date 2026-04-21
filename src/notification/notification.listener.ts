@@ -14,6 +14,10 @@ import { TourGuideNotificationEvent } from './events/tour-guide-notification.eve
 import { TourNotificationEvent } from './events/tour-notification.event';
 import { TourInventoryNotificationEvent } from './events/tour-inventory-notification.event';
 import { TourBookingNotificationEvent } from './events/tour-booking-notification.event';
+import {
+  RoomBookingPaymentExpiredClientEvent,
+  TourBookingPaymentExpiredClientEvent,
+} from './events/booking-payment-expired-client.event';
 
 @Injectable()
 export class NotificationListener {
@@ -395,6 +399,47 @@ export class NotificationListener {
         },
         this.getBullOpts(),
       ),
+    );
+  }
+
+  /** User client — đơn tour hết hạn thanh toán (cron). */
+  @OnEvent(NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED)
+  async onTourBookingPaymentExpiredClient(
+    event: TourBookingPaymentExpiredClientEvent,
+  ) {
+    this.logger.log(
+      `Tour booking payment expired (user notify): ${event.bookingId}`,
+    );
+
+    await this.notificationQueue.add(
+      'tour-booking-payment-expired-user',
+      {
+        recipientId: event.userId,
+        bookingId: event.bookingId,
+        bookingCode: event.bookingCode,
+        tourId: event.tourId,
+        tourName: event.tourName,
+      },
+      this.getBullOpts(),
+    );
+  }
+
+  /** User client — đặt phòng hết hạn thanh toán (cron). */
+  @OnEvent(NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED)
+  async onRoomBookingPaymentExpiredClient(
+    event: RoomBookingPaymentExpiredClientEvent,
+  ) {
+    this.logger.log(
+      `Room booking payment expired (user notify): ${event.bookingId}`,
+    );
+
+    await this.notificationQueue.add(
+      'room-booking-payment-expired-user',
+      {
+        recipientId: event.userId,
+        bookingId: event.bookingId,
+      },
+      this.getBullOpts(),
     );
   }
 

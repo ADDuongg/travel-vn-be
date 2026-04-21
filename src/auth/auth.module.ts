@@ -17,6 +17,7 @@ import { PermissionService } from 'src/permission/permission.service';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RefreshTokenCleanupService } from './refresh-token-cleanup.service';
 import {
   RefreshToken,
   RefreshTokenSchema,
@@ -37,7 +38,7 @@ import {
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PermissionService],
+  providers: [AuthService, JwtStrategy, PermissionService, RefreshTokenCleanupService],
   exports: [AuthService, PermissionService],
 })
 export class AuthModule {}

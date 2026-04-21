@@ -14,10 +14,12 @@ describe('ReviewController', () => {
           useValue: {
             findPublicReviews: jest.fn(),
             findMyReview: jest.fn(),
+            findMyReviewsList: jest.fn(),
             adminFindAll: jest.fn(),
             upsertReview: jest.fn(),
             approveReview: jest.fn(),
-            removeReview: jest.fn(),
+            setReviewStatusByAdmin: jest.fn(),
+            softDeleteOwnReview: jest.fn(),
           },
         },
       ],

@@ -1,6 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-@Schema({ timestamps: { createdAt: true, updatedAt: false } })
+@Schema({
+  collection: 'refreshtokens',
+  timestamps: { createdAt: true, updatedAt: false },
+})
 export class RefreshToken {
   @Prop({ required: true, unique: true }) jti: string;
   @Prop({ type: Types.ObjectId, ref: 'User', index: true, required: true })

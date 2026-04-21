@@ -15,6 +15,8 @@ export enum NotificationEvent {
   TOUR_BOOKING_CANCELLED = 'tour.booking.cancelled',
   TOUR_BOOKING_PAYMENT_FAILED = 'tour.booking.payment_failed',
   TOUR_BOOKING_OVERBOOKING = 'tour.booking.overbooking',
+  TOUR_BOOKING_PAYMENT_EXPIRED = 'tour.booking.payment_expired',
+  ROOM_BOOKING_PAYMENT_EXPIRED = 'room.booking.payment_expired',
 }
 
 export enum NotificationType {
@@ -34,4 +36,6 @@ export enum NotificationType {
   TOUR_BOOKING_CANCELLED = 'TOUR_BOOKING_CANCELLED',
   TOUR_BOOKING_PAYMENT_FAILED = 'TOUR_BOOKING_PAYMENT_FAILED',
   TOUR_BOOKING_OVERBOOKING = 'TOUR_BOOKING_OVERBOOKING',
+  TOUR_BOOKING_PAYMENT_EXPIRED = 'TOUR_BOOKING_PAYMENT_EXPIRED',
+  ROOM_BOOKING_PAYMENT_EXPIRED = 'ROOM_BOOKING_PAYMENT_EXPIRED',
 }

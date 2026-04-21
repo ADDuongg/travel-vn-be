@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   TourBooking,
   TourBookingDocument,
@@ -13,6 +14,9 @@ import {
   TourInventoryDocument,
 } from 'src/tour-inventory/schema/tour-inventory.schema';
 import { TourInventoryService } from 'src/tour-inventory/tour-inventory.service';
+import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
+import { NotificationEvent } from 'src/notification/notification.constants';
+import { TourBookingPaymentExpiredClientEvent } from 'src/notification/events/booking-payment-expired-client.event';
 
 const EXPIRE_AFTER_MINUTES = 60;
 
@@ -25,7 +29,10 @@ export class TourBookingExpireService {
     private readonly tourBookingModel: Model<TourBookingDocument>,
     @InjectModel(TourInventory.name)
     private readonly inventoryModel: Model<TourInventoryDocument>,
+    @InjectModel(Tour.name)
+    private readonly tourModel: Model<TourDocument>,
     private readonly tourInventoryService: TourInventoryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -62,6 +69,24 @@ export class TourBookingExpireService {
       this.logger.log(
         `Expired tour booking ${String(booking._id)} (${String(booking.bookingCode ?? '')})`,
       );
+
+      if (booking.userId) {
+        const tour = await this.tourModel.findById(booking.tourId).lean();
+        const tr = tour?.translations as
+          | Record<string, { name?: string }>
+          | undefined;
+        const tourName = tr?.vi?.name ?? tr?.en?.name ?? undefined;
+        this.eventEmitter.emit(
+          NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED,
+          new TourBookingPaymentExpiredClientEvent(
+            String(booking.userId),
+            String(booking._id),
+            booking.bookingCode,
+            String(booking.tourId),
+            tourName,
+          ),
+        );
+      }
     }
   }
 }

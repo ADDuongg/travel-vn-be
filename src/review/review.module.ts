@@ -9,6 +9,8 @@ import {
   TourGuide,
   TourGuideSchema,
 } from 'src/tour-guide/schema/tour-guide.schema';
+import { Hotel, HotelSchema } from 'src/hotel/schema/hotel.schema';
+import { ReviewSoftDeleteCleanupService } from './review-soft-delete-cleanup.service';
 
 @Module({
   imports: [
@@ -17,10 +19,11 @@ import {
       { name: Room.name, schema: RoomSchema },
       { name: Tour.name, schema: TourSchema },
       { name: TourGuide.name, schema: TourGuideSchema },
+      { name: Hotel.name, schema: HotelSchema },
     ]),
   ],
   controllers: [ReviewController],
-  providers: [ReviewService],
+  providers: [ReviewService, ReviewSoftDeleteCleanupService],
   exports: [ReviewService],
 })
 export class ReviewModule {}

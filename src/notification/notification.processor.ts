@@ -180,6 +180,12 @@ export class NotificationProcessor extends WorkerHost {
           NotificationType.TOUR_BOOKING_OVERBOOKING,
         );
         break;
+      case 'tour-booking-payment-expired-user':
+        await this.handleTourBookingPaymentExpiredUser(job.data as any);
+        break;
+      case 'room-booking-payment-expired-user':
+        await this.handleRoomBookingPaymentExpiredUser(job.data as any);
+        break;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
     }
@@ -410,6 +416,46 @@ export class NotificationProcessor extends WorkerHost {
         tourName: data.tourName,
       },
       link: `/dashboard/tour-bookings/${data.bookingId}`,
+    });
+  }
+
+  /** FE Client — cron hết hạn thanh toán tour. */
+  private async handleTourBookingPaymentExpiredUser(data: {
+    recipientId: string;
+    bookingId: string;
+    bookingCode: string;
+    tourId: string;
+    tourName?: string;
+  }) {
+    await this.notificationService.create({
+      recipientId: data.recipientId,
+      type: NotificationType.TOUR_BOOKING_PAYMENT_EXPIRED,
+      title: 'notification.tour_booking_payment_expired.title',
+      message: 'notification.tour_booking_payment_expired.message',
+      metadata: {
+        bookingId: data.bookingId,
+        bookingCode: data.bookingCode,
+        tourId: data.tourId,
+        tourName: data.tourName,
+      },
+      link: `/bookings/tour/${data.bookingId}`,
+    });
+  }
+
+  /** FE Client — cron hết hạn thanh toán phòng. */
+  private async handleRoomBookingPaymentExpiredUser(data: {
+    recipientId: string;
+    bookingId: string;
+  }) {
+    await this.notificationService.create({
+      recipientId: data.recipientId,
+      type: NotificationType.ROOM_BOOKING_PAYMENT_EXPIRED,
+      title: 'notification.room_booking_payment_expired.title',
+      message: 'notification.room_booking_payment_expired.message',
+      metadata: {
+        bookingId: data.bookingId,
+      },
+      link: `/bookings/room/${data.bookingId}`,
     });
   }
 
