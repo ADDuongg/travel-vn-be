@@ -46,15 +46,17 @@ variables:
   DOCKER_TLS_CERTDIR: '/certs'
 
 # ---------------------------------------------------------------------------
-# GLOBAL CACHE -- Cache node_modules giua cac job
+# GLOBAL CACHE -- Cache Yarn cache (avoid caching node_modules)
+# Why: caching node_modules can become inconsistent/corrupted across jobs,
+# causing "Cannot find module" at runtime while yarn install still says "up-to-date".
 # ---------------------------------------------------------------------------
 cache:
   key:
     files:
       - yarn.lock
   paths:
-    - node_modules/
-  policy: pull
+    - .yarn-cache/
+  policy: pull-push
 
 # ===========================================================================
 # STAGE 1: VALIDATE -- Lint code
@@ -73,10 +75,11 @@ lint:
       files:
         - yarn.lock
     paths:
-      - node_modules/
+      - .yarn-cache/
     policy: pull-push
   script:
-    - yarn install --frozen-lockfile
+    - yarn config set cache-folder .yarn-cache
+    - yarn install --frozen-lockfile --check-files --non-interactive
     - yarn lint
   tags:
     - travel-staging
@@ -93,7 +96,8 @@ test:
   stage: test
   image: $NODE_IMAGE
   script:
-    - yarn install --frozen-lockfile
+    - yarn config set cache-folder .yarn-cache
+    - yarn install --frozen-lockfile --check-files --non-interactive
     - yarn test --coverage --passWithNoTests
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
