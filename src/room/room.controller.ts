@@ -19,12 +19,17 @@ import { RoomQueryDto } from './dto/room-query.dto';
 import { UpdateRoomDto } from './dto/update-room.dto';
 import { RoomService } from './room.service';
 import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 
 @Controller('/api/v1/rooms')
+@UseInterceptors(CrudAuditInterceptor)
 export class RoomController {
   constructor(private readonly roomService: RoomService) {}
 
   @Post()
+  @AuditLog(AuditResourceType.ROOM)
   @UseInterceptors(FilesInterceptor('gallery', 10))
   create(
     @Body() createRoomDto: CreateRoomDto,
@@ -46,6 +51,7 @@ export class RoomController {
   }
 
   @Patch(':id')
+  @AuditLog(AuditResourceType.ROOM)
   @UseInterceptors(FilesInterceptor('gallery', 10))
   update(
     @Param('id') id: string,
@@ -56,6 +62,7 @@ export class RoomController {
   }
 
   @Delete(':id')
+  @AuditLog(AuditResourceType.ROOM)
   remove(@Param('id') id: string) {
     return this.roomService.remove(id);
   }

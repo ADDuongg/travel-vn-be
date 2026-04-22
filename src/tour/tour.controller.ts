@@ -20,8 +20,12 @@ import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto } from './dto/tour-query.dto';
 import { ParseFormDataJsonPipe } from 'src/common/pipes/parse-form-data-json.pipe';
 import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 
 @Controller('api/v1/tours')
+@UseInterceptors(CrudAuditInterceptor)
 export class TourController {
   constructor(
     private readonly tourService: TourService,
@@ -29,6 +33,7 @@ export class TourController {
   ) {}
 
   @Post()
+  @AuditLog(AuditResourceType.TOUR)
   @UseInterceptors(FilesInterceptor('gallery', 10))
   create(
     @Body(new ParseFormDataJsonPipe()) dto: CreateTourDto,
@@ -76,6 +81,7 @@ export class TourController {
   }
 
   @Patch(':id')
+  @AuditLog(AuditResourceType.TOUR)
   @UseInterceptors(FilesInterceptor('gallery', 10))
   update(
     @Param('id') id: string,
@@ -86,6 +92,7 @@ export class TourController {
   }
 
   @Delete(':id')
+  @AuditLog(AuditResourceType.TOUR)
   delete(@Param('id') id: string) {
     return this.tourService.delete(id);
   }

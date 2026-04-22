@@ -29,6 +29,12 @@ import {
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { PermissionService } from '../permission/permission.service';
 import { User, UserDocument } from 'src/user/schema/user.schema';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
+import {
+  AuditCategory,
+  AuditResourceType,
+  AuthAuditAction,
+} from 'src/audit-log/enums/audit-log.enum';
 
 @Injectable()
 export class AuthService {
@@ -43,6 +49,7 @@ export class AuthService {
     private readonly permissionService: PermissionService,
     private readonly otpService: OtpService,
     private readonly mailService: MailService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   // =========================
@@ -138,6 +145,17 @@ export class AuthService {
     const permissions =
       user.permissions ??
       (await this.permissionService.resolvePermissions(user.roles || []));
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.USER_LOGIN,
+      resourceType: AuditResourceType.AUTH_SESSION,
+      userId: user._id,
+      username: user.username,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -211,6 +229,15 @@ export class AuthService {
       html: template.html,
     });
 
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.PASSWORD_RESET_REQUEST,
+      resourceType: AuditResourceType.AUTH_SESSION,
+      userId: user._id,
+      username: user.username,
+      metadata: { identifier },
+    });
+
     return { message: 'Password reset email sent' };
   }
 
@@ -254,6 +281,15 @@ export class AuthService {
     }
 
     await this.logoutAll(payload.sub);
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.PASSWORD_RESET_CONFIRM,
+      resourceType: AuditResourceType.AUTH_SESSION,
+      userId: updated._id,
+      username: updated.username,
+    });
+
     return { message: 'Password has been reset successfully' };
   }
 
@@ -313,6 +349,17 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.USER_REGISTER,
+      resourceType: AuditResourceType.USER,
+      resourceId: created._id,
+      userId: created._id,
+      username: created.username,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -358,6 +405,14 @@ export class AuthService {
         }
         await this.revokeRefreshTokenFamily(familyId);
         await this.logoutAll(payload.sub);
+        this.auditLogService.log({
+          category: AuditCategory.AUTH,
+          action: AuthAuditAction.TOKEN_REUSE_DETECTED,
+          resourceType: AuditResourceType.AUTH_SESSION,
+          userId: payload.sub,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        });
         throw new UnauthorizedException('Token reuse detected');
       }
 
@@ -370,6 +425,14 @@ export class AuthService {
         }
         await this.revokeRefreshTokenFamily(familyId);
         await this.logoutAll(payload.sub);
+        this.auditLogService.log({
+          category: AuditCategory.AUTH,
+          action: AuthAuditAction.TOKEN_REUSE_DETECTED,
+          resourceType: AuditResourceType.AUTH_SESSION,
+          userId: payload.sub,
+          ip: meta.ip,
+          userAgent: meta.userAgent,
+        });
         throw new UnauthorizedException('Token reuse detected');
       }
       if (!existing.tokenHash) {
@@ -404,6 +467,11 @@ export class AuthService {
       const permissions = await this.permissionService.resolvePermissions(
         user.roles || [],
       );
+
+      // Intentionally not logging successful token refresh: it fires on every
+      // page reload / background refresh and would flood audit logs without
+      // security signal. TOKEN_REUSE_DETECTED still logged on suspicious reuse.
+
       return {
         access_token: newAccessToken,
         refresh_token: newRefreshToken,
@@ -483,6 +551,13 @@ export class AuthService {
     (existing as any).keepUntil = addDays(new Date(), 1);
     await (existing as any).save();
 
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.USER_LOGOUT,
+      resourceType: AuditResourceType.AUTH_SESSION,
+      userId: payload.sub,
+    });
+
     return { message: 'Logged out successfully' };
   }
 
@@ -503,6 +578,14 @@ export class AuthService {
         },
       },
     );
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.USER_LOGOUT_ALL,
+      resourceType: AuditResourceType.AUTH_SESSION,
+      userId,
+      metadata: { sessionsRevoked: result.modifiedCount },
+    });
 
     return {
       message: 'All sessions logged out successfully',

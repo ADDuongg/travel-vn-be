@@ -8,17 +8,23 @@ import {
   Query,
   Req,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { HotelService } from './hotel.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 
 @Controller('api/v1/hotels')
+@UseInterceptors(CrudAuditInterceptor)
 export class HotelController {
   constructor(private readonly hotelService: HotelService) {}
 
   @Post()
+  @AuditLog(AuditResourceType.HOTEL)
   create(@Body() dto: CreateHotelDto) {
     return this.hotelService.create(dto);
   }
@@ -48,6 +54,7 @@ export class HotelController {
   }
 
   @Patch(':id')
+  @AuditLog(AuditResourceType.HOTEL)
   update(@Param('id') id: string, @Body() dto: UpdateHotelDto) {
     return this.hotelService.update(id, dto);
   }

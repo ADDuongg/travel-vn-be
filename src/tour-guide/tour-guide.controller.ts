@@ -20,8 +20,12 @@ import { UpdateTourGuideDto } from './dto/update-tour-guide.dto';
 import { TourGuideQueryDto } from './dto/tour-guide-query.dto';
 import { VerifyTourGuideDto } from './dto/verify-tour-guide.dto';
 import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 
 @Controller('api/v1/tour-guides')
+@UseInterceptors(CrudAuditInterceptor)
 export class TourGuideController {
   constructor(private readonly tourGuideService: TourGuideService) {}
 
@@ -72,8 +76,8 @@ export class TourGuideController {
     return this.tourGuideService.register(req.user.userId, dto, cv, gallery);
   }
 
-  /** Admin tạo tour guide */
   @Post()
+  @AuditLog(AuditResourceType.TOUR_GUIDE)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(['admin'])
   @UseInterceptors(
@@ -132,6 +136,7 @@ export class TourGuideController {
   }
 
   @Patch(':id')
+  @AuditLog(AuditResourceType.TOUR_GUIDE)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(['admin'])
   @UseInterceptors(
@@ -151,6 +156,7 @@ export class TourGuideController {
   }
 
   @Delete(':id')
+  @AuditLog(AuditResourceType.TOUR_GUIDE)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(['admin'])
   softDelete(@Param('id') id: string) {

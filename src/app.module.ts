@@ -52,6 +52,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { RedisModule } from './redis/redis.module';
 import { EnvService } from './env/env.service';
 import { FavoriteModule } from './favorite/favorite.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 
 @Module({
   imports: [
@@ -203,6 +204,7 @@ import { FavoriteModule } from './favorite/favorite.module';
     ChatModule,
     AnalyticsModule,
     EnvModule,
+    AuditLogModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

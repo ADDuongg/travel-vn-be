@@ -19,6 +19,12 @@ import {
   TourBookingStatus,
   TourPaymentStatus,
 } from 'src/tour-booking/schema/tour-booking.schema';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
+import {
+  AuditCategory,
+  AuditResourceType,
+  PaymentAuditAction,
+} from 'src/audit-log/enums/audit-log.enum';
 
 @Injectable()
 export class PaymentService {
@@ -27,6 +33,7 @@ export class PaymentService {
     private readonly paymentModel: Model<PaymentDocument>,
     private readonly bookingService: BookingService,
     private readonly tourBookingService: TourBookingService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async createPaymentIntent(bookingId: string) {
@@ -76,6 +83,19 @@ export class PaymentService {
     });
 
     await payment.save();
+
+    this.auditLogService.log({
+      category: AuditCategory.PAYMENT,
+      action: PaymentAuditAction.PAYMENT_INTENT_CREATED,
+      resourceType: AuditResourceType.PAYMENT,
+      resourceId: payment._id,
+      metadata: {
+        bookingId,
+        intentId: intent.id,
+        amount: booking.amount,
+        currency: booking.currency,
+      },
+    });
 
     return {
       clientSecret: intent.client_secret,
@@ -151,6 +171,19 @@ export class PaymentService {
 
     await payment.save();
 
+    this.auditLogService.log({
+      category: AuditCategory.PAYMENT,
+      action: PaymentAuditAction.PAYMENT_INTENT_CREATED,
+      resourceType: AuditResourceType.PAYMENT,
+      resourceId: payment._id,
+      metadata: {
+        tourBookingId,
+        intentId: intent.id,
+        amount: amountToCharge,
+        currency: doc.currency ?? 'VND',
+      },
+    });
+
     return {
       clientSecret: intent.client_secret,
       paymentId: payment._id,
@@ -174,6 +207,7 @@ export class PaymentService {
         });
         if (!payment) return;
 
+        const oldStatus = payment.status;
         payment.status = PaymentStatus.SUCCEEDED;
         payment.processedAt = new Date();
         await payment.save();
@@ -187,6 +221,21 @@ export class PaymentService {
             payment.intentId,
           );
         }
+
+        this.auditLogService.log({
+          category: AuditCategory.PAYMENT,
+          action: PaymentAuditAction.PAYMENT_SUCCEEDED,
+          resourceType: AuditResourceType.PAYMENT,
+          resourceId: payment._id,
+          oldValue: { status: oldStatus },
+          newValue: { status: PaymentStatus.SUCCEEDED },
+          metadata: {
+            intentId: intent.id,
+            bookingId: payment.bookingId?.toString(),
+            tourBookingId: payment.tourBookingId?.toString(),
+            amount: payment.amount,
+          },
+        });
         break;
       }
 
@@ -197,6 +246,7 @@ export class PaymentService {
         });
         if (!payment) return;
 
+        const oldStatus = payment.status;
         payment.status = PaymentStatus.FAILED;
         payment.processedAt = new Date();
         await payment.save();
@@ -208,6 +258,20 @@ export class PaymentService {
             payment.tourBookingId.toString(),
           );
         }
+
+        this.auditLogService.log({
+          category: AuditCategory.PAYMENT,
+          action: PaymentAuditAction.PAYMENT_FAILED,
+          resourceType: AuditResourceType.PAYMENT,
+          resourceId: payment._id,
+          oldValue: { status: oldStatus },
+          newValue: { status: PaymentStatus.FAILED },
+          metadata: {
+            intentId: intent.id,
+            bookingId: payment.bookingId?.toString(),
+            tourBookingId: payment.tourBookingId?.toString(),
+          },
+        });
         break;
       }
 
@@ -377,6 +441,20 @@ export class PaymentService {
       bookingId,
       payment.status === PaymentStatus.FULLY_REFUNDED,
     );
+
+    this.auditLogService.log({
+      category: AuditCategory.PAYMENT,
+      action: PaymentAuditAction.PAYMENT_REFUNDED,
+      resourceType: AuditResourceType.PAYMENT,
+      resourceId: payment._id,
+      oldValue: { refundedAmount: alreadyRefunded, status: PaymentStatus.SUCCEEDED },
+      newValue: { refundedAmount: payment.refundedAmount, status: payment.status },
+      metadata: {
+        bookingId,
+        refundAmount,
+        stripeRefundId: refund.id,
+      },
+    });
 
     return refund;
   }

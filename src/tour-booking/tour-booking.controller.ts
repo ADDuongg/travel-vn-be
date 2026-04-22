@@ -18,6 +18,9 @@ import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
 import { CancelTourBookingDto } from './dto/cancel-tour-booking.dto';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from 'src/guards/role.guard';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 import { IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 class AssignGuideDto {
@@ -28,10 +31,12 @@ class AssignGuideDto {
 import { TourBookingStatus } from './schema/tour-booking.schema';
 
 @Controller('api/v1/tour-bookings')
+@UseInterceptors(CrudAuditInterceptor)
 export class TourBookingController {
   constructor(private readonly tourBookingService: TourBookingService) {}
 
   @Post()
+  @AuditLog(AuditResourceType.TOUR_BOOKING)
   @UseGuards(JwtAuthGuard)
   create(
     @Req() req: { user: { userId: string } },
@@ -69,6 +74,7 @@ export class TourBookingController {
   }
 
   @Patch(':id/confirm')
+  @AuditLog(AuditResourceType.TOUR_BOOKING)
   confirm(@Param('id') id: string) {
     return this.tourBookingService.confirm(id);
   }
@@ -81,6 +87,7 @@ export class TourBookingController {
   }
 
   @Patch(':id/cancel')
+  @AuditLog(AuditResourceType.TOUR_BOOKING)
   @UseGuards(JwtAuthGuard)
   cancel(
     @Req() req: { user: { userId: string; role?: string; roles?: string[] } },

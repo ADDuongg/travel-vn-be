@@ -14,6 +14,12 @@ import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { EnvService } from 'src/env/env.service';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
+import {
+  AuditCategory,
+  AuditResourceType,
+  AuthAuditAction,
+} from 'src/audit-log/enums/audit-log.enum';
 
 import { AuthService } from './auth.service';
 import {
@@ -27,6 +33,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly env: EnvService,
+    private readonly auditLogService: AuditLogService,
   ) {}
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @ApiBearerAuth('bearer')
@@ -51,7 +58,17 @@ export class AuthController {
       dto.password,
     );
 
-    if (!user) throw new UnauthorizedException();
+    if (!user) {
+      this.auditLogService.log({
+        category: AuditCategory.AUTH,
+        action: AuthAuditAction.USER_LOGIN_FAILED,
+        resourceType: AuditResourceType.AUTH_SESSION,
+        ip: req.ip,
+        userAgent: req.headers['user-agent']?.toString(),
+        metadata: { username: dto.username },
+      });
+      throw new UnauthorizedException();
+    }
     const userAgentHeader = req.headers['user-agent'];
     const userAgent =
       typeof userAgentHeader === 'string' ? userAgentHeader : undefined;

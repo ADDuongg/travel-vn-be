@@ -1,1 +1,1 @@
-{"type":"entity","name":"AGENTS.md","entityType":"project_documentation","observations":["AGENTS.md is the main project brain."]}
+{"type":"entity","name":"package_manager","entityType":"project_convention","observations":["Use Yarn for this project (preferred package manager). Do not use npm; do not create/commit package-lock.json. Use yarn.lock as the lockfile."]} 

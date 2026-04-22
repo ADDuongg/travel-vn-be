@@ -18,12 +18,17 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { BookingQueryDto } from './dto/booking-query.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
+import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
+import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
+import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 
 @Controller('api/v1/bookings')
+@UseInterceptors(CrudAuditInterceptor)
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
   @Post('room')
+  @AuditLog(AuditResourceType.BOOKING)
   @UseGuards(JwtAuthGuard)
   createRoom(
     @Req() req: { user: { userId: string } },
@@ -84,11 +89,13 @@ export class BookingController {
   }
 
   @Patch(':id')
+  @AuditLog(AuditResourceType.BOOKING)
   update(@Param('id') id: string, @Body() dto: UpdateBookingDto) {
     return this.bookingService.update(id, dto);
   }
 
   @Patch(':id/cancel')
+  @AuditLog(AuditResourceType.BOOKING)
   @UseGuards(JwtAuthGuard)
   cancel(
     @Req() req: { user: { userId: string; role?: string; roles?: string[] } },
