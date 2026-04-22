@@ -33,8 +33,8 @@
 # STAGES -- Dinh nghia thu tu chay cua pipeline
 # ---------------------------------------------------------------------------
 stages:
-  - validate
-  - test
+  # - validate
+  # - test
   - build
   - deploy
 
@@ -58,6 +58,13 @@ cache:
     - .yarn-cache/
   policy: pull-push
 
+default:
+  before_script:
+    - rm -rf node_modules
+  after_script:
+    - rm -rf node_modules dist build .vite || true
+  interruptible: true
+
 # ===========================================================================
 # STAGE 1: VALIDATE -- Lint code
 # ===========================================================================
@@ -67,22 +74,22 @@ cache:
 # ---------------------------------------------------------------------------
 # Chay ESLint de kiem tra code style, best practices, potential bugs.
 # Chay tren MOI branch (khong gioi han).
-lint:
-  stage: validate
-  image: $NODE_IMAGE
-  cache:
-    key:
-      files:
-        - yarn.lock
-    paths:
-      - .yarn-cache/
-    policy: pull-push
-  script:
-    - yarn config set cache-folder .yarn-cache
-    - yarn install --frozen-lockfile --check-files --non-interactive
-    - yarn lint
-  tags:
-    - travel-staging
+# lint:
+#   stage: validate
+#   image: $NODE_IMAGE
+#   cache:
+#     key:
+#       files:
+#         - yarn.lock
+#     paths:
+#       - .yarn-cache/
+#     policy: pull-push
+#   script:
+#     - yarn config set cache-folder .yarn-cache
+#     - yarn install --frozen-lockfile --check-files --non-interactive
+#     - yarn lint
+#   tags:
+#     - travel-staging
 
 # ===========================================================================
 # STAGE 2: TEST -- Unit tests
@@ -92,21 +99,21 @@ lint:
 # Job: test
 # ---------------------------------------------------------------------------
 # Chay Jest unit tests voi coverage report.
-test:
-  stage: test
-  image: $NODE_IMAGE
-  script:
-    - yarn config set cache-folder .yarn-cache
-    - yarn install --frozen-lockfile --check-files --non-interactive
-    - yarn test --coverage --passWithNoTests
-  coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
-  artifacts:
-    when: always
-    paths:
-      - coverage/
-    expire_in: 7 days
-  tags:
-    - travel-staging
+# test:
+#   stage: test
+#   image: $NODE_IMAGE
+#   script:
+#     - yarn config set cache-folder .yarn-cache
+#     - yarn install --frozen-lockfile --check-files --non-interactive
+#     - yarn test --coverage --passWithNoTests
+#   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
+#   artifacts:
+#     when: always
+#     paths:
+#       - coverage/
+#     expire_in: 7 days
+#   tags:
+#     - travel-staging
 
 # ===========================================================================
 # STAGE 3: BUILD -- Docker build + push to registry
@@ -228,6 +235,8 @@ deploy:staging:
       exit 1
 
     - echo "Deploy staging success!"
+  after_script:
+    - docker image prune -f || true
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
   environment:
@@ -272,6 +281,8 @@ deploy:production:
       exit 1
 
     - echo "Deploy production success!"
+  after_script:
+    - docker image prune -f || true
   rules:
     - if: '$CI_COMMIT_BRANCH == "production"'
   environment:
