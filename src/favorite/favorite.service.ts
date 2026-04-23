@@ -270,7 +270,7 @@ export class FavoriteService {
       hotelIds.length
         ? this.hotelModel
             .find({ _id: { $in: hotelIds } })
-            .select('translations thumbnail slug')
+            .select('translations thumbnail slug ratingSummary')
             .lean()
             .then((docs: any[]) => {
               for (const d of docs) {
@@ -281,6 +281,7 @@ export class FavoriteService {
                   slug: d.slug,
                   name: this.pickTranslatedName(d.translations, lang),
                   thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
+                  ratingSummary: d.ratingSummary,
                 });
               }
             })

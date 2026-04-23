@@ -13,6 +13,7 @@ import {
 import { HotelService } from './hotel.service';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { HotelQueryDto } from './dto/hotel-query.dto';
 import { JwtOptionalAuthGuard } from 'src/guards/jwt-optional-auth.guard';
 import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
 import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
@@ -35,16 +36,19 @@ export class HotelController {
     @Query('provinceId') provinceId?: string,
     @Req() req?: { user?: { userId: string } },
   ) {
-    return this.hotelService.findAllActive(provinceId, req?.user?.userId);
+    return this.hotelService.findAllActiveOptions(
+      provinceId,
+      req?.user?.userId,
+    );
   }
 
   @Get()
   @UseGuards(JwtOptionalAuthGuard)
   findAll(
-    @Query('provinceId') provinceId?: string,
+    @Query() query?: HotelQueryDto,
     @Req() req?: { user?: { userId: string } },
   ) {
-    return this.hotelService.findAllActive(provinceId, req?.user?.userId);
+    return this.hotelService.findAllActive(query ?? {}, req?.user?.userId);
   }
 
   @Get(':id')

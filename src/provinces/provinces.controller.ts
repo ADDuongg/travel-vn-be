@@ -10,7 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { ProvincesService } from './provinces.service';
@@ -48,20 +48,13 @@ export class ProvincesController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(['admin'])
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'thumbnail', maxCount: 1 },
-      { name: 'gallery', maxCount: 10 },
-    ]),
-  )
+  @UseInterceptors(AnyFilesInterceptor())
   update(
     @Param('id') id: string,
     @Body() dto: UpdateProvinceDto,
-    @Req() req: { files?: Record<string, Express.Multer.File[]> },
+    @Req() req: { files?: Express.Multer.File[] },
   ) {
-    const thumbnail = req.files?.thumbnail?.[0];
-    const gallery = req.files?.gallery ?? [];
-    return this.provincesService.update(id, dto, thumbnail, gallery);
+    return this.provincesService.update(id, dto, req.files ?? []);
   }
 
   @Patch(':id/toggle-popular')

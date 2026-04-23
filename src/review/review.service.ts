@@ -116,6 +116,7 @@ export class ReviewService {
     if (
       entityType === ReviewEntityType.ROOM ||
       entityType === ReviewEntityType.TOUR ||
+      entityType === ReviewEntityType.HOTEL ||
       entityType === ReviewEntityType.GUIDE
     ) {
       await this.recalcByEntity(entityType, entityId);
@@ -378,6 +379,7 @@ export class ReviewService {
     if (
       review.entityType === ReviewEntityType.ROOM ||
       review.entityType === ReviewEntityType.TOUR ||
+      review.entityType === ReviewEntityType.HOTEL ||
       review.entityType === ReviewEntityType.GUIDE
     ) {
       await this.recalcByEntity(review.entityType, review.entityId.toString());
@@ -391,6 +393,8 @@ export class ReviewService {
       await this.recalculateRoomRating(entityId);
     } else if (entityType === ReviewEntityType.TOUR) {
       await this.recalculateTourRating(entityId);
+    } else if (entityType === ReviewEntityType.HOTEL) {
+      await this.recalculateHotelRating(entityId);
     } else if (entityType === ReviewEntityType.GUIDE) {
       await this.recalculateGuideRating(entityId);
     }
@@ -569,6 +573,36 @@ export class ReviewService {
     const ratingSummary = result[0] || { average: 0, total: 0 };
 
     await this.roomModel.findByIdAndUpdate(roomId, {
+      ratingSummary: {
+        average: Number(ratingSummary.average?.toFixed(2) || 0),
+        total: ratingSummary.total || 0,
+      },
+    });
+  }
+
+  private async recalculateHotelRating(hotelId: string) {
+    const result = await this.reviewModel.aggregate([
+      {
+        $match: {
+          entityType: ReviewEntityType.HOTEL,
+          entityId: new Types.ObjectId(hotelId),
+          status: ReviewStatus.APPROVED,
+          deletedAt: null,
+          rating: { $exists: true },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          average: { $avg: '$rating' },
+          total: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const ratingSummary = result[0] || { average: 0, total: 0 };
+
+    await this.hotelModel.findByIdAndUpdate(hotelId, {
       ratingSummary: {
         average: Number(ratingSummary.average?.toFixed(2) || 0),
         total: ratingSummary.total || 0,

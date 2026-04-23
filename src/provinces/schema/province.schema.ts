@@ -31,6 +31,41 @@ export class Ward {
 
 export const WardSchema = SchemaFactory.createForClass(Ward);
 
+@Schema({ _id: false })
+export class ProvinceBestTimeToVisit {
+  @Prop()
+  vi: string;
+
+  @Prop()
+  en: string;
+}
+
+export const ProvinceBestTimeToVisitSchema = SchemaFactory.createForClass(
+  ProvinceBestTimeToVisit,
+);
+
+@Schema({ _id: false })
+export class ProvinceHighlight {
+  @Prop({ type: LocalizedNameSchema, required: true })
+  name: LocalizedName;
+
+  @Prop({
+    type: { url: String, publicId: String, alt: String, order: Number },
+  })
+  thumbnail?: {
+    url: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  };
+
+  @Prop({ type: LocalizedNameSchema })
+  description?: LocalizedName;
+}
+
+export const ProvinceHighlightSchema =
+  SchemaFactory.createForClass(ProvinceHighlight);
+
 @Schema({ collection: 'provinces', timestamps: true })
 export class Province {
   @Prop({ default: 'province' })
@@ -50,6 +85,18 @@ export class Province {
 
   @Prop({ type: [WardSchema], default: [] })
   wards: Ward[];
+
+  @Prop()
+  population?: number;
+
+  @Prop()
+  area?: number;
+
+  @Prop({ type: ProvinceBestTimeToVisitSchema })
+  bestTimeToVisit?: ProvinceBestTimeToVisit;
+
+  @Prop({ type: [ProvinceHighlightSchema], default: [] })
+  highlights?: ProvinceHighlight[];
 
   /* ================= NEW FIELDS ================= */
 

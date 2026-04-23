@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreateHotelDto } from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
+import { HotelQueryDto } from './dto/hotel-query.dto';
 import { Hotel, HotelDocument } from './schema/hotel.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
 import { FavoriteService } from 'src/favorite/favorite.service';
@@ -49,6 +50,7 @@ export class HotelService {
       contact: dto.contact,
       location: dto.location,
       amenities: dto.amenities?.map((id) => new Types.ObjectId(id)) ?? [],
+      ratingSummary: { average: 0, total: 0 },
     });
   }
 
@@ -67,21 +69,38 @@ export class HotelService {
   }
 
   /**
-   * Find all active hotels for dropdown/options.
-   * Returns minimal fields: _id, slug, translations, provinceId
+   * Find all active hotels (same document shape as findById: full schema + populated province & amenities).
    */
-  async findAllActive(provinceId?: string, userId?: string) {
+  async findAllActive(query: HotelQueryDto = {}, userId?: string) {
+    const { provinceId, page = 1, limit = 12 } = query;
     const filter: Record<string, unknown> = { isActive: true };
     if (provinceId && Types.ObjectId.isValid(provinceId)) {
       filter.provinceId = new Types.ObjectId(provinceId);
     }
-    const items = await this.hotelModel
-      .find(filter)
-      .select('_id slug translations provinceId')
-      .populate('provinceId', 'name code slug')
-      .sort({ 'translations.vi.name': 1 })
-      .lean();
-    if (!userId) return items;
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.hotelModel
+        .find(filter)
+        .sort({ 'translations.vi.name': 1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('provinceId', 'name code slug fullName')
+        .populate('amenities')
+        .lean(),
+      this.hotelModel.countDocuments(filter),
+    ]);
+
+    if (!userId) {
+      return {
+        items,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
     const favSet = await this.favoriteService.existsByUserAndEntities({
       userId,
       pairs: items.map((h: any) => ({
@@ -89,10 +108,26 @@ export class HotelService {
         entityId: String(h._id),
       })),
     });
-    return items.map((h: any) => ({
-      ...h,
-      isFavorited: favSet.has(`${FavoriteEntityType.HOTEL}:${String(h._id)}`),
-    }));
+    return {
+      items: items.map((h: any) => ({
+        ...h,
+        isFavorited: favSet.has(`${FavoriteEntityType.HOTEL}:${String(h._id)}`),
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findAllActiveOptions(provinceId?: string, userId?: string) {
+    const result = await this.findAllActive(
+      { provinceId, page: 1, limit: 1000 },
+      userId,
+    );
+    return result.items;
   }
 
   /**

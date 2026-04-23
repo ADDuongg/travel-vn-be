@@ -15,8 +15,9 @@ export class ChatTools {
 
   async searchHotels(args: { location: string; starRating?: number }) {
     const allHotels = await this.hotelService.findAllActive();
+    const items = allHotels?.items || allHotels || [];
     const keyword = args.location.toLowerCase();
-    const filtered = (allHotels as any[]).filter((h) => {
+    const filtered = (Array.isArray(items) ? items : []).filter((h: any) => {
       const provinceName =
         h.provinceId?.name?.toLowerCase() ||
         h.provinceId?.slug?.toLowerCase() ||

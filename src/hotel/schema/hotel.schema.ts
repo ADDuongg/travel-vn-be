@@ -133,6 +133,20 @@ export class Hotel {
     default: [],
   })
   amenities: Types.ObjectId[];
+
+  /* ================= RATING ================= */
+
+  @Prop({
+    type: {
+      average: { type: Number, default: 0 },
+      total: { type: Number, default: 0 },
+    },
+    default: {},
+  })
+  ratingSummary: {
+    average: number;
+    total: number;
+  };
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);
@@ -143,3 +157,4 @@ HotelSchema.index({ provinceId: 1 });
 HotelSchema.index({ isActive: 1 });
 HotelSchema.index({ provinceId: 1, isActive: 1 });
 HotelSchema.index({ starRating: 1 });
+HotelSchema.index({ 'ratingSummary.average': -1 });

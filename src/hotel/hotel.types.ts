@@ -2,7 +2,7 @@
  * Types for Hotel API - copy to FE project
  *
  * APIs:
- * - GET /api/v1/hotels?provinceId=... - List hotels
+ * - GET /api/v1/hotels?provinceId=...&page=1&limit=12 - List hotels (paginated)
  * - GET /api/v1/hotels/options?provinceId=... - Dropdown options
  * - GET /api/v1/hotels/:id - Hotel detail
  */
@@ -38,6 +38,11 @@ export interface ProvinceRef {
   fullName?: { vi: string; en: string };
 }
 
+export interface HotelRatingSummary {
+  average: number;
+  total: number;
+}
+
 export interface Hotel {
   _id: string;
   slug: string;
@@ -55,4 +60,15 @@ export interface Hotel {
     order?: number;
   }>;
   amenities?: Array<{ _id: string; [key: string]: unknown }>;
+  ratingSummary?: HotelRatingSummary;
+}
+
+export interface HotelListResponse {
+  items: Hotel[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }

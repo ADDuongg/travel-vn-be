@@ -45,6 +45,12 @@ export interface ProvinceTranslation {
   seo?: ProvinceSeo;
 }
 
+export interface ProvinceHighlightItem {
+  name: LocalizedName;
+  thumbnail?: ImageItem;
+  description?: LocalizedName;
+}
+
 /** Danh sách (không kèm wards) */
 export interface ProvinceListItem {
   _id: string;
@@ -60,6 +66,13 @@ export interface ProvinceListItem {
   displayOrder: number;
   isActive: boolean;
   region?: 'NORTH' | 'CENTRAL' | 'SOUTH';
+  population?: number;
+  area?: number;
+  bestTimeToVisit?: LocalizedName;
+  highlights?: ProvinceHighlightItem[];
+  totalHotels?: number;
+  totalTours?: number;
+  totalTourGuides?: number;
   createdAt: string;
   updatedAt: string;
 }
