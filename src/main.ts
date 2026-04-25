@@ -80,6 +80,7 @@ async function bootstrap() {
       whitelist: true,
       transform: true,
       forbidNonWhitelisted: false,
+      forbidUnknownValues: false,
     }),
   );
 

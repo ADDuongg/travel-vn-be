@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { MediaController } from './media.controller';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { MediaService } from './media.service';
 
 describe('MediaController', () => {
   let controller: MediaController;
@@ -10,7 +10,7 @@ describe('MediaController', () => {
       controllers: [MediaController],
       providers: [
         {
-          provide: CloudinaryService,
+          provide: MediaService,
           useValue: {
             uploadFile: jest.fn(),
             uploadFiles: jest.fn(),

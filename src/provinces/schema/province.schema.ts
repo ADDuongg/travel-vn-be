@@ -3,16 +3,8 @@ import { Document } from 'mongoose';
 
 export type ProvinceDocument = Province & Document;
 
-@Schema({ _id: false })
-export class LocalizedName {
-  @Prop()
-  vi: string;
-
-  @Prop()
-  en: string;
-}
-
-export const LocalizedNameSchema = SchemaFactory.createForClass(LocalizedName);
+/** Mã ngôn ngữ (lowercase) -> chuỗi hiển thị. */
+export type DynamicLocalized = Record<string, string>;
 
 @Schema({ _id: false })
 export class Ward {
@@ -25,29 +17,21 @@ export class Ward {
   @Prop()
   slug: string;
 
-  @Prop({ type: LocalizedNameSchema })
-  name: LocalizedName;
+  @Prop({ type: Object, required: true })
+  name: DynamicLocalized;
 }
 
 export const WardSchema = SchemaFactory.createForClass(Ward);
 
-@Schema({ _id: false })
-export class ProvinceBestTimeToVisit {
-  @Prop()
-  vi: string;
-
-  @Prop()
-  en: string;
-}
-
-export const ProvinceBestTimeToVisitSchema = SchemaFactory.createForClass(
-  ProvinceBestTimeToVisit,
-);
+export type ProvinceHighlightTranslationBlock = {
+  name: string;
+  description?: string;
+};
 
 @Schema({ _id: false })
 export class ProvinceHighlight {
-  @Prop({ type: LocalizedNameSchema, required: true })
-  name: LocalizedName;
+  @Prop({ type: Object, required: true })
+  translations: Record<string, ProvinceHighlightTranslationBlock>;
 
   @Prop({
     type: { url: String, publicId: String, alt: String, order: Number },
@@ -58,9 +42,6 @@ export class ProvinceHighlight {
     alt?: string;
     order?: number;
   };
-
-  @Prop({ type: LocalizedNameSchema })
-  description?: LocalizedName;
 }
 
 export const ProvinceHighlightSchema =
@@ -77,11 +58,11 @@ export class Province {
   @Prop({ required: true })
   slug: string;
 
-  @Prop({ type: LocalizedNameSchema, required: true })
-  name: LocalizedName;
+  @Prop({ type: Object, required: true })
+  name: DynamicLocalized;
 
-  @Prop({ type: LocalizedNameSchema })
-  fullName?: LocalizedName;
+  @Prop({ type: Object })
+  fullName?: DynamicLocalized;
 
   @Prop({ type: [WardSchema], default: [] })
   wards: Ward[];
@@ -91,9 +72,6 @@ export class Province {
 
   @Prop()
   area?: number;
-
-  @Prop({ type: ProvinceBestTimeToVisitSchema })
-  bestTimeToVisit?: ProvinceBestTimeToVisit;
 
   @Prop({ type: [ProvinceHighlightSchema], default: [] })
   highlights?: ProvinceHighlight[];
@@ -125,6 +103,7 @@ export class Province {
     [langCode: string]: {
       description?: string;
       shortDescription?: string;
+      bestTimeToVisit?: string;
       seo?: {
         title?: string;
         description?: string;

@@ -1,19 +1,49 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { Hotel, HotelDocument } from 'src/hotel/schema/hotel.schema';
-import { TourGuide, TourGuideDocument } from 'src/tour-guide/schema/tour-guide.schema';
+import {
+  TourGuide,
+  TourGuideDocument,
+} from 'src/tour-guide/schema/tour-guide.schema';
 import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
-import { Province, ProvinceDocument } from './schema/province.schema';
+import {
+  Language,
+  LanguageDocument,
+} from 'src/language/schema/language.schema';
+import {
+  Province,
+  ProvinceDocument,
+  ProvinceHighlight,
+  ProvinceHighlightTranslationBlock,
+} from './schema/province.schema';
 import { UpdateProvinceDto } from './dto/update-province.dto';
 import { ProvinceQueryDto, ProvinceSortBy } from './dto/province-query.dto';
+
+type NormalizedHighlight = {
+  translations: Record<string, ProvinceHighlightTranslationBlock>;
+  thumbnail?: {
+    url?: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  };
+};
+
+const FALLBACK_LANG_CODES = ['vi', 'en'] as const;
 
 @Injectable()
 export class ProvincesService {
   constructor(
     @InjectModel(Province.name)
     private readonly provinceModel: Model<ProvinceDocument>,
+    @InjectModel(Language.name)
+    private readonly languageModel: Model<LanguageDocument>,
     @InjectModel(Hotel.name)
     private readonly hotelModel: Model<HotelDocument>,
     @InjectModel(Tour.name)
@@ -22,6 +52,21 @@ export class ProvincesService {
     private readonly tourGuideModel: Model<TourGuideDocument>,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
+
+  private async getActiveLangCodes(): Promise<string[]> {
+    const langs = await this.languageModel
+      .find({ isActive: true })
+      .select('code')
+      .lean();
+    if (!langs.length) {
+      return [...FALLBACK_LANG_CODES];
+    }
+    return langs.map((l) => String(l.code).toLowerCase());
+  }
+
+  private sortKeyForName(langCodes: string[]): string {
+    return `name.${langCodes[0] ?? 'vi'}`;
+  }
 
   async findAll(query: ProvinceQueryDto) {
     const {
@@ -33,6 +78,9 @@ export class ProvincesService {
       search,
       sort = ProvinceSortBy.NAME,
     } = query;
+
+    const langCodes = await this.getActiveLangCodes();
+    const nameSort = this.sortKeyForName(langCodes);
 
     const filter: Record<string, unknown> = {};
 
@@ -47,20 +95,22 @@ export class ProvincesService {
     }
     if (search?.trim()) {
       const regex = new RegExp(search.trim(), 'i');
-      filter.$or = [{ 'name.vi': regex }, { 'name.en': regex }];
+      filter.$or = langCodes.map((code) => ({
+        [`name.${code}`]: regex,
+      }));
     }
 
-    let sortOption: Record<string, 1 | -1> = { 'name.vi': 1 };
+    let sortOption: Record<string, 1 | -1> = { [nameSort]: 1 };
     switch (sort) {
       case ProvinceSortBy.DISPLAY_ORDER:
-        sortOption = { displayOrder: 1, 'name.vi': 1 };
+        sortOption = { displayOrder: 1, [nameSort]: 1 };
         break;
       case ProvinceSortBy.NEWEST:
         sortOption = { createdAt: -1 };
         break;
       case ProvinceSortBy.NAME:
       default:
-        sortOption = { 'name.vi': 1 };
+        sortOption = { [nameSort]: 1 };
         break;
     }
 
@@ -96,36 +146,33 @@ export class ProvincesService {
   }
 
   async findPopular() {
+    const langCodes = await this.getActiveLangCodes();
+    const nameSort = this.sortKeyForName(langCodes);
     return this.provinceModel
       .find({ isActive: true, isPopular: true })
       .select('-wards')
-      .sort({ displayOrder: 1, 'name.vi': 1 })
+      .sort({ displayOrder: 1, [nameSort]: 1 })
       .lean();
   }
 
-  /** Dropdown cho form: chi _id, code, slug, name, fullName, wards */
-  findAllForDropdown() {
+  /** Dropdown: _id, code, slug, name, fullName, wards */
+  async findAllForDropdown() {
+    const langCodes = await this.getActiveLangCodes();
+    const nameSort = this.sortKeyForName(langCodes);
     return this.provinceModel
       .find({ type: 'province' })
       .select('_id code slug name fullName wards')
-      .sort({ 'name.vi': 1 })
+      .sort({ [nameSort]: 1 })
       .lean();
   }
 
-  async update(
-    id: string,
-    dto: UpdateProvinceDto,
-    files: Express.Multer.File[] = [],
-  ) {
+  /**
+   * Chỉ JSON — ảnh upload trước qua `POST /api/v1/media/upload`, gửi `url`/`publicId` trong body.
+   */
+  async update(id: string, dto: UpdateProvinceDto) {
+    const requiredLangs = await this.getActiveLangCodes();
     const province = await this.provinceModel.findById(id).exec();
     if (!province) throw new NotFoundException('Province not found');
-    const thumbnailFile = files.find((file) => file.fieldname === 'thumbnail');
-    const galleryFiles = files.filter((file) => file.fieldname === 'gallery');
-    const highlightThumbnailFiles = files.filter(
-      (file) =>
-        file.fieldname === 'highlightsThumbnail' ||
-        file.fieldname.startsWith('highlightsThumbnail_'),
-    );
 
     if (dto.translations !== undefined)
       province.translations = dto.translations;
@@ -136,27 +183,33 @@ export class ProvincesService {
     if (dto.region !== undefined) province.region = dto.region;
     if (dto.population !== undefined) province.population = dto.population;
     if (dto.area !== undefined) province.area = dto.area;
+
     const parsedThumbnail = this.normalizeThumbnail(dto.thumbnail);
     if (parsedThumbnail !== undefined) {
+      if (
+        province.thumbnail?.publicId &&
+        parsedThumbnail.publicId !== province.thumbnail.publicId
+      ) {
+        await this.cloudinaryService
+          .deleteFile(province.thumbnail.publicId)
+          .catch(() => {});
+      }
       province.thumbnail = parsedThumbnail;
     }
-    const parsedBestTimeToVisit = this.normalizeBestTimeToVisit(
-      dto.bestTimeToVisit,
+
+    const parsedHighlights = this.normalizeHighlights(
+      dto.highlights,
+      requiredLangs,
     );
-    if (parsedBestTimeToVisit !== undefined) {
-      province.bestTimeToVisit = parsedBestTimeToVisit;
-    }
-    const parsedHighlights = this.normalizeHighlights(dto.highlights);
-    if (parsedHighlights !== undefined || highlightThumbnailFiles.length) {
-      const baseHighlights =
-        parsedHighlights ?? this.normalizeHighlights(province.highlights) ?? [];
-      const highlightsWithUploadedThumbnail =
-        await this.applyHighlightThumbnailsFromFiles(
-          province,
-          baseHighlights,
-          highlightThumbnailFiles,
-        );
-      province.highlights = highlightsWithUploadedThumbnail;
+    if (parsedHighlights !== undefined) {
+      await this.deleteRemovedHighlightThumbnails(
+        this.highlightsAsPlain(province.highlights) as
+          | Array<{ thumbnail?: { publicId?: string } }>
+          | undefined,
+        parsedHighlights,
+      );
+      province.highlights =
+        this.sanitizeHighlightsForPersistence(parsedHighlights);
     }
 
     if (dto.gallery !== undefined) {
@@ -164,16 +217,21 @@ export class ProvincesService {
       province.gallery = dto.gallery;
     }
 
-    if (galleryFiles?.length) {
-      const uploaded = await this.uploadGallery(galleryFiles);
-      province.gallery = [...(province.gallery || []), ...uploaded];
-    }
-
-    if (thumbnailFile) {
-      await this.applyThumbnail(province, thumbnailFile);
-    }
-
     return province.save().then((p) => p.toObject());
+  }
+
+  private highlightsAsPlain(
+    raw: ProvinceDocument['highlights'],
+  ): unknown[] | undefined {
+    if (raw == null) return undefined;
+    if (!Array.isArray(raw)) return undefined;
+    return raw.map((h) => {
+      if (h && typeof h === 'object' && 'toObject' in h) {
+        const t = h as { toObject?: () => object };
+        if (typeof t.toObject === 'function') return t.toObject();
+      }
+      return h;
+    });
   }
 
   async softDelete(id: string) {
@@ -199,48 +257,22 @@ export class ProvincesService {
     return province.save().then((p) => p.toObject());
   }
 
-  private async uploadGallery(
-    files: Express.Multer.File[],
-  ): Promise<
-    Array<{ url: string; publicId?: string; alt?: string; order?: number }>
-  > {
-    if (!files?.length) return [];
-    const result: Array<{
-      url: string;
-      publicId?: string;
-      alt?: string;
-      order?: number;
-    }> = [];
-    for (let i = 0; i < files.length; i++) {
-      const uploaded = await this.cloudinaryService.uploadFile(files[i], {
-        folder: 'provinces/gallery',
-      });
-      result.push({
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id,
-        alt: files[i].originalname || undefined,
-      });
-    }
-    return result;
-  }
-
-  private async applyThumbnail(
-    province: ProvinceDocument,
-    file: Express.Multer.File,
+  private async deleteRemovedHighlightThumbnails(
+    current: Array<{ thumbnail?: { publicId?: string } }> | null | undefined,
+    next: NormalizedHighlight[],
   ) {
-    if (province.thumbnail?.publicId) {
-      await this.cloudinaryService
-        .deleteFile(province.thumbnail.publicId)
-        .catch(() => {});
+    if (!current?.length) return;
+    const nextIds = new Set(
+      next
+        .map((h) => h.thumbnail?.publicId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    for (const h of current) {
+      const pid = h.thumbnail?.publicId;
+      if (pid && !nextIds.has(pid)) {
+        await this.cloudinaryService.deleteFile(pid).catch(() => {});
+      }
     }
-    const result = await this.cloudinaryService.uploadFile(file, {
-      folder: 'provinces/thumbnail',
-    });
-    province.thumbnail = {
-      url: result.secure_url,
-      publicId: result.public_id,
-      alt: file.originalname || undefined,
-    };
   }
 
   private async deleteRemovedGalleryImages(
@@ -402,22 +434,7 @@ export class ProvincesService {
     }, {});
   }
 
-  private normalizeBestTimeToVisit(
-    raw: unknown,
-  ): { vi: string; en: string } | undefined {
-    if (raw === undefined) return undefined;
-    const parsed = this.parseJsonIfString(raw);
-    if (!parsed || typeof parsed !== 'object') return undefined;
-
-    const vi = this.asNonEmptyString((parsed as Record<string, unknown>).vi);
-    const en = this.asNonEmptyString((parsed as Record<string, unknown>).en);
-    if (!vi || !en) return undefined;
-    return { vi, en };
-  }
-
-  private normalizeThumbnail(
-    raw: unknown,
-  ):
+  private normalizeThumbnail(raw: unknown):
     | {
         url: string;
         publicId?: string;
@@ -439,163 +456,176 @@ export class ProvincesService {
 
   private normalizeHighlights(
     raw: unknown,
-  ):
-    | Array<{
-        name: { vi: string; en: string };
-        thumbnail?: {
-          url: string;
-          publicId?: string;
-          alt?: string;
-          order?: number;
-        };
-        description?: { vi: string; en: string };
-      }>
-    | undefined {
+    requiredLangCodes: string[],
+  ): NormalizedHighlight[] | undefined {
     if (raw === undefined) return undefined;
     const parsed = this.parseJsonIfString(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {
+      if (parsed && typeof parsed === 'object') {
+        throw new BadRequestException('highlights must be a JSON array');
+      }
+      return [];
+    }
 
-    return parsed
-      .map((item) => this.normalizeHighlightItem(item))
-      .filter(
-        (item): item is NonNullable<ReturnType<typeof this.normalizeHighlightItem>> =>
-          Boolean(item),
+    const mapped: NormalizedHighlight[] = [];
+    for (const item of parsed) {
+      const n: NormalizedHighlight | undefined = this.normalizeHighlightItem(
+        item,
+        requiredLangCodes,
       );
+      if (n) mapped.push(n);
+    }
+
+    if (parsed.length > 0 && mapped.length === 0) {
+      throw new BadRequestException(
+        `No valid highlight items: each item needs translations with non-empty name for: ${requiredLangCodes.join(', ')} (or legacy name/description per language).`,
+      );
+    }
+
+    return mapped;
   }
 
-  private normalizeHighlightItem(item: unknown):
-    | {
-        name: { vi: string; en: string };
-        thumbnail?: {
-          url: string;
-          publicId?: string;
-          alt?: string;
-          order?: number;
-        };
-        description?: { vi: string; en: string };
-      }
-    | undefined {
-    if (!item || typeof item !== 'object') return undefined;
-    const raw = item as Record<string, unknown>;
-    const normalizedName = this.normalizeLocalizedText(raw.name);
-    if (!normalizedName) return undefined;
-
-    const normalized: {
-      name: { vi: string; en: string };
-      thumbnail?: {
-        url: string;
-        publicId?: string;
-        alt?: string;
-        order?: number;
-      };
-      description?: { vi: string; en: string };
-    } = {
-      name: normalizedName,
-    };
-
-    const normalizedDescription = this.normalizeLocalizedText(raw.description);
-    if (normalizedDescription) {
-      normalized.description = normalizedDescription;
+  private normalizeHighlightItem(
+    item: unknown,
+    requiredLangCodes: string[],
+  ): NormalizedHighlight | undefined {
+    const coalesced = this.parseJsonIfString(item);
+    if (
+      !coalesced ||
+      typeof coalesced !== 'object' ||
+      Array.isArray(coalesced)
+    ) {
+      return undefined;
     }
+    const raw = coalesced as Record<string, unknown>;
+
+    let translations = this.parseTranslationsObject(raw.translations);
+
+    if (!translations) {
+      translations = this.legacyNameDescriptionToTranslations(raw);
+    }
+
+    if (!translations || !Object.keys(translations).length) {
+      return undefined;
+    }
+
+    const normalized: Record<string, ProvinceHighlightTranslationBlock> = {};
+    for (const [langKey, block] of Object.entries(translations)) {
+      const k = langKey.toLowerCase();
+      const name = this.asNonEmptyStringFromUnknown(block.name);
+      if (name) {
+        const desc = this.asNonEmptyStringFromUnknown(block.description);
+        normalized[k] = desc ? { name, description: desc } : { name };
+      }
+    }
+
+    for (const code of requiredLangCodes) {
+      if (!this.asNonEmptyStringFromUnknown(normalized[code]?.name)) {
+        return undefined;
+      }
+    }
+
+    const out: NormalizedHighlight = { translations: normalized };
 
     if (raw.thumbnail && typeof raw.thumbnail === 'object') {
       const thumb = raw.thumbnail as Record<string, unknown>;
       const url = this.asNonEmptyString(thumb.url);
       if (url) {
-        normalized.thumbnail = {
+        out.thumbnail = {
           url,
           publicId: this.asNonEmptyString(thumb.publicId),
           alt: this.asNonEmptyString(thumb.alt),
-          order:
-            typeof thumb.order === 'number'
-              ? thumb.order
-              : typeof thumb.order === 'string' && thumb.order.trim() !== ''
-                ? Number(thumb.order)
-                : undefined,
+          order: this.parseOptionalOrder(thumb.order),
+        };
+      } else {
+        const alt = this.asNonEmptyString(thumb.alt);
+        const order = this.parseOptionalOrder(thumb.order);
+        if (alt !== undefined || order !== undefined) {
+          out.thumbnail = { alt, order };
+        }
+      }
+    }
+
+    return out;
+  }
+
+  private parseTranslationsObject(
+    trRaw: unknown,
+  ): Record<string, { name?: unknown; description?: unknown }> | null {
+    if (trRaw == null) return null;
+    const tr = this.parseJsonIfString(trRaw);
+    if (tr == null || typeof tr !== 'object' || Array.isArray(tr)) {
+      return null;
+    }
+    const out: Record<string, { name?: unknown; description?: unknown }> = {};
+    for (const [k, v] of Object.entries(tr as Record<string, unknown>)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        const o = v as Record<string, unknown>;
+        out[k.toLowerCase()] = { name: o.name, description: o.description };
+      }
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
+  /** highlights[] cũ: name: { vi, en }, description?: { vi, en } */
+  private legacyNameDescriptionToTranslations(
+    raw: Record<string, unknown>,
+  ): Record<string, { name?: unknown; description?: unknown }> | null {
+    const nameObj = raw.name;
+    const descObj = raw.description;
+    if (!nameObj && !descObj) return null;
+    if (nameObj && typeof nameObj === 'object' && !Array.isArray(nameObj)) {
+      const out: Record<string, { name?: unknown; description?: unknown }> = {};
+      const n = nameObj as Record<string, unknown>;
+      const d =
+        descObj && typeof descObj === 'object' && !Array.isArray(descObj)
+          ? (descObj as Record<string, unknown>)
+          : {};
+      const keys = new Set([...Object.keys(n), ...Object.keys(d)]);
+      for (const k of keys) {
+        out[k.toLowerCase()] = {
+          name: n[k],
+          description: d[k],
         };
       }
+      return Object.keys(out).length ? out : null;
     }
-
-    return normalized;
+    return null;
   }
 
-  private async applyHighlightThumbnailsFromFiles(
-    province: ProvinceDocument,
-    highlights: Array<{
-      name: { vi: string; en: string };
-      thumbnail?: {
-        url: string;
-        publicId?: string;
-        alt?: string;
-        order?: number;
-      };
-      description?: { vi: string; en: string };
-    }>,
-    files: Express.Multer.File[],
-  ) {
-    if (!files.length || !highlights.length) return highlights;
-    const normalized = highlights.map((item) => ({ ...item }));
-    const sequentialFiles = files.filter(
-      (file) => file.fieldname === 'highlightsThumbnail',
-    );
-    const indexedFiles = files
-      .map((file) => {
-        const match = file.fieldname.match(/^highlightsThumbnail_(\d+)$/);
-        return match ? { index: Number(match[1]), file } : undefined;
-      })
-      .filter(
-        (
-          value,
-        ): value is {
-          index: number;
-          file: Express.Multer.File;
-        } => Boolean(value),
-      );
+  private parseOptionalOrder(value: unknown): number | undefined {
+    if (typeof value === 'number' && !Number.isNaN(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '') {
+      const n = Number(value);
+      return Number.isNaN(n) ? undefined : n;
+    }
+    return undefined;
+  }
 
-    const uploadAtIndex = async (index: number, file: Express.Multer.File) => {
-      if (index < 0 || index >= normalized.length) return;
-      const currentThumbnail = normalized[index].thumbnail;
-      if (currentThumbnail?.publicId) {
-        await this.cloudinaryService
-          .deleteFile(currentThumbnail.publicId)
-          .catch(() => {});
+  private sanitizeHighlightsForPersistence(
+    items: NormalizedHighlight[],
+  ): ProvinceHighlight[] {
+    return items.map((h) => {
+      const url = h.thumbnail && this.asNonEmptyString(h.thumbnail.url);
+      const row: ProvinceHighlight = {
+        translations: h.translations,
+      };
+      if (url && h.thumbnail) {
+        row.thumbnail = {
+          url,
+          publicId: this.asNonEmptyString(h.thumbnail.publicId),
+          alt: this.asNonEmptyString(h.thumbnail.alt),
+          order: h.thumbnail.order,
+        };
       }
-      const uploaded = await this.cloudinaryService.uploadFile(file, {
-        folder: 'provinces/highlights',
-      });
-      normalized[index].thumbnail = {
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id,
-        alt: file.originalname || undefined,
-        order: currentThumbnail?.order,
-      };
-    };
-
-    for (let index = 0; index < sequentialFiles.length; index++) {
-      await uploadAtIndex(index, sequentialFiles[index]);
-    }
-    for (const item of indexedFiles) {
-      await uploadAtIndex(item.index, item.file);
-    }
-
-    return normalized;
+      return row;
+    });
   }
 
-  private normalizeLocalizedText(
-    value: unknown,
-  ): { vi: string; en: string } | undefined {
-    if (!value || typeof value !== 'object') return undefined;
-    const obj = value as Record<string, unknown>;
-    const vi = this.asNonEmptyString(obj.vi);
-    const en = this.asNonEmptyString(obj.en);
-    if (!vi || !en) return undefined;
-    return { vi, en };
-  }
-
-  private parseJsonIfString<T = unknown>(value: unknown): T | unknown {
+  private parseJsonIfString(value: unknown): unknown {
     if (typeof value !== 'string') return value;
     try {
-      return JSON.parse(value) as T;
+      return JSON.parse(value) as unknown;
     } catch {
       return value;
     }
@@ -605,6 +635,17 @@ export class ProvincesService {
     if (typeof value !== 'string') return undefined;
     const trimmed = value.trim();
     return trimmed ? trimmed : undefined;
+  }
+
+  private asNonEmptyStringFromUnknown(value: unknown): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === 'string') {
+      return this.asNonEmptyString(value);
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return this.asNonEmptyString(String(value));
+    }
+    return undefined;
   }
 }
 

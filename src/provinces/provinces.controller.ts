@@ -6,11 +6,8 @@ import {
   Param,
   Patch,
   Query,
-  Req,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { Roles, RolesGuard } from 'src/guards/role.guard';
 import { ProvincesService } from './provinces.service';
@@ -45,16 +42,15 @@ export class ProvincesController {
 
   /* ================= ADMIN ================= */
 
+  /**
+   * Chỉ nhận JSON (không upload file). Ảnh dùng `POST /api/v1/media/upload` (hoặc upload-multiple),
+   * lấy `secure_url` / `public_id` gắn vào `thumbnail`, `gallery`, `highlights[].thumbnail`.
+   */
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(['admin'])
-  @UseInterceptors(AnyFilesInterceptor())
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateProvinceDto,
-    @Req() req: { files?: Express.Multer.File[] },
-  ) {
-    return this.provincesService.update(id, dto, req.files ?? []);
+  update(@Param('id') id: string, @Body() dto: UpdateProvinceDto) {
+    return this.provincesService.update(id, dto);
   }
 
   @Patch(':id/toggle-popular')

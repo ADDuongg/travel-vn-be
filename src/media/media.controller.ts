@@ -6,21 +6,21 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { MediaService } from './media.service';
 
 @Controller('/api/v1/media')
 export class MediaController {
-  constructor(private readonly cloudinaryService: CloudinaryService) {}
+  constructor(private readonly mediaService: MediaService) {}
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: Express.Multer.File) {
-    return this.cloudinaryService.uploadFile(file);
+    return this.mediaService.uploadFile(file);
   }
 
   @Post('upload-multiple')
   @UseInterceptors(FilesInterceptor('files'))
   uploadMultiple(@UploadedFiles() files: Express.Multer.File[]) {
-    return this.cloudinaryService.uploadFiles(files);
+    return this.mediaService.uploadFiles(files);
   }
 }

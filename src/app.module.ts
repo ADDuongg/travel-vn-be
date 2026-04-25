@@ -53,6 +53,9 @@ import { RedisModule } from './redis/redis.module';
 import { EnvService } from './env/env.service';
 import { FavoriteModule } from './favorite/favorite.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
+import { BlogCategoryModule } from './blog-category/blog-category.module';
+import { BlogTagModule } from './blog-tag/blog-tag.module';
+import { BlogModule } from './blog/blog.module';
 
 @Module({
   imports: [
@@ -205,6 +208,9 @@ import { AuditLogModule } from './audit-log/audit-log.module';
     AnalyticsModule,
     EnvModule,
     AuditLogModule,
+    BlogCategoryModule,
+    BlogTagModule,
+    BlogModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
