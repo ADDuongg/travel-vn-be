@@ -121,14 +121,28 @@ docker exec backend-staging-mongo mongorestore \
 # Đây là dữ liệu đã được docker cp vào container trước đó
 
 /tmp/travel-vn -->
+<!-- lệnh này chạy trên vps -->
 
 docker exec backend-staging-mongo mongorestore \
  --username duongnv \
- --password 'Duong@88999' \
+ --password 'xxx' \
  --authenticationDatabase admin \
  --drop \
  --db travel-vn \
  /tmp/travel-vn
+
+<!-- lệnh này chạy trên local nếu muốn nhanh -->
+<!-- ./db-mongo/e-commerce là thư mục ở local chứa database -->
+
+mongorestore \
+--host localhost \
+--port 27118 \
+--username duongnv \
+--password 'xxx' \
+--authenticationDatabase admin \
+--drop \
+--db e-commerce \
+./db-mongo/e-commerce
 
 <!-- copy thư mục db vào dump folder -->
 
