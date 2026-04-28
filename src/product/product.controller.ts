@@ -26,7 +26,7 @@ const destination = './public/uploads/products';
 
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Controller('api/v1/product')
+@Controller('product')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 

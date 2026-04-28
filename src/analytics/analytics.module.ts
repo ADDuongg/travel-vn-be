@@ -7,7 +7,7 @@ import { Hotel, HotelSchema } from 'src/hotel/schema/hotel.schema';
 import { Room, RoomSchema } from 'src/room/schema/room.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
 import { User, UserSchema } from 'src/user/schema/user.schema';
-import { AnalyticsController } from './analytics.controller';
+import { AnalyticsAdminController } from './analytics.admin.controller';
 import { AnalyticsService } from './analytics.service';
 
 @Module({
@@ -21,7 +21,7 @@ import { AnalyticsService } from './analytics.service';
       { name: User.name, schema: UserSchema },
     ]),
   ],
-  controllers: [AnalyticsController],
+  controllers: [AnalyticsAdminController],
   providers: [AnalyticsService],
 })
 export class AnalyticsModule {}

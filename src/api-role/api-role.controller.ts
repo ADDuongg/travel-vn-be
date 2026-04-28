@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { ApiRoleService } from './api-role.service';
 import { CreateApiRoleDto } from './dto/create-api-role.dto';
 
-@Controller('/api/v1/api-roles')
+@Controller('api-roles')
 export class ApiRoleController {
   constructor(private readonly apiRoleService: ApiRoleService) {}
 

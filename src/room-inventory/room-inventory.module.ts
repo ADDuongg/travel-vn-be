@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RoomInventoryService } from './room-inventory.service';
-import { RoomInventoryController } from './room-inventory.controller';
+import { RoomInventoryAdminController } from './room-inventory.admin.controller';
+import { RoomInventoryPublicController } from './room-inventory.public.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
   RoomInventory,
@@ -16,7 +17,7 @@ import { RoomInventoryCronService } from './room-inventory-cron.service';
       { name: Room.name, schema: RoomSchema },
     ]),
   ],
-  controllers: [RoomInventoryController],
+  controllers: [RoomInventoryPublicController, RoomInventoryAdminController],
   providers: [RoomInventoryService, RoomInventoryCronService],
   exports: [RoomInventoryService],
 })

@@ -7,7 +7,8 @@ import {
 } from 'src/tour-guide/schema/tour-guide.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
 import { Province, ProvinceSchema } from './schema/province.schema';
-import { ProvincesController } from './provinces.controller';
+import { ProvincesAdminController } from './provinces.admin.controller';
+import { ProvincesPublicController } from './provinces.public.controller';
 import { ProvincesService } from './provinces.service';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { Language, LanguageSchema } from 'src/language/schema/language.schema';
@@ -23,7 +24,7 @@ import { Language, LanguageSchema } from 'src/language/schema/language.schema';
     ]),
     CloudinaryModule,
   ],
-  controllers: [ProvincesController],
+  controllers: [ProvincesPublicController, ProvincesAdminController],
   providers: [ProvincesService],
   exports: [ProvincesService],
 })

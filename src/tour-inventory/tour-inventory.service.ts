@@ -41,7 +41,7 @@ export class TourInventoryService {
 
   /**
    * Lấy danh sách availability theo tháng (YYYY-MM)
-   * GET /api/v1/tours/:id/availability?month=2025-03
+   * GET /api/v1/public/tour-inventory/tours/:tourId/availability?month=2025-03
    */
   async getAvailabilityByMonth(
     tourId: string,

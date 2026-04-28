@@ -24,6 +24,7 @@ import { PermissionModule } from './permission/permission.module';
 import { ProductController } from './product/product.controller';
 import { ProductModule } from './product/product.module';
 import { RolesModule } from './roles/roles.module';
+import { RbacModule } from './rbac/rbac.module';
 import { RouterRoleModule } from './router-role/router-role.module';
 import { RoutersModule } from './routers/routers.module';
 import { SharedModule } from './shared/shared.module';
@@ -181,6 +182,7 @@ import { BlogModule } from './blog/blog.module';
     EventsModule,
     SharedModule,
     RolesModule,
+    RbacModule,
     RoutersModule,
     ApiPermissionModule,
     RouterRoleModule,

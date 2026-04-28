@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Model, Types } from 'mongoose';
@@ -8,14 +12,47 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthUser, UserWithPassword } from './interfaces/user-interface';
 import { User, UserDocument } from './schema/user.schema';
+import { hasPortalStaffRole } from 'src/rbac/staff-role.util';
 
 @Injectable()
 export class UserService {
+  private static readonly DEFAULT_RESET_PASSWORD = '123123123';
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
     private readonly permissionService: PermissionService,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
+
+  /**
+   * Enforces `/api/v1/admin/*` access — active portal staff (`super_admin`…`viewer` or `User.isSuperAdmin`).
+   */
+  async assertAdminPortalAccess(userId: string): Promise<void> {
+    const u = await this.userModel
+      .findById(userId)
+      .select('isActive deletedAt roles isSuperAdmin')
+      .lean<{
+        isActive?: boolean;
+        deletedAt?: Date | null;
+        roles?: string[];
+        isSuperAdmin?: boolean;
+      }>()
+      .exec();
+
+    if (!u) {
+      throw new ForbiddenException('Admin access required');
+    }
+    if (u.deletedAt || !u.isActive) {
+      throw new ForbiddenException('Account inactive');
+    }
+    if (u.isSuperAdmin) {
+      return;
+    }
+    if (!hasPortalStaffRole(u.roles ?? [])) {
+      throw new ForbiddenException('Admin access required');
+    }
+  }
+
   async create(userDto: CreateUserDto): Promise<User> {
     const existedUser = await this.userModel.findOne({
       $or: [{ username: userDto.username }, { email: userDto.email }],
@@ -45,8 +82,8 @@ export class UserService {
   async findOneById(id: string): Promise<AuthUser | null> {
     const user = await this.userModel
       .findById(id)
-      .select('_id username roles')
-      .lean<AuthUser>()
+      .select('_id username roles isSuperAdmin isActive deletedAt')
+      .lean<Omit<AuthUser, 'permissions'> | null>()
       .exec();
     if (!user) return null;
 
@@ -54,8 +91,15 @@ export class UserService {
       user.roles || [],
     );
 
+    const { isActive, deletedAt, ...rest } = user as typeof user & {
+      isActive?: boolean;
+      deletedAt?: Date | null;
+    };
+    void isActive;
+    void deletedAt;
+
     return {
-      ...user,
+      ...rest,
       permissions,
     };
   }
@@ -149,6 +193,22 @@ export class UserService {
 
   remove(id: string) {
     return this.userModel.findByIdAndDelete(id).exec();
+  }
+
+  async resetPasswordToDefault(id: string) {
+    const hashedPassword = await bcrypt.hash(
+      UserService.DEFAULT_RESET_PASSWORD,
+      10,
+    );
+    return this.userModel
+      .findByIdAndUpdate(
+        id,
+        { $set: { password: hashedPassword } },
+        { new: true },
+      )
+      .select('_id username email fullName roles isActive')
+      .lean()
+      .exec();
   }
 
   /** Thêm role vào user (dùng cho TourGuide register). */

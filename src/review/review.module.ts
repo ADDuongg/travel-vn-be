@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ReviewService } from './review.service';
-import { ReviewController } from './review.controller';
+import { ReviewPublicController } from './review.public.controller';
+import { ReviewClientController } from './review.client.controller';
+import { ReviewAdminController } from './review.admin.controller';
 import { Review, ReviewSchema } from './schema/ewview.schema';
 import { Room, RoomSchema } from 'src/room/schema/room.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
@@ -22,7 +24,11 @@ import { ReviewSoftDeleteCleanupService } from './review-soft-delete-cleanup.ser
       { name: Hotel.name, schema: HotelSchema },
     ]),
   ],
-  controllers: [ReviewController],
+  controllers: [
+    ReviewPublicController,
+    ReviewClientController,
+    ReviewAdminController,
+  ],
   providers: [ReviewService, ReviewSoftDeleteCleanupService],
   exports: [ReviewService],
 })

@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { TourController } from './tour.controller';
+import { TourAdminController } from './tour.admin.controller';
+import { TourPublicController } from './tour.public.controller';
 import { TourService } from './tour.service';
 import { Tour, TourSchema } from './schema/tour.schema';
 import { ProvincesModule } from 'src/provinces/provinces.module';
-import { TourInventoryModule } from 'src/tour-inventory/tour-inventory.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { FavoriteModule } from 'src/favorite/favorite.module';
 
@@ -12,11 +12,10 @@ import { FavoriteModule } from 'src/favorite/favorite.module';
   imports: [
     MongooseModule.forFeature([{ name: Tour.name, schema: TourSchema }]),
     ProvincesModule,
-    TourInventoryModule,
     CloudinaryModule,
     FavoriteModule,
   ],
-  controllers: [TourController],
+  controllers: [TourPublicController, TourAdminController],
   providers: [TourService],
   exports: [TourService],
 })

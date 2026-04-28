@@ -32,7 +32,9 @@
     "db:seed": "ts-node scripts/database/seed.ts",
     "db:seed:from-staging": "ts-node scripts/database/seed-from-staging.ts",
     "db:pull:staging": "ts-node scripts/database/pull-staging.ts",
-    "db:reset": "ts-node scripts/database/reset.ts"
+    "db:reset": "ts-node scripts/database/reset.ts",
+    "db:seed:rbac": "ts-node -r tsconfig-paths/register scripts/database/seed-rbac.ts",
+    "db:seed:rbac:matrix": "ts-node -r tsconfig-paths/register scripts/database/seed-rbac.ts --sync-default-matrix"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

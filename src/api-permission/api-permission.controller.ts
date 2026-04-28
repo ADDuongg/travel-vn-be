@@ -11,7 +11,7 @@ import { ApiPermissionService } from './api-permission.service';
 import { CreateApiPermissionDto } from './dto/create-api-permission.dto';
 import { UpdateApiPermissionDto } from './dto/update-api-permission.dto';
 
-@Controller('/api/v1/api-permissions')
+@Controller('api-permissions')
 export class ApiPermissionController {
   constructor(private readonly apiPermissionService: ApiPermissionService) {}
 

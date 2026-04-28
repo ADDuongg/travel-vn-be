@@ -1,30 +1,40 @@
 import {
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   Injectable,
+  UnauthorizedException,
 } from '@nestjs/common';
 
-const ADMIN_ROLES = ['admin', 'ADMIN', 'super_admin'];
+import { UserService } from 'src/user/user.service';
+
+function adminPathMatches(pathname: string): boolean {
+  return pathname.includes('/admin/') || pathname.endsWith('/admin');
+}
 
 @Injectable()
 export class AdminGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest();
-    const roles: string[] = Array.isArray(req.user?.roles)
-      ? req.user.roles
-      : req.user?.role
-        ? [req.user.role]
-        : [];
+  constructor(private readonly users: UserService) {}
 
-    const normalized = roles.map((r) => r.toLowerCase());
-    const hasAdminRole = ADMIN_ROLES.some((r) =>
-      normalized.includes(r.toLowerCase()),
-    );
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<{
+      originalUrl?: string;
+      url?: string;
+      user?: { userId?: string; sub?: string };
+    }>();
 
-    if (!hasAdminRole) {
-      throw new ForbiddenException('Admin access required');
+    const raw = req.originalUrl ?? req.url ?? '';
+    const pathname = typeof raw === 'string' ? raw.split('?')[0] : '';
+
+    if (!adminPathMatches(pathname)) {
+      return true;
     }
+
+    const userId = req.user?.userId ?? req.user?.sub;
+    if (!userId) {
+      throw new UnauthorizedException('Invalid authentication');
+    }
+
+    await this.users.assertAdminPortalAccess(String(userId));
     return true;
   }
 }

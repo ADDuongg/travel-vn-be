@@ -28,6 +28,7 @@ import {
 } from './interfaces/jwt-payload.interface';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { PermissionService } from '../permission/permission.service';
+import { RbacService } from 'src/rbac/rbac.service';
 import { User, UserDocument } from 'src/user/schema/user.schema';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
 import {
@@ -47,6 +48,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly env: EnvService,
     private readonly permissionService: PermissionService,
+    private readonly rbacService: RbacService,
     private readonly otpService: OtpService,
     private readonly mailService: MailService,
     private readonly auditLogService: AuditLogService,
@@ -62,8 +64,17 @@ export class AuthService {
     const match = await bcrypt.compare(pass, user.password);
     if (!match) return null;
 
+    if (!user.isActive || user.deletedAt) {
+      return null;
+    }
+
     const permissions = await this.permissionService.resolvePermissions(
       user.roles || [],
+    );
+
+    const rbacPermissions = await this.rbacService.resolveFlatPermissions(
+      user.roles || [],
+      user.isSuperAdmin ?? false,
     );
 
     return {
@@ -71,6 +82,8 @@ export class AuthService {
       username: user.username,
       roles: user.roles,
       permissions,
+      rbacPermissions,
+      isSuperAdmin: user.isSuperAdmin ?? false,
     };
   }
 
@@ -84,6 +97,8 @@ export class AuthService {
       sub: String(user._id),
       username: user.username,
       roles: user.roles,
+      rbacPermissions: user.rbacPermissions ?? [],
+      isSuperAdmin: user.isSuperAdmin ?? false,
       typ: 'access',
     };
 
@@ -146,6 +161,13 @@ export class AuthService {
       user.permissions ??
       (await this.permissionService.resolvePermissions(user.roles || []));
 
+    const rbacPermissions =
+      user.rbacPermissions ??
+      (await this.rbacService.resolveFlatPermissions(
+        user.roles || [],
+        user.isSuperAdmin ?? false,
+      ));
+
     this.auditLogService.log({
       category: AuditCategory.AUTH,
       action: AuthAuditAction.USER_LOGIN,
@@ -164,6 +186,8 @@ export class AuthService {
         username: user.username,
         roles: user.roles,
         permissions,
+        rbacPermissions,
+        isSuperAdmin: user.isSuperAdmin ?? false,
       },
     };
   }
@@ -338,6 +362,8 @@ export class AuthService {
         apis: [],
         routers: [],
       },
+      rbacPermissions: [],
+      isSuperAdmin: false,
     };
 
     const accessToken = this.signAccessToken(user);
@@ -452,18 +478,32 @@ export class AuthService {
       (existing as any).keepUntil = addDays(new Date(), 1);
       await existing.save();
 
+      const alive = await this.userModel
+        .findById(payload.sub)
+        .select('isActive deletedAt')
+        .lean<{ isActive?: boolean; deletedAt?: Date | null } | null>();
+      if (!alive || alive.deletedAt || !alive.isActive) {
+        throw new UnauthorizedException();
+      }
+
       const user = await this.usersService.findOneById(payload.sub);
       if (!user) throw new UnauthorizedException();
 
-      const { token: newRefreshToken, jti } = this.signRefreshToken(user);
+      const rbacPermissions = await this.rbacService.resolveFlatPermissions(
+        user.roles || [],
+        user.isSuperAdmin ?? false,
+      );
+      const sessionUser: AuthUser = { ...user, rbacPermissions };
 
-      await this.saveRefreshToken(user, newRefreshToken, jti, {
+      const { token: newRefreshToken, jti } = this.signRefreshToken(sessionUser);
+
+      await this.saveRefreshToken(sessionUser, newRefreshToken, jti, {
         familyId: (existing as any).familyId,
         ip: meta.ip,
         userAgent: meta.userAgent,
       });
 
-      const newAccessToken = this.signAccessToken(user);
+      const newAccessToken = this.signAccessToken(sessionUser);
       const permissions = await this.permissionService.resolvePermissions(
         user.roles || [],
       );
@@ -480,6 +520,8 @@ export class AuthService {
           username: user.username,
           roles: user.roles,
           permissions,
+          rbacPermissions,
+          isSuperAdmin: user.isSuperAdmin ?? false,
         },
       };
     } catch (err) {
@@ -502,10 +544,16 @@ export class AuthService {
     const permissions = await this.permissionService.resolvePermissions(
       user.roles || [],
     );
+    const rbacPermissions = await this.rbacService.resolveFlatPermissions(
+      user.roles || [],
+      !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
+    );
     return {
       ...user,
       id: String(user._id),
       permissions,
+      rbacPermissions,
+      isSuperAdmin: !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
     };
   }
 

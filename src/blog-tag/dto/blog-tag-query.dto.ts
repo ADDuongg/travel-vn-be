@@ -30,4 +30,9 @@ export class BlogTagQueryDto {
   @Type(() => Boolean)
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeDeleted?: boolean; // admin only, ignored for public
 }

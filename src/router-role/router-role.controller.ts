@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
 import { RouterRoleService } from './router-role.service';
 import { CreateRouterRoleDto } from './dto/create-router-role.dto';
 
-@Controller('/api/v1/router-roles')
+@Controller('router-roles')
 export class RouterRoleController {
   constructor(private readonly routerRoleService: RouterRoleService) {}
 

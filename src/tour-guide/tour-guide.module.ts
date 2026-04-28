@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TourGuide, TourGuideSchema } from './schema/tour-guide.schema';
-import { TourGuideController } from './tour-guide.controller';
+import { TourGuideAdminController } from './tour-guide.admin.controller';
+import { TourGuideClientController } from './tour-guide.client.controller';
+import { TourGuidePublicController } from './tour-guide.public.controller';
 import { TourGuideService } from './tour-guide.service';
 import { UserModule } from 'src/user/user.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
@@ -18,7 +20,11 @@ import { FavoriteModule } from 'src/favorite/favorite.module';
     ReviewModule,
     FavoriteModule,
   ],
-  controllers: [TourGuideController],
+  controllers: [
+    TourGuidePublicController,
+    TourGuideClientController,
+    TourGuideAdminController,
+  ],
   providers: [TourGuideService],
   exports: [TourGuideService],
 })

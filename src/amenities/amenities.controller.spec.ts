@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AmenitiesController } from './amenities.controller';
+import { AmenitiesPublicController } from './amenities.public.controller';
 import { AmenitiesService } from './amenities.service';
 
-describe('AmenitiesController', () => {
-  let controller: AmenitiesController;
+describe('AmenitiesPublicController', () => {
+  let controller: AmenitiesPublicController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [AmenitiesController],
+      controllers: [AmenitiesPublicController],
       providers: [
         {
           provide: AmenitiesService,
@@ -21,7 +21,7 @@ describe('AmenitiesController', () => {
       ],
     }).compile();
 
-    controller = module.get<AmenitiesController>(AmenitiesController);
+    controller = module.get<AmenitiesPublicController>(AmenitiesPublicController);
   });
 
   it('should be defined', () => {

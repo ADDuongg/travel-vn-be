@@ -19,6 +19,10 @@ export class User {
   })
   roles: string[];
 
+  /** Bypass RBAC PermissionGuard checks; use sparingly — see RBAC seed / plans. */
+  @Prop({ default: false })
+  isSuperAdmin: boolean;
+
   @Prop({ default: 0 })
   tokenVersion: number;
 

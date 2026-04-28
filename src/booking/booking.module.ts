@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RoomInventoryModule } from 'src/room-inventory/room-inventory.module';
 import { RoomModule } from 'src/room/room.module';
-import { BookingController } from './booking.controller';
+import { BookingAdminController } from './booking.admin.controller';
+import { BookingClientController } from './booking.client.controller';
 import { BookingService } from './booking.service';
 import { Booking, BookingSchema } from './schema/booking.schema';
 import { ExpirePendingBookings } from './booking-room-expire.service';
@@ -20,7 +21,7 @@ import { Payment, PaymentSchema } from 'src/payment/schema/payment.schema';
     RoomInventoryModule,
     CloudinaryModule,
   ],
-  controllers: [BookingController],
+  controllers: [BookingClientController, BookingAdminController],
   providers: [BookingService, ExpirePendingBookings, BookingReconcileService],
   exports: [BookingService],
 })

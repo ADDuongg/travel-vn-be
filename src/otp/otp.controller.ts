@@ -15,7 +15,7 @@ class VerifyOtpDto {
   code: string;
 }
 
-@Controller('api/v1/otp')
+@Controller('otp')
 export class OtpController {
   constructor(private readonly otpService: OtpService) {}
 

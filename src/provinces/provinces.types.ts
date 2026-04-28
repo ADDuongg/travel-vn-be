@@ -12,7 +12,7 @@
  *   GET /api/v1/provinces/:slug     → ProvinceDetail
  *
  * ADMIN:
- *   PATCH  /api/v1/provinces/:id                → ProvinceDetail (JSON only; ảnh qua POST /api/v1/media/*)
+ *   PATCH  /api/v1/provinces/:id                → ProvinceDetail (JSON only; ảnh qua POST /api/v1/admin/media/*)
  *   PATCH  /api/v1/provinces/:id/toggle-popular → ProvinceDetail
  *   DELETE /api/v1/provinces/:id                → { message: string }
  *   PATCH  /api/v1/provinces/:id/restore        → { message: string }

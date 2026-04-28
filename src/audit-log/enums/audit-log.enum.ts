@@ -34,6 +34,7 @@ export enum PaymentAuditAction {
 }
 
 export enum AuditResourceType {
+  ROLE = 'ROLE',
   USER = 'USER',
   TOUR = 'TOUR',
   HOTEL = 'HOTEL',

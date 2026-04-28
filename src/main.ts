@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -21,6 +21,24 @@ async function bootstrap() {
     bufferLogs: true,
   });
   mark('NestFactory.create OK');
+
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: '', method: RequestMethod.GET },
+      { path: 'health', method: RequestMethod.ALL },
+      { path: 'health/(.*)', method: RequestMethod.ALL },
+      { path: 'payments/(.*)', method: RequestMethod.ALL },
+      { path: 'orders/(.*)', method: RequestMethod.ALL },
+      { path: 'upload', method: RequestMethod.ALL },
+      { path: 'upload/(.*)', method: RequestMethod.ALL },
+      { path: 'routers', method: RequestMethod.ALL },
+      { path: 'routers/(.*)', method: RequestMethod.ALL },
+      { path: 'idempotency', method: RequestMethod.ALL },
+      { path: 'idempotency/(.*)', method: RequestMethod.ALL },
+      { path: 'api/chat', method: RequestMethod.ALL },
+      { path: 'api/chat/(.*)', method: RequestMethod.ALL },
+    ],
+  });
 
   app.useLogger(app.get(Logger));
 
@@ -55,7 +73,7 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  // Swagger (dev only)
+  // Swagger (dev only) — filtered UIs for public vs client vs admin prefixes
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('VN Tours API')
@@ -67,8 +85,44 @@ async function bootstrap() {
       )
       .build();
 
-    SwaggerModule.setup('api', app, () =>
-      SwaggerModule.createDocument(app, swaggerConfig),
+    type OpenApiDoc = ReturnType<typeof SwaggerModule.createDocument>;
+
+    function pickPathsByPrefixes(
+      document: OpenApiDoc,
+      prefixes: string[],
+    ): OpenApiDoc {
+      const pathsEntries = Object.entries(document.paths ?? {}).filter(
+        ([routePath]) => prefixes.some((p) => routePath.startsWith(p)),
+      );
+      return {
+        ...document,
+        paths: Object.fromEntries(pathsEntries),
+      };
+    }
+
+    const fullDoc = (): OpenApiDoc =>
+      SwaggerModule.createDocument(app, swaggerConfig);
+
+    const basePrefixes = ['/api/v1'];
+
+    SwaggerModule.setup('api/docs/all', app, () => fullDoc());
+    SwaggerModule.setup('api/docs/public', app, () =>
+      pickPathsByPrefixes(
+        fullDoc(),
+        basePrefixes.map((b) => `${b}/public`),
+      ),
+    );
+    SwaggerModule.setup('api/docs/client', app, () =>
+      pickPathsByPrefixes(
+        fullDoc(),
+        basePrefixes.map((b) => `${b}/client`),
+      ),
+    );
+    SwaggerModule.setup('api/docs/admin', app, () =>
+      pickPathsByPrefixes(
+        fullDoc(),
+        basePrefixes.map((b) => `${b}/admin`),
+      ),
     );
   }
 

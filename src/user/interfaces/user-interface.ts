@@ -8,6 +8,9 @@ export interface AuthUser {
     routers: string[];
     apis: string[];
   };
+  /** Flat `resource.action` keys for RBAC (JWT + admin guards). */
+  rbacPermissions?: string[];
+  isSuperAdmin?: boolean;
 }
 
 export interface UserWithPassword {
@@ -19,4 +22,8 @@ export interface UserWithPassword {
     routers: string[];
     apis: string[];
   };
+  rbacPermissions?: string[];
+  isSuperAdmin?: boolean;
+  isActive?: boolean;
+  deletedAt?: Date | null;
 }

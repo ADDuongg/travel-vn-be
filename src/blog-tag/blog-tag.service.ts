@@ -53,13 +53,19 @@ export class BlogTagService {
   }
 
   async findAllPublic(query: BlogTagQueryDto) {
-    return this.findAll({ ...query, isActive: true });
+    return this.findAll({ ...query, isActive: true }, { admin: false });
   }
 
-  async findAll(query: BlogTagQueryDto) {
-    const { page = 1, limit = 100, search, isActive } = query;
-    const filter: Record<string, unknown> = { isDeleted: { $ne: true } };
+  async findAll(
+    query: BlogTagQueryDto,
+    options?: { admin?: boolean },
+  ) {
+    const { page = 1, limit = 100, search, isActive, includeDeleted } = query;
+    const filter: Record<string, unknown> = {};
 
+    if (!options?.admin || !includeDeleted) {
+      filter.isDeleted = { $ne: true };
+    }
     if (typeof isActive === 'boolean') {
       filter.isActive = isActive;
     }

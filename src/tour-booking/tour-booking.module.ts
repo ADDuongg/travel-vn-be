@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { TourBookingController } from './tour-booking.controller';
+import { TourBookingAdminController } from './tour-booking.admin.controller';
+import { TourBookingClientController } from './tour-booking.client.controller';
+import { TourBookingPublicController } from './tour-booking.public.controller';
 import { TourBookingService } from './tour-booking.service';
 import { TourBooking, TourBookingSchema } from './schema/tour-booking.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
@@ -30,7 +32,11 @@ import {
     TourInventoryModule,
     CloudinaryModule,
   ],
-  controllers: [TourBookingController],
+  controllers: [
+    TourBookingPublicController,
+    TourBookingClientController,
+    TourBookingAdminController,
+  ],
   providers: [
     TourBookingService,
     TourBookingExpireService,

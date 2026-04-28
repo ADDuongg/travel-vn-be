@@ -1,18 +1,23 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiCode } from 'src/common/decorators/api-code.decorator';
+import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
-import { Roles, RolesGuard } from 'src/guards/role.guard';
+import { AdminGuard } from 'src/guards/admin.guard';
+import { PermissionGuard } from 'src/guards/permission.guard';
 import { AdminFavoritesQueryDto } from './dto/admin-favorites-query.dto';
 import { FavoriteService } from './favorite.service';
 
-@ApiTags('favorites-admin')
-@Controller('/api/v1/favorites/admin')
+@ApiBearerAuth()
+@ApiTags('Admin · Favorites')
+@UseGuards(JwtAuthGuard, AdminGuard, PermissionGuard)
+@Controller('admin/favorites')
 export class FavoriteAdminController {
   constructor(private readonly favoriteService: FavoriteService) {}
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(['admin'])
   @Get()
+  @RequirePermissions('favorite.view')
+  @ApiCode('favorite.admin.list')
   findAll(@Query() query: AdminFavoritesQueryDto) {
     return this.favoriteService.adminFindAll({
       userId: query.userId,
@@ -23,4 +28,3 @@ export class FavoriteAdminController {
     });
   }
 }
-

@@ -21,6 +21,7 @@ import {
 } from '../enums/audit-log.enum';
 
 const RESOURCE_MODEL_MAP: Record<AuditResourceType, string> = {
+  [AuditResourceType.ROLE]: 'Role',
   [AuditResourceType.TOUR]: 'Tour',
   [AuditResourceType.USER]: 'User',
   [AuditResourceType.HOTEL]: 'Hotel',

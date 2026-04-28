@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BlogCategoryController } from './blog-category.controller';
+import { BlogCategoryAdminController } from './blog-category.admin.controller';
+import { BlogCategoryPublicController } from './blog-category.public.controller';
 import { BlogCategoryService } from './blog-category.service';
 import {
   BlogCategory,
@@ -13,7 +14,7 @@ import {
       { name: BlogCategory.name, schema: BlogCategorySchema },
     ]),
   ],
-  controllers: [BlogCategoryController],
+  controllers: [BlogCategoryPublicController, BlogCategoryAdminController],
   providers: [BlogCategoryService],
   exports: [BlogCategoryService],
 })

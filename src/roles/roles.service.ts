@@ -1,19 +1,35 @@
 import {
   BadRequestException,
+  ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import Redis from 'ioredis';
+import { Model, Types } from 'mongoose';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
+import { User } from 'src/user/schema/user.schema';
+
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { Role } from './schemas/role.schema';
+import {
+  RbacRolePermission,
+  RbacRolePermissionDocument,
+} from 'src/rbac/schemas/rbac-role-permission.schema';
 
 @Injectable()
 export class RolesService {
   constructor(
     @InjectModel(Role.name)
     private readonly roleModel: Model<Role>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
+    @InjectModel(RbacRolePermission.name)
+    private readonly rolePermModel: Model<RbacRolePermissionDocument>,
+    @Inject(REDIS_CLIENT)
+    private readonly redis: Redis,
   ) {}
 
   // CREATE
@@ -61,12 +77,41 @@ export class RolesService {
 
   // DELETE
   async remove(id: string) {
-    const role = await this.roleModel.findByIdAndDelete(id);
+    const role = await this.roleModel.findById(id).exec();
 
     if (!role) {
       throw new NotFoundException('Role not found');
     }
 
+    const assigned = await this.userModel.countDocuments({
+      roles: role.code,
+    });
+    if (assigned > 0) {
+      throw new ConflictException(
+        `Cannot delete role "${role.code}": ${assigned} user(s) still reference this role.`,
+      );
+    }
+
+    await this.rolePermModel
+      .deleteMany({
+        roleId: role._id as Types.ObjectId,
+      })
+      .exec();
+
+    await role.deleteOne();
+    await this.invalidateAllFlatPermissionCaches();
+
     return { deleted: true };
+  }
+
+  private async invalidateAllFlatPermissionCaches(): Promise<void> {
+    try {
+      const keys = await this.redis.keys('rbac:flat:*');
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+      }
+    } catch {
+      // ignore
+    }
   }
 }

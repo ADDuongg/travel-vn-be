@@ -2,6 +2,8 @@ export interface AccessTokenPayload {
   sub: string;
   username: string;
   roles: string[];
+  rbacPermissions?: string[];
+  isSuperAdmin?: boolean;
   typ: 'access';
   iat?: number;
   exp?: number;

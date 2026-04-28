@@ -167,7 +167,7 @@ export class ProvincesService {
   }
 
   /**
-   * Chỉ JSON — ảnh upload trước qua `POST /api/v1/media/upload`, gửi `url`/`publicId` trong body.
+   * Chỉ JSON — ảnh upload trước qua `POST /api/v1/admin/media/upload`, gửi `url`/`publicId` trong body.
    */
   async update(id: string, dto: UpdateProvinceDto) {
     const requiredLangs = await this.getActiveLangCodes();

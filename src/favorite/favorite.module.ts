@@ -5,7 +5,7 @@ import { Room, RoomSchema } from 'src/room/schema/room.schema';
 import { TourGuide, TourGuideSchema } from 'src/tour-guide/schema/tour-guide.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
 import { FavoriteAdminController } from './favorite.admin.controller';
-import { FavoriteController } from './favorite.controller';
+import { FavoriteClientController } from './favorite.client.controller';
 import { FavoriteRepository } from './favorite.repository';
 import { FavoriteService } from './favorite.service';
 import { Favorite, FavoriteSchema } from './schema/favorite.schema';
@@ -20,7 +20,7 @@ import { Favorite, FavoriteSchema } from './schema/favorite.schema';
       { name: TourGuide.name, schema: TourGuideSchema },
     ]),
   ],
-  controllers: [FavoriteController, FavoriteAdminController],
+  controllers: [FavoriteClientController, FavoriteAdminController],
   providers: [FavoriteRepository, FavoriteService],
   exports: [FavoriteService],
 })

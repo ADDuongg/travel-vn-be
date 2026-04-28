@@ -17,6 +17,8 @@ import { EnvService } from 'src/env/env.service';
 import { OtpService } from 'src/otp/otp.service';
 import { MailService } from 'src/mail/mail.service';
 import { PermissionService } from '../permission/permission.service';
+import { RbacService } from 'src/rbac/rbac.service';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 
 /* ────────── helpers ────────── */
@@ -28,6 +30,7 @@ const mockUser = {
   password: 'hashed_pass',
   roles: ['user'],
   permissions: { apis: [], routers: [] },
+  isActive: true,
 };
 
 const mockAuthUser: AuthUser = {
@@ -47,7 +50,11 @@ const mockRefreshTokenModel = {
 };
 
 const mockUserModel = {
-  findById: jest.fn(),
+  findById: jest.fn().mockReturnValue({
+    select: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue({ isActive: true }),
+    }),
+  }),
 };
 
 const mockUsersService = {
@@ -80,6 +87,10 @@ const mockPermissionService = {
   resolvePermissions: jest.fn().mockResolvedValue({ apis: [], routers: [] }),
 };
 
+const mockRbacService = {
+  resolveFlatPermissions: jest.fn().mockResolvedValue([]),
+};
+
 const mockOtpService = {
   requestOtp: jest.fn(),
   verifyOtp: jest.fn(),
@@ -89,11 +100,21 @@ const mockMailService = {
   send: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockAuditLogService = {
+  log: jest.fn().mockResolvedValue(undefined),
+};
+
 describe('AuthService', () => {
   let service: AuthService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
+
+    mockUserModel.findById.mockReturnValue({
+      select: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue({ isActive: true, deletedAt: null }),
+      }),
+    });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,8 +128,10 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: EnvService, useValue: mockEnvService },
         { provide: PermissionService, useValue: mockPermissionService },
+        { provide: RbacService, useValue: mockRbacService },
         { provide: OtpService, useValue: mockOtpService },
         { provide: MailService, useValue: mockMailService },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
@@ -128,6 +151,10 @@ describe('AuthService', () => {
       expect(result).toMatchObject({ username: 'testuser' });
       expect(mockPermissionService.resolvePermissions).toHaveBeenCalledWith(
         mockUser.roles,
+      );
+      expect(mockRbacService.resolveFlatPermissions).toHaveBeenCalledWith(
+        mockUser.roles,
+        false,
       );
     });
 
@@ -280,6 +307,20 @@ describe('AuthService', () => {
       });
       mockRefreshTokenModel.create.mockResolvedValue({});
       mockTokenRecord.save.mockResolvedValue(undefined);
+
+      mockUserModel.findById.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest
+            .fn()
+            .mockResolvedValue({ isActive: true, deletedAt: null }),
+        }),
+      });
+
+      mockUsersService.findOneById.mockResolvedValue({
+        ...mockUser,
+        permissions: { apis: [], routers: [] },
+        isSuperAdmin: false,
+      });
 
       const result = await service.refresh('old_token');
 

@@ -16,6 +16,17 @@ export class RolesGuard implements CanActivate {
       context.getClass(),
     ]);
     if (!requiredRoles || requiredRoles.length === 0) {
+      const req = context.switchToHttp().getRequest<{
+        originalUrl?: string;
+        url?: string;
+      }>();
+      const raw = req.originalUrl ?? req.url ?? '';
+      const pathname = typeof raw === 'string' ? raw.split('?')[0] : '';
+      const isUnderAdminBranch =
+        pathname.includes('/admin/') || pathname.endsWith('/admin');
+      if (isUnderAdminBranch) {
+        return false;
+      }
       return true;
     }
 

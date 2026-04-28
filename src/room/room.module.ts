@@ -7,7 +7,8 @@ import { HotelModule } from 'src/hotel/hotel.module';
 import { RoomInventoryModule } from 'src/room-inventory/room-inventory.module';
 import { FavoriteModule } from 'src/favorite/favorite.module';
 
-import { RoomController } from './room.controller';
+import { RoomAdminController } from './room.admin.controller';
+import { RoomPublicController } from './room.public.controller';
 import { RoomService } from './room.service';
 import { Room, RoomSchema } from './schema/room.schema';
 
@@ -26,7 +27,7 @@ import { Room, RoomSchema } from './schema/room.schema';
     RoomInventoryModule,
     FavoriteModule,
   ],
-  controllers: [RoomController],
+  controllers: [RoomPublicController, RoomAdminController],
   providers: [RoomService],
   exports: [RoomService],
 })

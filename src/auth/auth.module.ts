@@ -14,6 +14,7 @@ import { UserModule } from 'src/user/user.module';
 import { User, UserSchema } from 'src/user/schema/user.schema';
 import { JwtStrategy } from 'src/jwt/jwt.strategy';
 import { PermissionService } from 'src/permission/permission.service';
+import { RbacModule } from 'src/rbac/rbac.module';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -27,6 +28,7 @@ import {
   imports: [
     PassportModule,
     UserModule,
+    RbacModule,
     OtpModule,
     EnvModule,
     MailModule,

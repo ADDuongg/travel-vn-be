@@ -1,13 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { LanguageController } from './language.controller';
+import { LanguagePublicController } from './language.public.controller';
 import { LanguageService } from './language.service';
 
-describe('LanguageController', () => {
-  let controller: LanguageController;
+describe('LanguagePublicController', () => {
+  let controller: LanguagePublicController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [LanguageController],
+      controllers: [LanguagePublicController],
       providers: [
         {
           provide: LanguageService,
@@ -22,7 +22,7 @@ describe('LanguageController', () => {
       ],
     }).compile();
 
-    controller = module.get<LanguageController>(LanguageController);
+    controller = module.get<LanguagePublicController>(LanguagePublicController);
   });
 
   it('should be defined', () => {

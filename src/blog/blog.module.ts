@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BlogController } from './blog.controller';
+import { BlogAdminController } from './blog.admin.controller';
+import { BlogPublicController } from './blog.public.controller';
 import { BlogService } from './blog.service';
 import { BlogPost, BlogPostSchema } from './schema/blog-post.schema';
 import { Province, ProvinceSchema } from 'src/provinces/schema/province.schema';
@@ -24,7 +25,7 @@ import { BlogTagModule } from 'src/blog-tag/blog-tag.module';
       { name: Language.name, schema: LanguageSchema },
     ]),
   ],
-  controllers: [BlogController],
+  controllers: [BlogPublicController, BlogAdminController],
   providers: [BlogService],
   exports: [BlogService],
 })

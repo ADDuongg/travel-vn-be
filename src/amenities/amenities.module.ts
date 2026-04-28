@@ -2,7 +2,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AmenitiesService } from './amenities.service';
-import { AmenitiesController } from './amenities.controller';
+import { AmenitiesAdminController } from './amenities.admin.controller';
+import { AmenitiesPublicController } from './amenities.public.controller';
 import { Amenity, AmenitySchema } from './schema/amenity.schema';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 
@@ -11,7 +12,7 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     MongooseModule.forFeature([{ name: Amenity.name, schema: AmenitySchema }]),
     CloudinaryModule,
   ],
-  controllers: [AmenitiesController],
+  controllers: [AmenitiesPublicController, AmenitiesAdminController],
   providers: [AmenitiesService],
   exports: [AmenitiesService],
 })

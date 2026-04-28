@@ -14,12 +14,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: any) {
+  async validate(payload: Record<string, unknown>) {
+    const rbac = Array.isArray(payload.rbacPermissions)
+      ? (payload.rbacPermissions as string[])
+      : [];
+
     return {
       userId: payload.sub,
       username: payload.username,
       role: payload.role,
-      roles: payload.roles || [],
+      roles: (payload.roles as string[]) || [],
+      rbacPermissions: rbac,
+      isSuperAdmin: payload.isSuperAdmin === true,
     };
   }
 }

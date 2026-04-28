@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { BullModule } from '@nestjs/bullmq';
 import { Notification, NotificationSchema } from './schema/notification.schema';
 import { User, UserSchema } from 'src/user/schema/user.schema';
-import { NotificationController } from './notification.controller';
+import { NotificationClientController } from './notification.client.controller';
 import { NotificationService } from './notification.service';
 import { NotificationListener } from './notification.listener';
 import { NotificationProcessor } from './notification.processor';
@@ -23,7 +23,7 @@ import { IdempotencyModule } from 'src/idempotency/idempotency.module';
     MailModule,
     IdempotencyModule,
   ],
-  controllers: [NotificationController],
+  controllers: [NotificationClientController],
   providers: [NotificationService, NotificationListener, NotificationProcessor],
   exports: [NotificationService],
 })

@@ -8,7 +8,7 @@ import {
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+import { Response, Request, CookieOptions } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 
@@ -28,13 +28,50 @@ import {
 } from './dto/forgot-password-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-@Controller('api/v1/auth')
+@Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly env: EnvService,
     private readonly auditLogService: AuditLogService,
   ) {}
+
+  private resetRefreshTokenCookie(
+    res: Response,
+    refreshToken?: string,
+    shouldSet = false,
+  ) {
+    const isProduction = this.env.isProduction();
+    const sameSite: CookieOptions['sameSite'] = isProduction ? 'strict' : 'lax';
+    const baseCookieOptions: Pick<
+      CookieOptions,
+      'httpOnly' | 'secure' | 'sameSite'
+    > = {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite,
+    };
+
+    // Clear legacy/global cookie to avoid duplicated cookie name in requests.
+    res.clearCookie('refresh_token', {
+      ...baseCookieOptions,
+      path: '/',
+    });
+
+    // Clear scoped auth cookie before setting rotated/new value.
+    res.clearCookie('refresh_token', {
+      ...baseCookieOptions,
+      path: '/api/v1/auth',
+    });
+
+    if (shouldSet && refreshToken) {
+      res.cookie('refresh_token', refreshToken, {
+        ...baseCookieOptions,
+        path: '/api/v1/auth',
+      });
+    }
+  }
+
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   @ApiBearerAuth('bearer')
   @ApiBody({
@@ -59,7 +96,7 @@ export class AuthController {
     );
 
     if (!user) {
-      this.auditLogService.log({
+      void this.auditLogService.log({
         category: AuditCategory.AUTH,
         action: AuthAuditAction.USER_LOGIN_FAILED,
         resourceType: AuditResourceType.AUTH_SESSION,
@@ -77,13 +114,7 @@ export class AuthController {
       userAgent,
     });
 
-    const isProduction = this.env.isProduction();
-    res.cookie('refresh_token', result.refresh_token, {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
-      path: '/api/v1/auth',
-    });
+    this.resetRefreshTokenCookie(res, result.refresh_token, true);
 
     return {
       access_token: result.access_token,
@@ -122,14 +153,8 @@ export class AuthController {
       userAgent,
     });
 
-    const isProduction = this.env.isProduction();
     if (result.refresh_token) {
-      res.cookie('refresh_token', result.refresh_token, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'strict' : 'lax',
-        path: '/api/v1/auth',
-      });
+      this.resetRefreshTokenCookie(res, result.refresh_token, true);
     }
 
     return result;
@@ -169,13 +194,7 @@ export class AuthController {
 
     await this.authService.logout(refreshToken);
 
-    const isProduction = this.env.isProduction();
-    res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
-      path: '/api/v1/auth',
-    });
+    this.resetRefreshTokenCookie(res);
 
     return { message: 'Logged out successfully' };
   }

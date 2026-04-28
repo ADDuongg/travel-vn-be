@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BlogTagController } from './blog-tag.controller';
+import { BlogTagAdminController } from './blog-tag.admin.controller';
+import { BlogTagPublicController } from './blog-tag.public.controller';
 import { BlogTagService } from './blog-tag.service';
 import { BlogTag, BlogTagSchema } from './schema/blog-tag.schema';
 
@@ -8,7 +9,7 @@ import { BlogTag, BlogTagSchema } from './schema/blog-tag.schema';
   imports: [
     MongooseModule.forFeature([{ name: BlogTag.name, schema: BlogTagSchema }]),
   ],
-  controllers: [BlogTagController],
+  controllers: [BlogTagPublicController, BlogTagAdminController],
   providers: [BlogTagService],
   exports: [BlogTagService],
 })

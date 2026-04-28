@@ -1,0 +1,204 @@
+import type { RbacRoleCode } from './constants';
+
+/**
+ * Human-readable descriptions for every `resource.action` key.
+ * Matrix for non–super_admin roles follows plans/RBAC_PLANS.md §4 (second table).
+ */
+export const RBAC_PERMISSION_SEED: ReadonlyArray<{
+  key: string;
+  resource: string;
+  action: string;
+  description: string;
+}> = [
+  { key: 'dashboard.view', resource: 'dashboard', action: 'view', description: 'Xem dashboard' },
+  { key: 'user.view', resource: 'user', action: 'view', description: 'Xem người dùng' },
+  { key: 'user.create', resource: 'user', action: 'create', description: 'Tạo người dùng' },
+  { key: 'user.update', resource: 'user', action: 'update', description: 'Cập nhật người dùng' },
+  { key: 'user.delete', resource: 'user', action: 'delete', description: 'Xóa người dùng' },
+  { key: 'hotel.view', resource: 'hotel', action: 'view', description: 'Xem khách sạn' },
+  { key: 'hotel.create', resource: 'hotel', action: 'create', description: 'Tạo khách sạn' },
+  { key: 'hotel.update', resource: 'hotel', action: 'update', description: 'Sửa khách sạn' },
+  { key: 'hotel.delete', resource: 'hotel', action: 'delete', description: 'Xóa khách sạn' },
+  { key: 'room.view', resource: 'room', action: 'view', description: 'Xem phòng' },
+  { key: 'room.create', resource: 'room', action: 'create', description: 'Tạo phòng' },
+  { key: 'room.update', resource: 'room', action: 'update', description: 'Sửa phòng' },
+  { key: 'room.delete', resource: 'room', action: 'delete', description: 'Xóa phòng' },
+  { key: 'tour.view', resource: 'tour', action: 'view', description: 'Xem tour' },
+  { key: 'tour.create', resource: 'tour', action: 'create', description: 'Tạo tour' },
+  { key: 'tour.update', resource: 'tour', action: 'update', description: 'Sửa tour' },
+  { key: 'tour.delete', resource: 'tour', action: 'delete', description: 'Xóa tour' },
+  { key: 'blog.view', resource: 'blog', action: 'view', description: 'Xem bài blog' },
+  { key: 'blog.create', resource: 'blog', action: 'create', description: 'Tạo bài blog' },
+  { key: 'blog.update', resource: 'blog', action: 'update', description: 'Sửa bài blog' },
+  { key: 'blog.publish', resource: 'blog', action: 'publish', description: 'Xuất bản blog' },
+  { key: 'blog.delete', resource: 'blog', action: 'delete', description: 'Xóa bài blog' },
+  { key: 'booking.view', resource: 'booking', action: 'view', description: 'Xem booking' },
+  { key: 'booking.update', resource: 'booking', action: 'update', description: 'Cập nhật booking' },
+  { key: 'booking.cancel', resource: 'booking', action: 'cancel', description: 'Hủy booking' },
+  { key: 'booking.refund', resource: 'booking', action: 'refund', description: 'Hoàn tiền booking' },
+  { key: 'payment.view', resource: 'payment', action: 'view', description: 'Xem thanh toán' },
+  { key: 'payment.refund', resource: 'payment', action: 'refund', description: 'Hoàn tiền thanh toán' },
+  { key: 'inventory.view', resource: 'inventory', action: 'view', description: 'Xem tồn kho' },
+  { key: 'inventory.manage', resource: 'inventory', action: 'manage', description: 'Quản lý tồn kho' },
+  { key: 'media.upload', resource: 'media', action: 'upload', description: 'Upload media' },
+  { key: 'media.delete', resource: 'media', action: 'delete', description: 'Xóa media' },
+  { key: 'settings.manage', resource: 'settings', action: 'manage', description: 'Quản lý cài đặt hệ thống' },
+  { key: 'rbac.manage', resource: 'rbac', action: 'manage', description: 'Gán permission cho role (admin RBAC)' },
+  { key: 'role.view', resource: 'role', action: 'view', description: 'Xem danh sách và chi tiết role (admin)' },
+  { key: 'audit_log.view', resource: 'audit_log', action: 'view', description: 'Xem audit log' },
+  { key: 'province.view', resource: 'province', action: 'view', description: 'Xem tỉnh/thành' },
+  { key: 'province.update', resource: 'province', action: 'update', description: 'Cập nhật tỉnh/thành' },
+  { key: 'amenity.view', resource: 'amenity', action: 'view', description: 'Xem tiện ích' },
+  { key: 'amenity.create', resource: 'amenity', action: 'create', description: 'Tạo tiện ích' },
+  { key: 'amenity.update', resource: 'amenity', action: 'update', description: 'Sửa tiện ích' },
+  { key: 'amenity.delete', resource: 'amenity', action: 'delete', description: 'Xóa tiện ích' },
+  { key: 'language.view', resource: 'language', action: 'view', description: 'Xem ngôn ngữ' },
+  { key: 'language.create', resource: 'language', action: 'create', description: 'Tạo ngôn ngữ' },
+  { key: 'language.update', resource: 'language', action: 'update', description: 'Sửa ngôn ngữ' },
+  { key: 'language.delete', resource: 'language', action: 'delete', description: 'Xóa ngôn ngữ' },
+  { key: 'favorite.view', resource: 'favorite', action: 'view', description: 'Xem yêu thích (admin)' },
+  { key: 'tour_guide.view', resource: 'tour_guide', action: 'view', description: 'Xem hướng dẫn viên' },
+  { key: 'tour_guide.create', resource: 'tour_guide', action: 'create', description: 'Tạo hướng dẫn viên' },
+  { key: 'tour_guide.update', resource: 'tour_guide', action: 'update', description: 'Sửa hướng dẫn viên' },
+  { key: 'tour_guide.delete', resource: 'tour_guide', action: 'delete', description: 'Xóa hướng dẫn viên' },
+  { key: 'review.view', resource: 'review', action: 'view', description: 'Xem đánh giá (admin)' },
+  { key: 'review.update', resource: 'review', action: 'update', description: 'Duyệt / cập nhật trạng thái đánh giá' },
+];
+
+const allKeys = () => RBAC_PERMISSION_SEED.map((p) => p.key);
+
+/** Keys granted to the `admin` role (RBAC_PLANS §4 column “admin”). */
+const KEYS_ADMIN: string[] = [
+  'dashboard.view',
+  'user.view',
+  'user.create',
+  'user.update',
+  'user.delete',
+  'hotel.view',
+  'hotel.create',
+  'hotel.update',
+  'hotel.delete',
+  'room.view',
+  'room.create',
+  'room.update',
+  'room.delete',
+  'tour.view',
+  'tour.create',
+  'tour.update',
+  'tour.delete',
+  'blog.view',
+  'blog.create',
+  'blog.update',
+  'blog.publish',
+  'blog.delete',
+  'booking.view',
+  'booking.update',
+  'booking.cancel',
+  'booking.refund',
+  'payment.view',
+  'payment.refund',
+  'inventory.view',
+  'inventory.manage',
+  'media.upload',
+  'media.delete',
+  'audit_log.view',
+];
+
+/** Extend admin with provinces/amenities/etc. sensible defaults */
+KEYS_ADMIN.push(
+  'rbac.manage',
+  'role.view',
+  'province.view',
+  'province.update',
+  'amenity.view',
+  'amenity.create',
+  'amenity.update',
+  'amenity.delete',
+  'language.view',
+  'language.create',
+  'language.update',
+  'language.delete',
+  'favorite.view',
+  'tour_guide.view',
+  'tour_guide.create',
+  'tour_guide.update',
+  'tour_guide.delete',
+  'review.view',
+  'review.update',
+);
+
+const KEYS_EDITOR: string[] = [
+  'dashboard.view',
+  'hotel.view',
+  'hotel.update',
+  'room.view',
+  'room.update',
+  'tour.view',
+  'tour.update',
+  'blog.view',
+  'blog.create',
+  'blog.update',
+  'blog.publish',
+  'inventory.view',
+  'media.upload',
+  'province.view',
+  'province.update',
+  'amenity.view',
+  'language.view',
+  'language.update',
+  'favorite.view',
+  'review.view',
+  'review.update',
+];
+
+const KEYS_GUIDE: string[] = [
+  'dashboard.view',
+  'hotel.view',
+  'room.view',
+  'tour.view',
+  'tour.update',
+  'tour.delete',
+  'blog.view',
+  'booking.view',
+  'booking.update',
+  'inventory.view',
+  'inventory.manage',
+  'province.view',
+  'amenity.view',
+  'language.view',
+  'favorite.view',
+  'tour_guide.view',
+  'tour_guide.create',
+  'tour_guide.update',
+  'review.view',
+];
+
+const KEYS_VIEWER: string[] = [
+  'dashboard.view',
+  'user.view',
+  'hotel.view',
+  'room.view',
+  'tour.view',
+  'blog.view',
+  'booking.view',
+  'inventory.view',
+  'province.view',
+  'amenity.view',
+  'language.view',
+  'favorite.view',
+  'review.view',
+];
+
+/** Non–super_admin roles and their permission keys (super_admin uses User.isSuperAdmin only). */
+export const RBAC_ROLE_KEY_MATRIX: Record<
+  Exclude<RbacRoleCode, 'super_admin'>,
+  string[]
+> = {
+  admin: KEYS_ADMIN,
+  editor: KEYS_EDITOR,
+  guide: KEYS_GUIDE,
+  viewer: KEYS_VIEWER,
+};
+
+/** Full key set for smoke tests / super-admin JWT convenience. */
+export const ALL_RBAC_KEYS = allKeys();

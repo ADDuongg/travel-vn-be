@@ -1,14 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PaymentController } from './payment.controller';
+import { PaymentClientController } from './payment.client.controller';
 import { PaymentService } from './payment.service';
 import { IdempotencyService } from 'src/idempotency/idempotency.service';
 
-describe('PaymentController', () => {
-  let controller: PaymentController;
+describe('PaymentClientController', () => {
+  let controller: PaymentClientController;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [PaymentController],
+      controllers: [PaymentClientController],
       providers: [
         {
           provide: PaymentService,
@@ -40,7 +40,7 @@ describe('PaymentController', () => {
       ],
     }).compile();
 
-    controller = module.get<PaymentController>(PaymentController);
+    controller = module.get<PaymentClientController>(PaymentClientController);
   });
 
   it('should be defined', () => {
