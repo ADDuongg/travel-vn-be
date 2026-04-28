@@ -7,11 +7,13 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private readonly resend?: Resend;
   private readonly fromEmail?: string;
-
+  private readonly isProduction?: boolean;
+  private readonly forceTo?: string;
   constructor(private readonly envService: EnvService) {
     const apiKey = this.envService.get('RESEND_API_KEY');
     this.fromEmail = this.envService.get('RESEND_FROM_EMAIL');
-
+    this.forceTo = this.envService.get('RESEND_FORCE_TO');
+    this.isProduction = this.envService.isProduction();
     if (!apiKey) {
       this.logger.warn('RESEND_API_KEY not set, email sending is disabled');
       return;
@@ -30,11 +32,12 @@ export class EmailService {
       this.logger.warn('RESEND_FROM_EMAIL not set, skipping email send');
       return;
     }
-
+    console.log('send email to', to);
+    const finalTo = !this.isProduction && this.forceTo ? this.forceTo : to;
     try {
       await this.resend.emails.send({
         from: this.fromEmail,
-        to: 'monbedehp1@gmail.com',
+        to: finalTo,
         subject,
         html,
       });

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
 import {
   BadRequestException,
   ConflictException,
@@ -495,7 +496,8 @@ export class AuthService {
       );
       const sessionUser: AuthUser = { ...user, rbacPermissions };
 
-      const { token: newRefreshToken, jti } = this.signRefreshToken(sessionUser);
+      const { token: newRefreshToken, jti } =
+        this.signRefreshToken(sessionUser);
 
       await this.saveRefreshToken(sessionUser, newRefreshToken, jti, {
         familyId: (existing as any).familyId,

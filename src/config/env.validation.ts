@@ -53,6 +53,7 @@ export const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),
   ADMIN_EMAIL: z.string().optional(),
+  RESEND_FORCE_TO: z.string().optional(),
 
   // OpenAI
   OPENAI_API_KEY: z.string().optional(),
