@@ -44,7 +44,6 @@ stages:
 variables:
   NODE_IMAGE: node:20-alpine
   DOCKER_TLS_CERTDIR: '/certs'
-  DOCKER_BUILDKIT: '1'
 
 # ---------------------------------------------------------------------------
 # GLOBAL CACHE -- Cache Yarn cache (avoid caching node_modules)
