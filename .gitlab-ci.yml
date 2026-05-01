@@ -140,7 +140,7 @@ build:staging:
       -t $CI_REGISTRY_IMAGE:staging
       -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
       .
-   - |
+    - |
       for i in 1 2 3; do
         docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA && break
         echo "Push failed, retry $i/3..." && sleep 10
