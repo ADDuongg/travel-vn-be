@@ -140,7 +140,16 @@ build:staging:
       -t $CI_REGISTRY_IMAGE:staging
       -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
       .
-    - docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+   - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:staging-latest && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
   environment:
@@ -160,6 +169,8 @@ build:production:
     - docker:27-dind
   variables:
     DOCKER_TLS_CERTDIR: '/certs'
+    # BuildKit is required for multi-stage builds
+    DOCKER_BUILDKIT: '1'
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
@@ -168,7 +179,16 @@ build:production:
       -t $CI_REGISTRY_IMAGE:production
       -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
       .
-    - docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:production-latest && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
   rules:
     - if: '$CI_COMMIT_BRANCH == "production"'
   environment:
