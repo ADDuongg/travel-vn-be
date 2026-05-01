@@ -44,6 +44,7 @@ stages:
 variables:
   NODE_IMAGE: node:20-alpine
   DOCKER_TLS_CERTDIR: '/certs'
+  DOCKER_BUILDKIT: '1'
 
 # ---------------------------------------------------------------------------
 # GLOBAL CACHE -- Cache Yarn cache (avoid caching node_modules)
@@ -169,8 +170,6 @@ build:production:
     - docker:27-dind
   variables:
     DOCKER_TLS_CERTDIR: '/certs'
-    # BuildKit is required for multi-stage builds
-    DOCKER_BUILDKIT: '1'
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
