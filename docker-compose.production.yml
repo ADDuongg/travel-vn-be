@@ -89,7 +89,8 @@ services:
         max-file: '5'
 
   backend-production:
-    image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-production}'
+    # image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-production}'
+    image: registry.gitlab.com/nvduong2302/travel-vn-be:production-latest
     container_name: backend-production
     ports:
       - '127.0.0.1:3002:9001'
