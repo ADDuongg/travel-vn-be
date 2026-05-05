@@ -88,7 +88,8 @@ services:
         max-file: '3'
 
   backend-staging:
-    image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}'
+    # image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-staging}'
+    image: registry.gitlab.com/nvduong2302/travel-vn-be:staging-latest
     container_name: backend-staging
     ports:
       - '127.0.0.1:3001:9001'

@@ -133,15 +133,23 @@ build:staging:
   variables:
     DOCKER_TLS_CERTDIR: '/certs'
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
     - >
       docker build
       -t $CI_REGISTRY_IMAGE:staging
       -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
       .
-    - docker push $CI_REGISTRY_IMAGE:staging
-    - docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:staging-latest && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
   rules:
     - if: '$CI_COMMIT_BRANCH == "staging"'
   environment:
@@ -162,15 +170,23 @@ build:production:
   variables:
     DOCKER_TLS_CERTDIR: '/certs'
   before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
     - >
       docker build
       -t $CI_REGISTRY_IMAGE:production
       -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
       .
-    - docker push $CI_REGISTRY_IMAGE:production
-    - docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
+    - |
+      for i in 1 2 3; do
+        docker push $CI_REGISTRY_IMAGE:production-latest && break
+        echo "Push failed, retry $i/3..." && sleep 10
+      done
   rules:
     - if: '$CI_COMMIT_BRANCH == "production"'
   environment:
@@ -203,7 +219,7 @@ deploy:staging:
     - cp "$CI_PROJECT_DIR/docker-compose.staging.yml" /opt/travel-be/staging/docker-compose.staging.yml
     - cd /opt/travel-be/staging
     - echo "Login registry..."
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
 
     - echo "Set registry + tag for compose (image :staging)..."
     - export IMAGE_TAG=staging
@@ -254,7 +270,7 @@ deploy:production:
   script:
     - cp "$CI_PROJECT_DIR/docker-compose.production.yml" /opt/travel-be/production/docker-compose.production.yml
     - cd /opt/travel-be/production
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
 
     - export IMAGE_TAG=production
 
