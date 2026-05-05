@@ -51,7 +51,7 @@ async function main() {
   // Step 4: Run migrations
   log.step('Running migrations...');
   try {
-    execSync('npx migrate-mongo up', {
+    execSync('yarn run migrate-mongo up', {
       stdio: 'inherit',
       cwd: PATHS.projectRoot,
     });

@@ -1,0 +1,80 @@
+# Monitoring stack overlay cho local stack (mongo/redis/es).
+#
+# Backend Nest thường chạy ngoài Docker (yarn start:dev) — Prometheus scrape host qua host.docker.internal:9001.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.monitoring.local.yml up -d
+#
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: monitoring-local-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.local.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    ports:
+      - '127.0.0.1:${MONITORING_PROMETHEUS_PORT_LOCAL:-9090}:9090'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    networks:
+      - travel-vn-local-network
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: monitoring-local-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${MONITORING_GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${MONITORING_GRAFANA_ADMIN_PASSWORD:-changeme-grafana-admin}
+      # GF_SERVER_HTTP_PORT: ${MONITORING_GRAFANA_PORT_LOCAL:-3030}
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    volumes:
+      - grafana_local_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - '127.0.0.1:${MONITORING_GRAFANA_PORT_LOCAL:-3030}:3000'
+    networks:
+      - travel-vn-local-network
+    depends_on:
+      - prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: monitoring-local-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    pid: host
+    networks:
+      - travel-vn-local-network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    container_name: monitoring-local-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:ro'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    networks:
+      - travel-vn-local-network
+
+networks:
+  travel-vn-local-network:
+    external: true
+    driver: bridge
+
+volumes:
+  grafana_local_data:

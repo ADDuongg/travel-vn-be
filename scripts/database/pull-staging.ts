@@ -55,7 +55,7 @@ async function main() {
       MONGO_URI_LOCAL: debugUri,
       MONGO_DB_LOCAL: config.dbDebug,
     };
-    execSync('npx migrate-mongo up', {
+    execSync('yarn run migrate-mongo up', {
       stdio: 'inherit',
       cwd: PATHS.projectRoot,
       env: migrationEnv,

@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-base-to-string */
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -17,6 +19,11 @@ import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourNotificationEvent } from 'src/notification/events/tour-notification.event';
 import { FavoriteService } from 'src/favorite/favorite.service';
 import { FavoriteEntityType } from 'src/favorite/favorite.types';
+import { TourSearchService } from './tour-search.service';
+import { TourIndexQueueService } from './tour-index.queue';
+import { InjectMetric } from '@willsoto/nestjs-prometheus';
+import type { Counter } from 'prom-client';
+import { ES_FALLBACK_TOTAL } from './tour-es.metrics';
 
 /* interface PaginatedResult<T> {
   items: T[];
@@ -30,6 +37,8 @@ import { FavoriteEntityType } from 'src/favorite/favorite.types';
  */
 @Injectable()
 export class TourService {
+  private readonly logger = new Logger(TourService.name);
+
   constructor(
     @InjectModel(Tour.name)
     private readonly tourModel: Model<TourDocument>,
@@ -37,6 +46,10 @@ export class TourService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
     private readonly favoriteService: FavoriteService,
+    private readonly tourSearch: TourSearchService,
+    private readonly tourIndexQueue: TourIndexQueueService,
+    @InjectMetric(ES_FALLBACK_TOTAL)
+    private readonly esFallbackTotal: Counter<string>,
   ) {}
 
   /**
@@ -120,6 +133,10 @@ export class TourService {
       new TourNotificationEvent(String(created._id), created.code, tourName),
     );
 
+    if (this.tourSearch.isUsable()) {
+      void this.tourIndexQueue.enqueue(String(created._id), 'create');
+    }
+
     return created;
   }
 
@@ -127,6 +144,84 @@ export class TourService {
    * Find all tours with filters and pagination
    */
   async findAll(query: TourQueryDto, userId?: string) {
+    if (this.tourSearch.canServeSearch()) {
+      this.logger.log('🚀 USING ELASTICSEARCH');
+      try {
+        return await this.findAllFromElasticsearch(query, userId);
+      } catch (err) {
+        this.logger.warn(
+          `Elasticsearch tour list failed, using MongoDB fallback: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        this.esFallbackTotal.inc({ reason: 'search_error' });
+      }
+    } else if (this.tourSearch.isUsable()) {
+      this.logger.warn(
+        'Elasticsearch tours index is not ready (bootstrap/mapping), using MongoDB fallback for tour list',
+      );
+      this.esFallbackTotal.inc({ reason: 'index_not_ready' });
+    }
+    this.logger.log('🚀 USING MONGODB');
+    return this.findAllFromMongo(query, userId);
+  }
+
+  private async findAllFromElasticsearch(query: TourQueryDto, userId?: string) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 12;
+
+    const { ids, total } = await this.tourSearch.search(query);
+
+    if (ids.length === 0) {
+      return {
+        items: [] as unknown[],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit) || 0,
+        },
+      };
+    }
+
+    const objectIds = ids.map((id) => new Types.ObjectId(id));
+    const rows = await this.tourModel
+      .find({ _id: { $in: objectIds } })
+      .populate('destinations.provinceId', 'name code slug fullName')
+      .populate('departureProvinceId', 'name code slug fullName')
+      .populate('amenities')
+      .lean();
+
+    const rank = new Map(ids.map((id, i) => [id, i]));
+    rows.sort(
+      (a, b) => (rank.get(String(a._id)) ?? 0) - (rank.get(String(b._id)) ?? 0),
+    );
+
+    let enrichedItems: unknown[] = rows;
+    if (userId) {
+      const favSet = await this.favoriteService.existsByUserAndEntities({
+        userId,
+        pairs: rows.map((t) => ({
+          entityType: FavoriteEntityType.TOUR,
+          entityId: String(t._id),
+        })),
+      });
+      enrichedItems = rows.map((t) => ({
+        ...t,
+        isFavorited: favSet.has(`${FavoriteEntityType.TOUR}:${String(t._id)}`),
+      }));
+    }
+
+    return {
+      items: enrichedItems,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 0,
+      },
+    };
+  }
+
+  private async findAllFromMongo(query: TourQueryDto, userId?: string) {
     const {
       page = 1,
       limit = 12,
@@ -419,6 +514,10 @@ export class TourService {
       );
     }
 
+    if (this.tourSearch.isUsable()) {
+      void this.tourIndexQueue.enqueue(String(saved._id), 'update');
+    }
+
     return saved;
   }
 
@@ -442,6 +541,10 @@ export class TourService {
       String(NotificationEvent.TOUR_DELETED),
       new TourNotificationEvent(String(tour._id), tour.code, tourName, false),
     );
+
+    if (this.tourSearch.isUsable()) {
+      void this.tourIndexQueue.enqueue(String(tour._id), 'delete');
+    }
   }
 
   /**

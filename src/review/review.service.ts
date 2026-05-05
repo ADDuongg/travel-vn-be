@@ -19,6 +19,11 @@ import {
   ReviewEntityType,
   ReviewStatus,
 } from './schema/ewview.schema';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  TOUR_INDEX_SYNC_EVENT,
+  TourIndexSyncPayload,
+} from 'src/tour/tour-index.constants';
 
 const MODERATION_UNSET = {
   approvedAt: '',
@@ -48,6 +53,8 @@ export class ReviewService {
 
     @InjectModel(Hotel.name)
     private readonly hotelModel: Model<HotelDocument>,
+
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async upsertReview(params: {
@@ -638,6 +645,11 @@ export class ReviewService {
         total: ratingSummary.total || 0,
       },
     });
+
+    this.eventEmitter.emit(
+      TOUR_INDEX_SYNC_EVENT,
+      new TourIndexSyncPayload(tourId),
+    );
   }
 
   private async recalculateGuideRating(guideId: string) {

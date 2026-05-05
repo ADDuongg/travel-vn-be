@@ -29,6 +29,21 @@ services:
     networks:
       - travel-vn-local-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: backend-local-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - travel-vn-local-network
+
   # backend-local:
   #   build:
   #     context: .
@@ -54,8 +69,10 @@ services:
 
 networks:
   travel-vn-local-network:
+    external: true
     driver: bridge
 
 volumes:
   mongo_data:
   redis_data:
+  es_data:

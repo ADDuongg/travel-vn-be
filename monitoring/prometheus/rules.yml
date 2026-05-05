@@ -1,0 +1,65 @@
+groups:
+  - name: vn-tours-monitoring.rules
+    rules:
+      - alert: NestMetricsDown
+        expr: up{job="nestjs-api"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend Prometheus target down
+          description: |
+            Scrape của job `nestjs-api` thất bại quá 2 phút. Kiểm tra API và đường dẫn `/metrics`.
+
+      - alert: EsFallbackElevated
+        expr: increase(es_fallback_total[15m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Nhiều fallback Mongo khỏi Elasticsearch cho tour list
+          description: >-
+            Counter `es_fallback_total` tăng >10 trong 15 phút — kiểm tra ES, index, và queue đồng bộ tour.
+
+      - alert: EsSyncFailedElevated
+        expr: increase(es_sync_failed_total[15m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Có tour ES sync jobs fail
+          description: >-
+            Counter `es_sync_failed_total` tăng — xem BullMQ/logs và Prometheus series theo label `operation`.
+
+      # Process CPU của Node Nest (second/second có thể vượt 1 core = >1 — chỉnh theo SLA)
+      - alert: NestProcessCpuHigh
+        expr: rate(process_cpu_seconds_total{job="nestjs-api"}[5m]) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Process CPU của API cao (>~0.85 core trung bình 5 phút)
+          description: Kiểm tra load, Mongo/Redis latency, và job queue BullMQ.
+
+      - alert: NestProcessMemoryHigh
+        expr: process_resident_memory_bytes{job="nestjs-api"} > 600000000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Resident memory của API cao (>600MiB)
+          description: Tune heap limits hoặc tăng limit container Compose nếu cần (điều chỉnh ngưỡng trong rules.yml).
+
+      - alert: HostDiskNearlyFull
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|fuse\\.lxcfs|squashfs", mountpoint="/"}
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|fuse\\.lxcfs|squashfs", mountpoint="/"}
+          ) < 0.15
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: Disk / gần đầy (>85% đã dùng)
+          description: Dọn Docker images/log/volumes trên host. Kiểm tra mountpoint trong Explore nếu cần thêm `/var/lib/docker`.

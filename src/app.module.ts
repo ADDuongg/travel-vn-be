@@ -8,6 +8,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { BullModule } from '@nestjs/bullmq';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { JwtModule } from '@nestjs/jwt';
 import { ApiPermissionModule } from './api-permission/api-permission.module';
 import { ApiRoleModule } from './api-role/api-role.module';
@@ -68,6 +69,10 @@ import { BlogModule } from './blog/blog.module';
     }),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
+    PrometheusModule.register({
+      path: '/metrics',
+      defaultMetrics: { enabled: true },
+    }),
     RedisModule.forRootAsync({ isGlobal: true }),
     JwtModule.registerAsync({
       global: true,

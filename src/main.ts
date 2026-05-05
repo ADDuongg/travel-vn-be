@@ -27,6 +27,8 @@ async function bootstrap() {
       { path: '', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.ALL },
       { path: 'health/(.*)', method: RequestMethod.ALL },
+      { path: 'metrics', method: RequestMethod.ALL },
+      { path: 'metrics/(.*)', method: RequestMethod.ALL },
       { path: 'payments/(.*)', method: RequestMethod.ALL },
       { path: 'orders/(.*)', method: RequestMethod.ALL },
       { path: 'upload', method: RequestMethod.ALL },

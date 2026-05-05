@@ -1,0 +1,110 @@
+# Prometheus + Grafana + exporters — chạy cùng stack production backend.
+#
+# Prometheus chỉ reachable trong Compose network — vào Grafana tại localhost (SSH tunnel như các service khác).
+#
+# Usage:
+#   docker compose -f docker-compose.production.yml -f docker-compose.monitoring.production.yml up -d
+#
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: monitoring-production-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=45d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.production.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    networks:
+      - travel-vn-network
+    depends_on:
+      backend-production:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: monitoring-production-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${MONITORING_GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${MONITORING_GRAFANA_ADMIN_PASSWORD:-changeme-monitor-grafana}
+      GF_SERVER_HTTP_PORT: ${MONITORING_GRAFANA_PORT_PRODUCTION:-3032}
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    volumes:
+      - grafana_production_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - '127.0.0.1:${MONITORING_GRAFANA_PORT_PRODUCTION:-3032}:${MONITORING_GRAFANA_PORT_PRODUCTION:-3032}'
+    networks:
+      - travel-vn-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: monitoring-production-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    pid: host
+    networks:
+      - travel-vn-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    container_name: monitoring-production-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:ro'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    networks:
+      - travel-vn-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+networks:
+  travel-vn-network: {}
+
+volumes:
+  grafana_production_data:

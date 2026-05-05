@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/rules.yml
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: nestjs-api
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ['backend-production:9001']
+        labels:
+          env: production
+
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          env: production
+
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          env: production

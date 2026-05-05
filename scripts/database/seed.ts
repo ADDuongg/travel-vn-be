@@ -34,7 +34,7 @@ async function main() {
   // Step 2: Run migrations
   log.step('Running migrations...');
   try {
-    execSync('npx migrate-mongo up', {
+    execSync('yarn run migrate-mongo up', {
       stdio: 'inherit',
       cwd: PATHS.projectRoot,
     });
@@ -62,7 +62,7 @@ async function main() {
   } else {
     log.warn('No seed data found in seeds/realistic/ or seeds/base/.');
     log.info(
-      'Run "npm run db:seed:from-staging" first to generate realistic seeds,',
+      'Run "yarn db:seed:from-staging" first to generate realistic seeds,',
     );
     log.info('or add base seed data to seeds/base/.');
   }

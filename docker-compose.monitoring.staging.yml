@@ -1,0 +1,111 @@
+# Prometheus + Grafana + exporters — chạy cùng stack staging backend.
+#
+# Prometheus scrape trong network Docker: backend-staging:9001/metrics — không bind host cho Prometheus để tránh xung đột cổng nếu cùng VPS với prod.
+#
+# Usage:
+#   docker compose -f docker-compose.staging.yml -f docker-compose.monitoring.staging.yml up -d
+#
+services:
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: monitoring-staging-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.staging.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules.yml:/etc/prometheus/rules.yml:ro
+    networks:
+      - travel-vn-dev-network
+    depends_on:
+      backend-staging:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: monitoring-staging-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${MONITORING_GRAFANA_ADMIN_USER:-admin}
+      # Trên VPS: đặt mật khẩu mạnh trong .env (đừng dùng mặc định trong production).
+      GF_SECURITY_ADMIN_PASSWORD: ${MONITORING_GRAFANA_ADMIN_PASSWORD:-changeme-monitor-grafana}
+      GF_SERVER_HTTP_PORT: ${MONITORING_GRAFANA_PORT_STAGING:-3031}
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+    volumes:
+      - grafana_staging_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - '127.0.0.1:${MONITORING_GRAFANA_PORT_STAGING:-3031}:${MONITORING_GRAFANA_PORT_STAGING:-3031}'
+    networks:
+      - travel-vn-dev-network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: monitoring-staging-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    pid: host
+    networks:
+      - travel-vn-dev-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    container_name: monitoring-staging-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - '/:/rootfs:ro'
+      - '/var/run:/var/run:ro'
+      - '/sys:/sys:ro'
+      - '/var/lib/docker/:/var/lib/docker:ro'
+    networks:
+      - travel-vn-dev-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  travel-vn-dev-network: {}
+
+volumes:
+  grafana_staging_data:
