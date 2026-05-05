@@ -1,29 +1,17 @@
+import { Injectable, BadRequestException } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
-import { Room, RoomDocument } from 'src/room/schema/room.schema';
-import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
-import { Hotel, HotelDocument } from 'src/hotel/schema/hotel.schema';
-import {
-  TourGuide,
-  TourGuideDocument,
-} from 'src/tour-guide/schema/tour-guide.schema';
-import {
-  Review,
-  ReviewDocument,
-  ReviewEntityType,
-  ReviewStatus,
-} from './schema/ewview.schema';
+  ForbiddenDomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
+import { Types } from 'mongoose';
+import { ReviewEntityType, ReviewStatus } from './schema/ewview.schema';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   TOUR_INDEX_SYNC_EVENT,
   TourIndexSyncPayload,
 } from 'src/tour/tour-index.constants';
+import { ReviewRepository } from './review.repository';
+import { ReviewTargetRepository } from './review-target.repository';
 
 const MODERATION_UNSET = {
   approvedAt: '',
@@ -39,21 +27,8 @@ const MODERATION_UNSET = {
 @Injectable()
 export class ReviewService {
   constructor(
-    @InjectModel(Review.name)
-    private readonly reviewModel: Model<ReviewDocument>,
-
-    @InjectModel(Room.name)
-    private readonly roomModel: Model<RoomDocument>,
-
-    @InjectModel(Tour.name)
-    private readonly tourModel: Model<TourDocument>,
-
-    @InjectModel(TourGuide.name)
-    private readonly tourGuideModel: Model<TourGuideDocument>,
-
-    @InjectModel(Hotel.name)
-    private readonly hotelModel: Model<HotelDocument>,
-
+    private readonly reviewRepository: ReviewRepository,
+    private readonly reviewTargetRepository: ReviewTargetRepository,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -89,32 +64,26 @@ export class ReviewService {
       filter.isAnonymous = true;
     }
 
-    const existing = await this.reviewModel.findOne(filter).exec();
+    const existing = await this.reviewRepository.findOneForUpsert(filter);
 
     if (existing?.deletedAt) {
       throw new BadRequestException('Review was deleted');
     }
 
     if (existing?.status === ReviewStatus.HIDDEN) {
-      throw new ForbiddenException('Hidden reviews cannot be edited');
+      throw new ForbiddenDomainException('Hidden reviews cannot be edited');
     }
 
-    const review = await this.reviewModel
-      .findOneAndUpdate(
-        filter,
-        {
-          $set: {
-            rating,
-            comment,
-            isAnonymous,
-            status: ReviewStatus.PENDING,
-            deletedAt: null,
-          },
-          $unset: { ...MODERATION_UNSET },
-        },
-        { upsert: true, new: true },
-      )
-      .exec();
+    const review = await this.reviewRepository.upsertReview(filter, {
+      $set: {
+        rating,
+        comment,
+        isAnonymous,
+        status: ReviewStatus.PENDING,
+        deletedAt: null,
+      },
+      $unset: { ...MODERATION_UNSET },
+    });
 
     if (!review) {
       throw new BadRequestException('Could not save review');
@@ -133,19 +102,16 @@ export class ReviewService {
   }
 
   async softDeleteOwnReview(reviewId: string, userId: string) {
-    const review = await this.reviewModel.findOne({
-      _id: new Types.ObjectId(reviewId),
-      userId: new Types.ObjectId(userId),
-      deletedAt: null,
-    });
+    const review = await this.reviewRepository.findOneOwnedActive(
+      reviewId,
+      userId,
+    );
 
     if (!review) {
       return false;
     }
 
-    await this.reviewModel.findByIdAndUpdate(reviewId, {
-      $set: { deletedAt: new Date() },
-    });
+    await this.reviewRepository.softDeleteById(reviewId);
 
     if (review.status === ReviewStatus.APPROVED && review.rating) {
       await this.recalcByEntity(review.entityType, review.entityId.toString());
@@ -162,17 +128,12 @@ export class ReviewService {
   }) {
     const { entityType, entityId, page = 1, limit = 10 } = params;
 
-    return this.reviewModel
-      .find({
-        entityType,
-        entityId: new Types.ObjectId(entityId),
-        status: ReviewStatus.APPROVED,
-        deletedAt: null,
-      })
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .lean();
+    return this.reviewRepository.findPublicApproved({
+      entityType,
+      entityId,
+      page,
+      limit,
+    });
   }
 
   async findMyReview(params: {
@@ -180,12 +141,7 @@ export class ReviewService {
     entityId: string;
     userId: string;
   }) {
-    return this.reviewModel.findOne({
-      entityType: params.entityType,
-      entityId: new Types.ObjectId(params.entityId),
-      userId: new Types.ObjectId(params.userId),
-      deletedAt: null,
-    });
+    return this.reviewRepository.findMyReview(params);
   }
 
   async findMyReviewsList(params: {
@@ -212,15 +168,11 @@ export class ReviewService {
       filter.status = Array.isArray(st) ? { $in: st } : st;
     }
 
-    const [reviews, total] = await Promise.all([
-      this.reviewModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .lean(),
-      this.reviewModel.countDocuments(filter),
-    ]);
+    const [reviews, total] = await this.reviewRepository.findMyReviewsPage({
+      filter,
+      page,
+      limit,
+    });
 
     const summaryMap = await this.buildEntitySummaryMap(
       reviews as Array<{
@@ -270,19 +222,11 @@ export class ReviewService {
       filter.deletedAt = null;
     }
 
-    const [data, total] = await Promise.all([
-      this.reviewModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
-        .populate('userId', 'username email')
-        .populate('approvedBy', 'username email')
-        .populate('rejectedBy', 'username email')
-        .populate('hiddenBy', 'username email')
-        .lean(),
-      this.reviewModel.countDocuments(filter),
-    ]);
+    const [data, total] = await this.reviewRepository.adminFindPage({
+      filter,
+      page,
+      limit,
+    });
 
     return {
       data,
@@ -309,9 +253,9 @@ export class ReviewService {
       hiddenReason?: string;
     },
   ) {
-    const review = await this.reviewModel.findById(id);
+    const review = await this.reviewRepository.findById(id);
     if (!review || review.deletedAt) {
-      throw new NotFoundException('Review not found');
+      throw new NotFoundDomainException('Review not found');
     }
 
     if (
@@ -371,16 +315,13 @@ export class ReviewService {
       });
     }
 
-    const updated = await this.reviewModel
-      .findByIdAndUpdate(
-        id,
-        { $set, ...(Object.keys($unset).length ? { $unset } : {}) },
-        { new: true },
-      )
-      .exec();
+    const updated = await this.reviewRepository.updateById(id, {
+      $set,
+      ...(Object.keys($unset).length ? { $unset } : {}),
+    });
 
     if (!updated) {
-      throw new NotFoundException('Review not found');
+      throw new NotFoundDomainException('Review not found');
     }
 
     if (
@@ -472,179 +413,104 @@ export class ReviewService {
     const hotelIds = this.uniqueEntityIds(reviews, ReviewEntityType.HOTEL);
     const guideIds = this.uniqueEntityIds(reviews, ReviewEntityType.GUIDE);
 
-    await Promise.all([
-      tourIds.length
-        ? this.tourModel
-            .find({ _id: { $in: tourIds } })
-            .select('translations thumbnail')
-            .lean()
-            .then((docs) => {
-              for (const d of docs) {
-                const id = (d._id as Types.ObjectId).toString();
-                map.set(`${ReviewEntityType.TOUR}:${id}`, {
-                  name: this.pickTranslatedName(
-                    d.translations as Record<string, { name?: string }>,
-                    lang,
-                  ),
-                  thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
-                });
-              }
-            })
-        : Promise.resolve(),
-      roomIds.length
-        ? this.roomModel
-            .find({ _id: { $in: roomIds } })
-            .select('translations thumbnail')
-            .lean()
-            .then((docs) => {
-              for (const d of docs) {
-                const id = (d._id as Types.ObjectId).toString();
-                map.set(`${ReviewEntityType.ROOM}:${id}`, {
-                  name: this.pickTranslatedName(
-                    d.translations as Record<string, { name?: string }>,
-                    lang,
-                  ),
-                  thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
-                });
-              }
-            })
-        : Promise.resolve(),
-      hotelIds.length
-        ? this.hotelModel
-            .find({ _id: { $in: hotelIds } })
-            .select('translations thumbnail')
-            .lean()
-            .then((docs) => {
-              for (const d of docs) {
-                const id = (d._id as Types.ObjectId).toString();
-                map.set(`${ReviewEntityType.HOTEL}:${id}`, {
-                  name: this.pickTranslatedName(
-                    d.translations as Record<string, { name?: string }>,
-                    lang,
-                  ),
-                  thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
-                });
-              }
-            })
-        : Promise.resolve(),
-      guideIds.length
-        ? this.tourGuideModel
-            .find({ _id: { $in: guideIds } })
-            .select('translations gallery')
-            .lean()
-            .then((docs) => {
-              for (const d of docs) {
-                const id = (d._id as Types.ObjectId).toString();
-                const thumb =
-                  Array.isArray(d.gallery) && d.gallery.length > 0
-                    ? (d.gallery[0]?.url?.trim() ?? '')
-                    : '';
-                map.set(`${ReviewEntityType.GUIDE}:${id}`, {
-                  name: this.pickGuideDisplayName(
-                    d.translations as Record<
-                      string,
-                      { shortBio?: string; bio?: string }
-                    >,
-                    lang,
-                  ),
-                  thumbnailUrl: thumb,
-                });
-              }
-            })
-        : Promise.resolve(),
+    const [tourDocs, roomDocs, hotelDocs, guideDocs] = await Promise.all([
+      this.reviewTargetRepository.findToursSummaryDocs(tourIds),
+      this.reviewTargetRepository.findRoomsSummaryDocs(roomIds),
+      this.reviewTargetRepository.findHotelsSummaryDocs(hotelIds),
+      this.reviewTargetRepository.findTourGuidesSummaryDocs(guideIds),
     ]);
+
+    for (const d of tourDocs) {
+      const id = (d._id as Types.ObjectId).toString();
+      map.set(`${ReviewEntityType.TOUR}:${id}`, {
+        name: this.pickTranslatedName(
+          d.translations as Record<string, { name?: string }>,
+          lang,
+        ),
+        thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
+      });
+    }
+    for (const d of roomDocs) {
+      const id = (d._id as Types.ObjectId).toString();
+      map.set(`${ReviewEntityType.ROOM}:${id}`, {
+        name: this.pickTranslatedName(
+          d.translations as Record<string, { name?: string }>,
+          lang,
+        ),
+        thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
+      });
+    }
+    for (const d of hotelDocs) {
+      const id = (d._id as Types.ObjectId).toString();
+      map.set(`${ReviewEntityType.HOTEL}:${id}`, {
+        name: this.pickTranslatedName(
+          d.translations as Record<string, { name?: string }>,
+          lang,
+        ),
+        thumbnailUrl: d.thumbnail?.url?.trim() ?? '',
+      });
+    }
+    for (const d of guideDocs) {
+      const id = (d._id as Types.ObjectId).toString();
+      const thumb =
+        Array.isArray(d.gallery) && d.gallery.length > 0
+          ? (d.gallery[0]?.url?.trim() ?? '')
+          : '';
+      map.set(`${ReviewEntityType.GUIDE}:${id}`, {
+        name: this.pickGuideDisplayName(
+          d.translations as Record<string, { shortBio?: string; bio?: string }>,
+          lang,
+        ),
+        thumbnailUrl: thumb,
+      });
+    }
 
     return map;
   }
 
+  private ratingPatchFromAggregate(
+    raw: { average?: number; total?: number } | undefined,
+  ) {
+    return {
+      average: Number(raw?.average?.toFixed(2) || 0),
+      total: raw?.total || 0,
+    };
+  }
+
   private async recalculateRoomRating(roomId: string) {
-    const result = await this.reviewModel.aggregate([
-      {
-        $match: {
-          entityType: ReviewEntityType.ROOM,
-          entityId: new Types.ObjectId(roomId),
-          status: ReviewStatus.APPROVED,
-          deletedAt: null,
-          rating: { $exists: true },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          average: { $avg: '$rating' },
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const ratingSummary = result[0] || { average: 0, total: 0 };
-
-    await this.roomModel.findByIdAndUpdate(roomId, {
-      ratingSummary: {
-        average: Number(ratingSummary.average?.toFixed(2) || 0),
-        total: ratingSummary.total || 0,
-      },
-    });
+    const result = await this.reviewRepository.aggregateApprovedRating(
+      ReviewEntityType.ROOM,
+      roomId,
+    );
+    const ratingSummary = this.ratingPatchFromAggregate(result[0]);
+    await this.reviewTargetRepository.updateRoomRatingSummary(
+      roomId,
+      ratingSummary,
+    );
   }
 
   private async recalculateHotelRating(hotelId: string) {
-    const result = await this.reviewModel.aggregate([
-      {
-        $match: {
-          entityType: ReviewEntityType.HOTEL,
-          entityId: new Types.ObjectId(hotelId),
-          status: ReviewStatus.APPROVED,
-          deletedAt: null,
-          rating: { $exists: true },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          average: { $avg: '$rating' },
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const ratingSummary = result[0] || { average: 0, total: 0 };
-
-    await this.hotelModel.findByIdAndUpdate(hotelId, {
-      ratingSummary: {
-        average: Number(ratingSummary.average?.toFixed(2) || 0),
-        total: ratingSummary.total || 0,
-      },
-    });
+    const result = await this.reviewRepository.aggregateApprovedRating(
+      ReviewEntityType.HOTEL,
+      hotelId,
+    );
+    const ratingSummary = this.ratingPatchFromAggregate(result[0]);
+    await this.reviewTargetRepository.updateHotelRatingSummary(
+      hotelId,
+      ratingSummary,
+    );
   }
 
   private async recalculateTourRating(tourId: string) {
-    const result = await this.reviewModel.aggregate([
-      {
-        $match: {
-          entityType: ReviewEntityType.TOUR,
-          entityId: new Types.ObjectId(tourId),
-          status: ReviewStatus.APPROVED,
-          deletedAt: null,
-          rating: { $exists: true },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          average: { $avg: '$rating' },
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const ratingSummary = result[0] || { average: 0, total: 0 };
-
-    await this.tourModel.findByIdAndUpdate(tourId, {
-      ratingSummary: {
-        average: Number(ratingSummary.average?.toFixed(2) || 0),
-        total: ratingSummary.total || 0,
-      },
-    });
+    const result = await this.reviewRepository.aggregateApprovedRating(
+      ReviewEntityType.TOUR,
+      tourId,
+    );
+    const ratingSummary = this.ratingPatchFromAggregate(result[0]);
+    await this.reviewTargetRepository.updateTourRatingSummary(
+      tourId,
+      ratingSummary,
+    );
 
     this.eventEmitter.emit(
       TOUR_INDEX_SYNC_EVENT,
@@ -653,32 +519,14 @@ export class ReviewService {
   }
 
   private async recalculateGuideRating(guideId: string) {
-    const result = await this.reviewModel.aggregate([
-      {
-        $match: {
-          entityType: ReviewEntityType.GUIDE,
-          entityId: new Types.ObjectId(guideId),
-          status: ReviewStatus.APPROVED,
-          deletedAt: null,
-          rating: { $exists: true },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          average: { $avg: '$rating' },
-          total: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const ratingSummary = result[0] || { average: 0, total: 0 };
-
-    await this.tourGuideModel.findByIdAndUpdate(guideId, {
-      ratingSummary: {
-        average: Number(ratingSummary.average?.toFixed(2) || 0),
-        total: ratingSummary.total || 0,
-      },
-    });
+    const result = await this.reviewRepository.aggregateApprovedRating(
+      ReviewEntityType.GUIDE,
+      guideId,
+    );
+    const ratingSummary = this.ratingPatchFromAggregate(result[0]);
+    await this.reviewTargetRepository.updateTourGuideRatingSummary(
+      guideId,
+      ratingSummary,
+    );
   }
 }

@@ -4,14 +4,14 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, SortOrder, Types } from 'mongoose';
+import { NotFoundDomainException } from 'src/common/exceptions';
+import { FilterQuery, SortOrder, Types } from 'mongoose';
 import { CreateTourDto } from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto, TourSortBy } from './dto/tour-query.dto';
 import { Tour, TourDocument } from './schema/tour.schema';
+import { TourRepository } from './tour.repository';
 import { ProvincesService } from 'src/provinces/provinces.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -40,8 +40,7 @@ export class TourService {
   private readonly logger = new Logger(TourService.name);
 
   constructor(
-    @InjectModel(Tour.name)
-    private readonly tourModel: Model<TourDocument>,
+    private readonly tourRepository: TourRepository,
     private readonly provincesService: ProvincesService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
@@ -60,13 +59,13 @@ export class TourService {
     files?: Express.Multer.File[],
   ): Promise<Tour> {
     // Check slug uniqueness
-    const existedSlug = await this.tourModel.findOne({ slug: dto.slug });
+    const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
     if (existedSlug) {
       throw new ConflictException('Tour slug already exists');
     }
 
     // Check code uniqueness
-    const existedCode = await this.tourModel.findOne({ code: dto.code });
+    const existedCode = await this.tourRepository.findOneByCode(dto.code);
     if (existedCode) {
       throw new ConflictException('Tour code already exists');
     }
@@ -90,7 +89,7 @@ export class TourService {
     const { thumbnail, gallery } = await this.uploadGallery(files);
 
     // Create tour
-    const created = await this.tourModel.create({
+    const created = await this.tourRepository.create({
       slug: dto.slug,
       code: dto.code,
       isActive: dto.isActive ?? true,
@@ -118,7 +117,7 @@ export class TourService {
       contact: dto.contact,
       amenities: dto.amenities?.map((id) => new Types.ObjectId(id)) ?? [],
       transportTypes: dto.transportTypes ?? [],
-      bookingConfig: dto.bookingConfig ?? {},
+      bookingConfig: (dto.bookingConfig ?? {}) as Tour['bookingConfig'],
       difficulty: dto.difficulty ?? 'MODERATE',
       thumbnail: thumbnail ?? undefined,
       gallery,
@@ -183,16 +182,8 @@ export class TourService {
     }
 
     const objectIds = ids.map((id) => new Types.ObjectId(id));
-    const rows = await this.tourModel
-      .find({ _id: { $in: objectIds } })
-      .populate('destinations.provinceId', 'name code slug fullName')
-      .populate('departureProvinceId', 'name code slug fullName')
-      .populate('amenities')
-      .lean();
-
-    const rank = new Map(ids.map((id, i) => [id, i]));
-    rows.sort(
-      (a, b) => (rank.get(String(a._id)) ?? 0) - (rank.get(String(b._id)) ?? 0),
+    const rows = await this.tourRepository.findManyByIdsOrderedPopulate(
+      objectIds,
     );
 
     let enrichedItems: unknown[] = rows;
@@ -307,18 +298,12 @@ export class TourService {
 
     // Execute query
     const skip = (page - 1) * limit;
-    const [items, total] = await Promise.all([
-      this.tourModel
-        .find(filter)
-        .sort(sort)
-        .skip(skip)
-        .limit(limit)
-        .populate('destinations.provinceId', 'name code slug fullName')
-        .populate('departureProvinceId', 'name code slug fullName')
-        .populate('amenities')
-        .lean(),
-      this.tourModel.countDocuments(filter),
-    ]);
+    const [items, total] = await this.tourRepository.findPageMongo({
+      filter,
+      sort,
+      skip,
+      limit,
+    });
 
     let enrichedItems: any[] = items;
     if (userId) {
@@ -354,15 +339,10 @@ export class TourService {
       throw new BadRequestException('Invalid tour ID');
     }
 
-    const tour = await this.tourModel
-      .findById(id)
-      .populate('destinations.provinceId', 'name code slug fullName')
-      .populate('departureProvinceId', 'name code slug fullName')
-      .populate('amenities')
-      .exec();
+    const tour = await this.tourRepository.findByIdPopulated(id);
 
     if (!tour) {
-      throw new NotFoundException('Tour not found');
+      throw new NotFoundDomainException('Tour not found');
     }
 
     const obj = tour.toObject();
@@ -379,15 +359,10 @@ export class TourService {
    * Find tour by slug
    */
   async findBySlug(slug: string, userId?: string): Promise<any> {
-    const tour = await this.tourModel
-      .findOne({ slug, isActive: true })
-      .populate('destinations.provinceId', 'name code slug fullName')
-      .populate('departureProvinceId', 'name code slug fullName')
-      .populate('amenities')
-      .exec();
+    const tour = await this.tourRepository.findOneActiveBySlug(slug);
 
     if (!tour) {
-      throw new NotFoundException('Tour not found');
+      throw new NotFoundDomainException('Tour not found');
     }
 
     const obj = tour.toObject();
@@ -408,14 +383,14 @@ export class TourService {
     dto: UpdateTourDto,
     files?: Express.Multer.File[],
   ): Promise<Tour> {
-    const tour = await this.tourModel.findById(id);
+    const tour = await this.tourRepository.findById(id);
     if (!tour) {
-      throw new NotFoundException('Tour not found');
+      throw new NotFoundDomainException('Tour not found');
     }
 
     // Check slug uniqueness
     if (dto.slug !== undefined && dto.slug !== tour.slug) {
-      const existedSlug = await this.tourModel.findOne({ slug: dto.slug });
+      const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
       if (existedSlug) {
         throw new ConflictException('Tour slug already exists');
       }
@@ -424,7 +399,7 @@ export class TourService {
 
     // Check code uniqueness
     if (dto.code !== undefined && dto.code !== tour.code) {
-      const existedCode = await this.tourModel.findOne({ code: dto.code });
+      const existedCode = await this.tourRepository.findOneByCode(dto.code);
       if (existedCode) {
         throw new ConflictException('Tour code already exists');
       }
@@ -525,9 +500,9 @@ export class TourService {
    * Delete tour (soft delete)
    */
   async delete(id: string): Promise<void> {
-    const tour = await this.tourModel.findById(id);
+    const tour = await this.tourRepository.findById(id);
     if (!tour) {
-      throw new NotFoundException('Tour not found');
+      throw new NotFoundDomainException('Tour not found');
     }
 
     tour.isActive = false;
@@ -557,24 +532,14 @@ export class TourService {
       filter['destinations.provinceId'] = new Types.ObjectId(destinationId);
     }
 
-    return this.tourModel
-      .find(filter)
-      .select('_id slug code translations duration pricing')
-      .sort({ 'translations.vi.name': 1 })
-      .lean();
+    return this.tourRepository.findActiveForOptions(filter);
   }
 
   /**
    * Find featured tours
    */
   async findFeatured(limit: number = 6, userId?: string): Promise<any[]> {
-    const items = await this.tourModel
-      .find({ isActive: true })
-      .sort({ 'ratingSummary.average': -1, 'ratingSummary.total': -1 })
-      .limit(limit)
-      .populate('destinations.provinceId', 'name code slug')
-      .populate('departureProvinceId', 'name code slug')
-      .lean();
+    const items = await this.tourRepository.findFeatured(limit);
     if (!userId) return items;
     const favSet = await this.favoriteService.existsByUserAndEntities({
       userId,

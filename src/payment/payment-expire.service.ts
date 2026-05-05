@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import {
-  Payment,
-  PaymentDocument,
   PaymentStatus,
 } from './schema/payment.schema';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
@@ -13,14 +9,14 @@ import {
   AuditResourceType,
   PaymentAuditAction,
 } from 'src/audit-log/enums/audit-log.enum';
+import { PaymentRepository } from './payment.repository';
 
 @Injectable()
 export class PaymentExpireService {
   private readonly logger = new Logger(PaymentExpireService.name);
 
   constructor(
-    @InjectModel(Payment.name)
-    private readonly paymentModel: Model<PaymentDocument>,
+    private readonly paymentRepository: PaymentRepository,
     private readonly auditLogService: AuditLogService,
   ) {}
 
@@ -28,23 +24,13 @@ export class PaymentExpireService {
   async expirePendingPayments() {
     const expireBefore = new Date(Date.now() - 15 * 60 * 1000);
 
-    const expiredPayments = await this.paymentModel
-      .find({
-        status: PaymentStatus.PENDING,
-        createdAt: { $lt: expireBefore },
-      })
-      .select('_id')
-      .lean();
+    const expiredPayments = await this.paymentRepository.findPendingOlderThan(
+      expireBefore,
+    );
 
     if (!expiredPayments.length) return;
 
-    await this.paymentModel.updateMany(
-      {
-        status: PaymentStatus.PENDING,
-        createdAt: { $lt: expireBefore },
-      },
-      { status: PaymentStatus.EXPIRED },
-    );
+    await this.paymentRepository.expirePendingOlderThan(expireBefore);
 
     this.logger.log(`Expired ${expiredPayments.length} payments`);
 

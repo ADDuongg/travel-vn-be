@@ -1,13 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
 import { PaymentService } from './payment.service';
-import { Payment, PaymentStatus } from './schema/payment.schema';
+import { PaymentStatus } from './schema/payment.schema';
 import { BookingService } from '../booking/booking.service';
 import { TourBookingService } from '../tour-booking/tour-booking.service';
 import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
+import { PaymentRepository } from './payment.repository';
+import { NotFoundDomainException } from 'src/common/exceptions';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
 
 jest.mock('../stripe.service', () => ({
   stripe: {
@@ -20,7 +22,6 @@ jest.mock('../stripe.service', () => ({
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const stripeModule = require('../stripe.service');
 
-/* ────────── helpers ────────── */
 const bookingId = new Types.ObjectId('000000000000000000000001');
 const tourBookingId = new Types.ObjectId('000000000000000000000002');
 
@@ -37,19 +38,20 @@ const makePayment = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-/* ────────── mocks ────────── */
-const mockPaymentModel = {
-  findOne: jest.fn(),
-  findById: jest.fn(),
-  create: jest.fn(),
-  prototype: { save: jest.fn() },
+const mockPaymentRepository = {
+  createNew: jest.fn(),
+  save: jest.fn(),
+  findOneByIntentId: jest.fn(),
+  findSucceededBefore: jest.fn(),
+  findOneByBookingId: jest.fn(),
+  findLatestByTourBookingId: jest.fn(),
+  findByIdLean: jest.fn(),
+  findStatusByBookingId: jest.fn(),
+  findStatusByTourBookingId: jest.fn(),
+  findRefundableByBookingId: jest.fn(),
+  findPendingOlderThan: jest.fn(),
+  expirePendingOlderThan: jest.fn(),
 };
-
-function makeModelCtor(instance: any) {
-  const ctor = jest.fn().mockImplementation(() => instance);
-  Object.assign(ctor, mockPaymentModel);
-  return ctor;
-}
 
 const mockBookingService = {
   findOne: jest.fn(),
@@ -64,13 +66,14 @@ const mockTourBookingService = {
   markAsFailed: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockAuditLogService = { log: jest.fn() };
+
 describe('PaymentService', () => {
   let service: PaymentService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
-    // reset stripe mock
     stripeModule.stripe.paymentIntents.create = jest.fn();
     stripeModule.stripe.webhooks.constructEvent = jest.fn();
     stripeModule.stripe.refunds.create = jest.fn();
@@ -78,20 +81,16 @@ describe('PaymentService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PaymentService,
-        { provide: getModelToken(Payment.name), useValue: mockPaymentModel },
+        { provide: PaymentRepository, useValue: mockPaymentRepository },
         { provide: BookingService, useValue: mockBookingService },
         { provide: TourBookingService, useValue: mockTourBookingService },
+        { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
 
     service = module.get<PaymentService>(PaymentService);
-    // inject model ctor so `new this.paymentModel(...)` works
-    (service as any).paymentModel = makeModelCtor(makePayment());
   });
 
-  /* ═══════════════════════════════════════════════
-     createPaymentIntent
-  ═══════════════════════════════════════════════ */
   describe('createPaymentIntent', () => {
     it('throws BadRequestException for invalid bookingId format', async () => {
       await expect(service.createPaymentIntent('not-valid-id')).rejects.toThrow(
@@ -99,12 +98,12 @@ describe('PaymentService', () => {
       );
     });
 
-    it('throws NotFoundException when booking not found', async () => {
+    it('throws NotFoundDomainException when booking not found', async () => {
       mockBookingService.findOne.mockResolvedValue(null);
 
       await expect(
         service.createPaymentIntent(bookingId.toString()),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(NotFoundDomainException);
     });
 
     it('throws BadRequestException when booking is EXPIRED', async () => {
@@ -141,8 +140,8 @@ describe('PaymentService', () => {
       });
 
       const savedPayment = makePayment();
-      savedPayment.save.mockResolvedValue(savedPayment);
-      (service as any).paymentModel = makeModelCtor(savedPayment);
+      mockPaymentRepository.createNew.mockReturnValue(savedPayment);
+      mockPaymentRepository.save.mockResolvedValue(savedPayment);
 
       const result = await service.createPaymentIntent(bookingId.toString());
 
@@ -152,13 +151,12 @@ describe('PaymentService', () => {
           metadata: { bookingId: bookingId.toString() },
         }),
       );
+      expect(mockPaymentRepository.createNew).toHaveBeenCalled();
+      expect(mockPaymentRepository.save).toHaveBeenCalledWith(savedPayment);
       expect(result.clientSecret).toBe('secret_abc');
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     handleStripeWebhook
-  ═══════════════════════════════════════════════ */
   describe('handleStripeWebhook', () => {
     it('marks payment SUCCEEDED and booking paid on payment_intent.succeeded', async () => {
       const payment = makePayment({ status: PaymentStatus.PENDING, bookingId });
@@ -166,12 +164,12 @@ describe('PaymentService', () => {
         type: 'payment_intent.succeeded',
         data: { object: { id: 'pi_test_123' } },
       });
-      mockPaymentModel.findOne.mockResolvedValue(payment);
+      mockPaymentRepository.findOneByIntentId.mockResolvedValue(payment);
 
       await service.handleStripeWebhook('sig', Buffer.from('payload'));
 
       expect(payment.status).toBe(PaymentStatus.SUCCEEDED);
-      expect(payment.save).toHaveBeenCalled();
+      expect(mockPaymentRepository.save).toHaveBeenCalledWith(payment);
       expect(mockBookingService.markAsPaid).toHaveBeenCalledWith(
         bookingId.toString(),
       );
@@ -183,7 +181,7 @@ describe('PaymentService', () => {
         type: 'payment_intent.payment_failed',
         data: { object: { id: 'pi_test_123' } },
       });
-      mockPaymentModel.findOne.mockResolvedValue(payment);
+      mockPaymentRepository.findOneByIntentId.mockResolvedValue(payment);
 
       await service.handleStripeWebhook('sig', Buffer.from('payload'));
 
@@ -204,7 +202,7 @@ describe('PaymentService', () => {
         type: 'payment_intent.succeeded',
         data: { object: { id: 'pi_tour_123' } },
       });
-      mockPaymentModel.findOne.mockResolvedValue(payment);
+      mockPaymentRepository.findOneByIntentId.mockResolvedValue(payment);
 
       await service.handleStripeWebhook('sig', Buffer.from('payload'));
 
@@ -216,12 +214,12 @@ describe('PaymentService', () => {
       expect(mockBookingService.markAsPaid).not.toHaveBeenCalled();
     });
 
-    it('silently returns when payment record not found (no duplicate processing)', async () => {
+    it('silently returns when payment record not found', async () => {
       stripeModule.stripe.webhooks.constructEvent.mockReturnValue({
         type: 'payment_intent.succeeded',
         data: { object: { id: 'pi_unknown' } },
       });
-      mockPaymentModel.findOne.mockResolvedValue(null);
+      mockPaymentRepository.findOneByIntentId.mockResolvedValue(null);
 
       await expect(
         service.handleStripeWebhook('sig', Buffer.from('payload')),
@@ -240,12 +238,9 @@ describe('PaymentService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     refund
-  ═══════════════════════════════════════════════ */
   describe('refund', () => {
     it('throws BadRequestException when no refundable payment found', async () => {
-      mockPaymentModel.findOne.mockResolvedValue(null);
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(null);
 
       await expect(service.refund(bookingId.toString())).rejects.toThrow(
         BadRequestException,
@@ -253,7 +248,7 @@ describe('PaymentService', () => {
     });
 
     it('throws BadRequestException when payment is already fully refunded', async () => {
-      mockPaymentModel.findOne.mockResolvedValue(
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
         makePayment({ amount: 500_000, refundedAmount: 500_000 }),
       );
 
@@ -263,11 +258,10 @@ describe('PaymentService', () => {
     });
 
     it('throws BadRequestException when requested refund exceeds remaining', async () => {
-      mockPaymentModel.findOne.mockResolvedValue(
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
         makePayment({ amount: 500_000, refundedAmount: 400_000 }),
       );
 
-      // Only 100_000 remaining, requesting 200_000
       await expect(
         service.refund(bookingId.toString(), 200_000),
       ).rejects.toThrow(BadRequestException);
@@ -279,7 +273,8 @@ describe('PaymentService', () => {
         refundedAmount: 0,
         status: PaymentStatus.SUCCEEDED,
       });
-      mockPaymentModel.findOne.mockResolvedValue(payment);
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(payment);
+      mockPaymentRepository.save.mockResolvedValue(payment);
       stripeModule.stripe.refunds.create.mockResolvedValue({
         id: 're_test_123',
       });
@@ -304,7 +299,8 @@ describe('PaymentService', () => {
         refundedAmount: 0,
         status: PaymentStatus.SUCCEEDED,
       });
-      mockPaymentModel.findOne.mockResolvedValue(payment);
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(payment);
+      mockPaymentRepository.save.mockResolvedValue(payment);
       stripeModule.stripe.refunds.create.mockResolvedValue({
         id: 're_partial',
       });

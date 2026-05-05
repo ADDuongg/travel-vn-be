@@ -11,6 +11,7 @@ import { FavoriteModule } from 'src/favorite/favorite.module';
 import { ElasticsearchModule } from 'src/elasticsearch/elasticsearch.module';
 import { EnvModule } from 'src/env/env.module';
 import { TourSearchService } from './tour-search.service';
+import { TourRepository } from './tour.repository';
 import { TourIndexListener } from './tour-index.listener';
 import { TOUR_INDEX_QUEUE } from './tour-index.constants';
 import { TourIndexQueueService } from './tour-index.queue';
@@ -30,6 +31,7 @@ import { tourEsCounterProviders } from './tour-es.metrics';
   controllers: [TourPublicController, TourAdminController],
   providers: [
     ...tourEsCounterProviders,
+    TourRepository,
     TourService,
     TourSearchService,
     TourIndexListener,

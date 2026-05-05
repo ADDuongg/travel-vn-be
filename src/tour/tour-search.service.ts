@@ -1,11 +1,10 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import { estypes } from '@elastic/elasticsearch';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { ElasticsearchConnectionService } from 'src/elasticsearch/elasticsearch-connection.service';
 import { EnvService } from 'src/env/env.service';
 import { TourQueryDto, TourSortBy } from './dto/tour-query.dto';
-import { Tour, TourDocument } from './schema/tour.schema';
+import { TourRepository } from './tour.repository';
 
 function esTextField(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -49,8 +48,7 @@ export class TourSearchService implements OnApplicationBootstrap {
   constructor(
     private readonly esConn: ElasticsearchConnectionService,
     private readonly env: EnvService,
-    @InjectModel(Tour.name)
-    private readonly tourModel: Model<TourDocument>,
+    private readonly tourRepository: TourRepository,
   ) {}
 
   isUsable(): boolean {
@@ -170,7 +168,7 @@ export class TourSearchService implements OnApplicationBootstrap {
 
     if (!Types.ObjectId.isValid(tourId)) return;
 
-    const tour = await this.tourModel.findById(tourId).lean();
+    const tour = await this.tourRepository.findByIdLean(tourId);
     const client = this.esConn.getClient();
     const index = this.getIndex();
 
@@ -328,7 +326,7 @@ export class TourSearchService implements OnApplicationBootstrap {
     const batchSize = 200;
     let batch: object[] = [];
 
-    const cursor = this.tourModel.find({}).lean().cursor();
+    const cursor = this.tourRepository.streamAllLean();
 
     for await (const doc of cursor) {
       const id = new Types.ObjectId(

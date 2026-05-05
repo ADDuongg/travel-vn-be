@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Review, ReviewDocument } from './schema/ewview.schema';
+import { ReviewRepository } from './review.repository';
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -10,17 +8,14 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 export class ReviewSoftDeleteCleanupService {
   private readonly logger = new Logger(ReviewSoftDeleteCleanupService.name);
 
-  constructor(
-    @InjectModel(Review.name)
-    private readonly reviewModel: Model<ReviewDocument>,
-  ) {}
+  constructor(private readonly reviewRepository: ReviewRepository) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
   async purgeOldSoftDeletedReviews() {
     const cutoff = new Date(Date.now() - NINETY_DAYS_MS);
-    const result = await this.reviewModel.deleteMany({
-      deletedAt: { $ne: null, $lt: cutoff },
-    });
+    const result = await this.reviewRepository.deleteManySoftDeletedBefore(
+      cutoff,
+    );
 
     if (result.deletedCount > 0) {
       this.logger.log(

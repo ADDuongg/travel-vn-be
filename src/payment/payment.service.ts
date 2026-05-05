@@ -1,17 +1,11 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { NotFoundDomainException } from 'src/common/exceptions';
+import { Types } from 'mongoose';
 import Stripe from 'stripe';
 import { BookingService } from '../booking/booking.service';
 import { TourBookingService } from '../tour-booking/tour-booking.service';
 import { stripe } from '../stripe.service';
 import {
-  Payment,
-  PaymentDocument,
   PaymentStatus,
 } from './schema/payment.schema';
 import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
@@ -25,12 +19,12 @@ import {
   AuditResourceType,
   PaymentAuditAction,
 } from 'src/audit-log/enums/audit-log.enum';
+import { PaymentRepository } from './payment.repository';
 
 @Injectable()
 export class PaymentService {
   constructor(
-    @InjectModel(Payment.name)
-    private readonly paymentModel: Model<PaymentDocument>,
+    private readonly paymentRepository: PaymentRepository,
     private readonly bookingService: BookingService,
     private readonly tourBookingService: TourBookingService,
     private readonly auditLogService: AuditLogService,
@@ -43,7 +37,7 @@ export class PaymentService {
 
     const booking = await this.bookingService.findOne(bookingId);
     if (!booking) {
-      throw new NotFoundException('Booking not found');
+      throw new NotFoundDomainException('Booking not found');
     }
 
     if (booking.paymentStatus === BookingPaymentStatus.EXPIRED) {
@@ -72,8 +66,8 @@ export class PaymentService {
       );
     }
 
-    const payment = new this.paymentModel({
-      bookingId: booking._id,
+    const payment = this.paymentRepository.createNew({
+      bookingId: booking._id as Types.ObjectId,
       provider: 'STRIPE',
       intentId: intent.id,
       providerRef: intent.id,
@@ -82,7 +76,7 @@ export class PaymentService {
       status: PaymentStatus.PENDING,
     });
 
-    await payment.save();
+    await this.paymentRepository.save(payment);
 
     this.auditLogService.log({
       category: AuditCategory.PAYMENT,
@@ -114,7 +108,7 @@ export class PaymentService {
 
     const tourBooking = await this.tourBookingService.getById(tourBookingId);
     if (!tourBooking) {
-      throw new NotFoundException('Tour booking not found');
+      throw new NotFoundDomainException('Tour booking not found');
     }
 
     const doc = tourBooking as unknown as {
@@ -159,7 +153,7 @@ export class PaymentService {
       );
     }
 
-    const payment = new this.paymentModel({
+    const payment = this.paymentRepository.createNew({
       tourBookingId: new Types.ObjectId(tourBookingId),
       provider: 'STRIPE',
       intentId: intent.id,
@@ -169,7 +163,7 @@ export class PaymentService {
       status: PaymentStatus.PENDING,
     });
 
-    await payment.save();
+    await this.paymentRepository.save(payment);
 
     this.auditLogService.log({
       category: AuditCategory.PAYMENT,
@@ -202,15 +196,15 @@ export class PaymentService {
     switch (event.type) {
       case 'payment_intent.succeeded': {
         const intent = event.data.object;
-        const payment = await this.paymentModel.findOne({
-          intentId: intent.id,
-        });
+        const payment = await this.paymentRepository.findOneByIntentId(
+          intent.id,
+        );
         if (!payment) return;
 
         const oldStatus = payment.status;
         payment.status = PaymentStatus.SUCCEEDED;
         payment.processedAt = new Date();
-        await payment.save();
+        await this.paymentRepository.save(payment);
 
         if (payment.bookingId) {
           await this.bookingService.markAsPaid(payment.bookingId.toString());
@@ -241,15 +235,15 @@ export class PaymentService {
 
       case 'payment_intent.payment_failed': {
         const intent = event.data.object;
-        const payment = await this.paymentModel.findOne({
-          intentId: intent.id,
-        });
+        const payment = await this.paymentRepository.findOneByIntentId(
+          intent.id,
+        );
         if (!payment) return;
 
         const oldStatus = payment.status;
         payment.status = PaymentStatus.FAILED;
         payment.processedAt = new Date();
-        await payment.save();
+        await this.paymentRepository.save(payment);
 
         if (payment.bookingId) {
           await this.bookingService.markAsFailed(payment.bookingId.toString());
@@ -285,14 +279,12 @@ export class PaymentService {
       throw new BadRequestException('Invalid bookingId');
     }
 
-    const payment = await this.paymentModel
-      .findOne({
-        bookingId: new Types.ObjectId(bookingId),
-      })
-      .lean();
+    const payment = await this.paymentRepository.findOneByBookingId(
+      new Types.ObjectId(bookingId),
+    );
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundDomainException('Payment not found');
     }
 
     return payment;
@@ -303,15 +295,12 @@ export class PaymentService {
       throw new BadRequestException('Invalid tourBookingId');
     }
 
-    const payment = await this.paymentModel
-      .findOne({
-        tourBookingId: new Types.ObjectId(tourBookingId),
-      })
-      .sort({ createdAt: -1 })
-      .lean();
+    const payment = await this.paymentRepository.findLatestByTourBookingId(
+      new Types.ObjectId(tourBookingId),
+    );
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundDomainException('Payment not found');
     }
 
     return payment;
@@ -322,10 +311,12 @@ export class PaymentService {
       throw new BadRequestException('Invalid paymentId');
     }
 
-    const payment = await this.paymentModel.findById(paymentId).lean();
+    const payment = await this.paymentRepository.findByIdLean(
+      new Types.ObjectId(paymentId),
+    );
 
     if (!payment) {
-      throw new NotFoundException('Payment not found');
+      throw new NotFoundDomainException('Payment not found');
     }
 
     return payment;
@@ -336,12 +327,9 @@ export class PaymentService {
       throw new BadRequestException('Invalid bookingId');
     }
 
-    const payment = await this.paymentModel
-      .findOne({
-        bookingId: new Types.ObjectId(bookingId),
-      })
-      .select('status amount currency refundedAmount createdAt')
-      .lean();
+    const payment = await this.paymentRepository.findStatusByBookingId(
+      new Types.ObjectId(bookingId),
+    );
 
     if (!payment) {
       return {
@@ -369,13 +357,10 @@ export class PaymentService {
       throw new BadRequestException('Invalid tourBookingId');
     }
 
-    const payment = await this.paymentModel
-      .findOne({
-        tourBookingId: new Types.ObjectId(tourBookingId),
-      })
-      .sort({ createdAt: -1 })
-      .select('status amount currency refundedAmount createdAt')
-      .lean();
+    const payment =
+      await this.paymentRepository.findStatusByTourBookingId(
+        new Types.ObjectId(tourBookingId),
+      );
 
     if (!payment) {
       return {
@@ -399,12 +384,9 @@ export class PaymentService {
   }
 
   async refund(bookingId: string, amount?: number) {
-    const payment = await this.paymentModel.findOne({
-      bookingId: new Types.ObjectId(bookingId),
-      status: {
-        $in: [PaymentStatus.SUCCEEDED, PaymentStatus.REFUNDED],
-      },
-    });
+    const payment = await this.paymentRepository.findRefundableByBookingId(
+      new Types.ObjectId(bookingId),
+    );
 
     if (!payment) {
       throw new BadRequestException('No refundable payment found');
@@ -424,7 +406,7 @@ export class PaymentService {
     }
 
     const refund = await stripe.refunds.create({
-      payment_intent: payment.intentId, // hoặc intentId
+      payment_intent: payment.intentId,
       amount: Math.round(refundAmount),
     });
 
@@ -435,7 +417,7 @@ export class PaymentService {
         ? PaymentStatus.FULLY_REFUNDED
         : PaymentStatus.REFUNDED;
 
-    await payment.save();
+    await this.paymentRepository.save(payment);
 
     await this.bookingService.markAsRefunded(
       bookingId,
@@ -447,8 +429,14 @@ export class PaymentService {
       action: PaymentAuditAction.PAYMENT_REFUNDED,
       resourceType: AuditResourceType.PAYMENT,
       resourceId: payment._id,
-      oldValue: { refundedAmount: alreadyRefunded, status: PaymentStatus.SUCCEEDED },
-      newValue: { refundedAmount: payment.refundedAmount, status: payment.status },
+      oldValue: {
+        refundedAmount: alreadyRefunded,
+        status: PaymentStatus.SUCCEEDED,
+      },
+      newValue: {
+        refundedAmount: payment.refundedAmount,
+        status: payment.status,
+      },
       metadata: {
         bookingId,
         refundAmount,

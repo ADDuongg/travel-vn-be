@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { PaymentClientController } from './payment.client.controller';
 import { PaymentWebhookController } from './payment.webhook.controller';
@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Payment, PaymentSchema } from './schema/payment.schema';
 import { Order, OrderSchema } from '../orders/schema/order.schema';
 import { PaymentExpireService } from './payment-expire.service';
+import { PaymentRepository } from './payment.repository';
 import { BookingModule } from 'src/booking/booking.module';
 import { TourBookingModule } from 'src/tour-booking/tour-booking.module';
 import { IdempotencyModule } from 'src/idempotency/idempotency.module';
@@ -16,11 +17,12 @@ import { IdempotencyModule } from 'src/idempotency/idempotency.module';
       { name: Payment.name, schema: PaymentSchema },
       { name: Order.name, schema: OrderSchema },
     ]),
-    BookingModule,
+    forwardRef(() => BookingModule),
     TourBookingModule,
     IdempotencyModule,
   ],
   controllers: [PaymentClientController, PaymentWebhookController],
-  providers: [PaymentService, PaymentExpireService],
+  providers: [PaymentService, PaymentExpireService, PaymentRepository],
+  exports: [PaymentService, PaymentRepository],
 })
 export class PaymentModule {}

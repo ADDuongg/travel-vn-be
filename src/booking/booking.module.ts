@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RoomInventoryModule } from 'src/room-inventory/room-inventory.module';
 import { RoomModule } from 'src/room/room.module';
@@ -9,20 +9,24 @@ import { Booking, BookingSchema } from './schema/booking.schema';
 import { ExpirePendingBookings } from './booking-room-expire.service';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { BookingReconcileService } from './booking-reconcile.service';
-import { Payment, PaymentSchema } from 'src/payment/schema/payment.schema';
+import { PaymentModule } from 'src/payment/payment.module';
+import { BookingRepository } from './booking.repository';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Booking.name, schema: BookingSchema },
-      { name: Payment.name, schema: PaymentSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Booking.name, schema: BookingSchema }]),
+    forwardRef(() => PaymentModule),
     RoomModule,
     RoomInventoryModule,
     CloudinaryModule,
   ],
   controllers: [BookingClientController, BookingAdminController],
-  providers: [BookingService, ExpirePendingBookings, BookingReconcileService],
+  providers: [
+    BookingRepository,
+    BookingService,
+    ExpirePendingBookings,
+    BookingReconcileService,
+  ],
   exports: [BookingService],
 })
 export class BookingModule {}

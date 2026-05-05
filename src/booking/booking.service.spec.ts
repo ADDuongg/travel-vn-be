@@ -1,15 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getModelToken } from '@nestjs/mongoose';
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
 
 import { BookingService } from './booking.service';
 import {
-  Booking,
   BookingPaymentStatus,
   BookingStatus,
   BookingType,
@@ -17,8 +11,12 @@ import {
 import { RoomService } from '../room/room.service';
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { BookingRepository } from './booking.repository';
+import {
+  ForbiddenDomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 
-/* ────────── room fixture ────────── */
 const roomId = new Types.ObjectId('000000000000000000000001');
 
 const mockRoom = {
@@ -35,7 +33,6 @@ const mockRoom = {
   inventory: { totalRooms: 5 },
 };
 
-/* ────────── booking fixture ────────── */
 const makeBooking = (overrides: Partial<any> = {}) => ({
   _id: new Types.ObjectId(),
   userId: new Types.ObjectId('000000000000000000000002'),
@@ -56,23 +53,19 @@ const makeBooking = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
-/* ────────── mocks ────────── */
-const mockBookingModel = {
+const mockBookingRepository = {
+  createRoomBookingDoc: jest.fn(),
+  save: jest.fn().mockImplementation((b) => Promise.resolve(b)),
+  findManyAdminList: jest.fn(),
+  findManyByUser: jest.fn(),
+  findOneByUserAndBookingId: jest.fn(),
+  findByIdForAdmin: jest.fn(),
   findById: jest.fn(),
-  find: jest.fn(),
-  countDocuments: jest.fn(),
-  create: jest.fn(),
-  prototype: { save: jest.fn() },
+  findByIdAsDocument: jest.fn(),
+  uploadReceiptFind: jest.fn(),
+  verifyReceiptFind: jest.fn(),
+  findPendingRoomBookingsToExpire: jest.fn(),
 };
-
-function makeModelConstructor(instance: any) {
-  const ctor: any = jest.fn().mockImplementation(() => instance);
-  ctor.findById = mockBookingModel.findById;
-  ctor.find = mockBookingModel.find;
-  ctor.countDocuments = mockBookingModel.countDocuments;
-  ctor.create = mockBookingModel.create;
-  return ctor;
-}
 
 const mockRoomService = { findOne: jest.fn() };
 const mockRoomInventoryService = {
@@ -89,10 +82,14 @@ describe('BookingService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
 
+    mockBookingRepository.findByIdAsDocument.mockImplementation((id: string) =>
+      mockBookingRepository.findById(id),
+    );
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BookingService,
-        { provide: getModelToken(Booking.name), useValue: mockBookingModel },
+        { provide: BookingRepository, useValue: mockBookingRepository },
         { provide: RoomService, useValue: mockRoomService },
         { provide: RoomInventoryService, useValue: mockRoomInventoryService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
@@ -102,7 +99,6 @@ describe('BookingService', () => {
     service = module.get<BookingService>(BookingService);
   });
 
-  /* ────────── shared DTO fixture ────────── */
   const baseDto = {
     roomId: roomId.toString(),
     checkIn: '2030-06-10',
@@ -110,15 +106,12 @@ describe('BookingService', () => {
     rooms: [{ adults: 2, children: 0 }],
   };
 
-  /* ═══════════════════════════════════════════════
-     Pricing helpers (tested through createRoomBooking)
-  ═══════════════════════════════════════════════ */
   describe('calcRoomNightPrice via createRoomBooking', () => {
-    it('throws NotFoundException when room does not exist', async () => {
+    it('throws NotFoundDomainException when room does not exist', async () => {
       mockRoomService.findOne.mockResolvedValue(null);
 
       await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
@@ -139,7 +132,6 @@ describe('BookingService', () => {
         bookingConfig: { minNights: 3, maxNights: 14 },
       });
 
-      // checkIn → checkOut = 2 nights, minNights = 3
       await expect(
         service.createRoomBooking(
           { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
@@ -154,7 +146,6 @@ describe('BookingService', () => {
         bookingConfig: { minNights: 1, maxNights: 1 },
       });
 
-      // 2 nights but maxNights = 1
       await expect(
         service.createRoomBooking(
           { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
@@ -177,14 +168,11 @@ describe('BookingService', () => {
       mockRoomInventoryService.checkAvailability.mockResolvedValue(true);
 
       const savedBooking = makeBooking();
-      savedBooking.save.mockResolvedValue(savedBooking);
-      const ctor = makeModelConstructor(savedBooking);
-      (service as any).bookingModel = ctor;
+      mockBookingRepository.createRoomBookingDoc.mockReturnValue(savedBooking);
 
       await service.createRoomBooking(baseDto, '000000000000000000000002');
 
-      // 2 adults within base (2), 0 children → price = 1_000_000 per night × 2 nights = 2_000_000
-      expect(ctor).toHaveBeenCalledWith(
+      expect(mockBookingRepository.createRoomBookingDoc).toHaveBeenCalledWith(
         expect.objectContaining({ amount: 2_000_000 }),
       );
     });
@@ -193,15 +181,12 @@ describe('BookingService', () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
 
       const savedBooking = makeBooking({ amount: 0 });
-      savedBooking.save.mockResolvedValue(savedBooking);
-      const ctor = makeModelConstructor(savedBooking);
-      (service as any).bookingModel = ctor;
+      mockBookingRepository.createRoomBookingDoc.mockReturnValue(savedBooking);
 
-      const dto = { ...baseDto, rooms: [{ adults: 3, children: 0 }] }; // 1 extra adult
+      const dto = { ...baseDto, rooms: [{ adults: 3, children: 0 }] };
       await service.createRoomBooking(dto, '000000000000000000000002');
 
-      // 1 extra adult * 200_000 extra = 1_200_000 per night × 2 nights = 2_400_000
-      expect(ctor).toHaveBeenCalledWith(
+      expect(mockBookingRepository.createRoomBookingDoc).toHaveBeenCalledWith(
         expect.objectContaining({ amount: 2_400_000 }),
       );
     });
@@ -209,7 +194,6 @@ describe('BookingService', () => {
     it('throws BadRequestException when guests exceed max capacity', async () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
 
-      // maxAdults=3, maxChildren=2 → total=5; 4 adults already exceeds maxAdults
       const dto = { ...baseDto, rooms: [{ adults: 4, children: 0 }] };
 
       await expect(service.createRoomBooking(dto, 'uid')).rejects.toThrow(
@@ -218,9 +202,6 @@ describe('BookingService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     applySale (indirect tests)
-  ═══════════════════════════════════════════════ */
   describe('applySale via createRoomBooking', () => {
     it('applies percent sale correctly', async () => {
       const roomWithSale = {
@@ -237,17 +218,14 @@ describe('BookingService', () => {
       mockRoomService.findOne.mockResolvedValue(roomWithSale);
 
       const savedBooking = makeBooking({ amount: 0 });
-      savedBooking.save.mockResolvedValue(savedBooking);
-      const ctor = makeModelConstructor(savedBooking);
-      (service as any).bookingModel = ctor;
+      mockBookingRepository.createRoomBookingDoc.mockReturnValue(savedBooking);
 
       await service.createRoomBooking(
         { ...baseDto, rooms: [{ adults: 2, children: 0 }] },
         '000000000000000000000002',
       );
 
-      // 50% off 1_000_000 = 500_000 × 2 nights = 1_000_000
-      expect(ctor).toHaveBeenCalledWith(
+      expect(mockBookingRepository.createRoomBookingDoc).toHaveBeenCalledWith(
         expect.objectContaining({ amount: 1_000_000 }),
       );
     });
@@ -260,54 +238,48 @@ describe('BookingService', () => {
           type: 'PERCENT',
           value: 50,
           startDate: null,
-          endDate: new Date('2020-01-01'), // in the past
+          endDate: new Date('2020-01-01'),
         },
       };
       mockRoomService.findOne.mockResolvedValue(roomExpiredSale);
 
       const savedBooking = makeBooking({ amount: 0 });
-      savedBooking.save.mockResolvedValue(savedBooking);
-      const ctor = makeModelConstructor(savedBooking);
-      (service as any).bookingModel = ctor;
+      mockBookingRepository.createRoomBookingDoc.mockReturnValue(savedBooking);
 
       await service.createRoomBooking(
         { ...baseDto, rooms: [{ adults: 2, children: 0 }] },
         '000000000000000000000002',
       );
 
-      // Sale expired → full price 1_000_000 × 2 nights = 2_000_000
-      expect(ctor).toHaveBeenCalledWith(
+      expect(mockBookingRepository.createRoomBookingDoc).toHaveBeenCalledWith(
         expect.objectContaining({ amount: 2_000_000 }),
       );
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     cancel
-  ═══════════════════════════════════════════════ */
   describe('cancel', () => {
     const ownerId = '000000000000000000000002';
 
-    it('throws NotFoundException when booking not found', async () => {
-      mockBookingModel.findById.mockResolvedValue(null);
+    it('throws NotFoundDomainException when booking not found', async () => {
+      mockBookingRepository.findById.mockResolvedValue(null);
 
       await expect(service.cancel('bookingId', ownerId)).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
-    it('throws ForbiddenException when requester is not owner or admin', async () => {
+    it('throws ForbiddenDomainException when requester is not owner or admin', async () => {
       const booking = makeBooking();
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await expect(
         service.cancel(booking._id.toString(), 'other_user_id'),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ForbiddenDomainException);
     });
 
     it('throws BadRequestException when booking is already paid', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await expect(
         service.cancel(booking._id.toString(), ownerId),
@@ -328,7 +300,7 @@ describe('BookingService', () => {
           },
         ],
       });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.cancel(booking._id.toString(), ownerId);
 
@@ -352,7 +324,7 @@ describe('BookingService', () => {
           },
         ],
       });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.cancel(booking._id.toString(), ownerId);
 
@@ -363,7 +335,7 @@ describe('BookingService', () => {
 
     it('allows admin to cancel any booking', async () => {
       const booking = makeBooking();
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.cancel(booking._id.toString(), 'admin_user_id', 'admin');
 
@@ -371,45 +343,39 @@ describe('BookingService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     markAsPaid
-  ═══════════════════════════════════════════════ */
   describe('markAsPaid', () => {
-    it('throws NotFoundException when booking not found', async () => {
-      mockBookingModel.findById.mockResolvedValue(null);
+    it('throws NotFoundDomainException when booking not found', async () => {
+      mockBookingRepository.findById.mockResolvedValue(null);
 
       await expect(service.markAsPaid('invalid_id')).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
     it('sets status=CONFIRMED and paymentStatus=PAID', async () => {
       const booking = makeBooking();
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.markAsPaid(booking._id.toString());
 
       expect(booking.status).toBe(BookingStatus.CONFIRMED);
       expect(booking.paymentStatus).toBe(BookingPaymentStatus.PAID);
-      expect(booking.save).toHaveBeenCalled();
+      expect(mockBookingRepository.save).toHaveBeenCalledWith(booking);
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     markAsFailed
-  ═══════════════════════════════════════════════ */
   describe('markAsFailed', () => {
-    it('throws NotFoundException when booking not found', async () => {
-      mockBookingModel.findById.mockResolvedValue(null);
+    it('throws NotFoundDomainException when booking not found', async () => {
+      mockBookingRepository.findById.mockResolvedValue(null);
 
       await expect(service.markAsFailed('invalid_id')).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
     it('sets status=CANCELLED and paymentStatus=FAILED', async () => {
       const booking = makeBooking({ status: BookingStatus.PENDING });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.markAsFailed(booking._id.toString());
 
@@ -419,29 +385,26 @@ describe('BookingService', () => {
 
     it('does not change booking if status is not PENDING (idempotent)', async () => {
       const booking = makeBooking({ status: BookingStatus.CONFIRMED });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.markAsFailed(booking._id.toString());
 
-      expect(booking.save).not.toHaveBeenCalled();
+      expect(mockBookingRepository.save).not.toHaveBeenCalled();
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     markAsRefunded
-  ═══════════════════════════════════════════════ */
   describe('markAsRefunded', () => {
-    it('throws NotFoundException when booking not found', async () => {
-      mockBookingModel.findById.mockResolvedValue(null);
+    it('throws NotFoundDomainException when booking not found', async () => {
+      mockBookingRepository.findById.mockResolvedValue(null);
 
       await expect(service.markAsRefunded('invalid_id', true)).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
     it('sets paymentStatus=REFUNDED for partial refund', async () => {
       const booking = makeBooking();
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.markAsRefunded(booking._id.toString(), false);
 
@@ -461,7 +424,7 @@ describe('BookingService', () => {
           },
         ],
       });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await service.markAsRefunded(booking._id.toString(), true);
 
@@ -472,21 +435,18 @@ describe('BookingService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     update
-  ═══════════════════════════════════════════════ */
   describe('update', () => {
-    it('throws NotFoundException when booking not found', async () => {
-      mockBookingModel.findById.mockResolvedValue(null);
+    it('throws NotFoundDomainException when booking not found', async () => {
+      mockBookingRepository.findById.mockResolvedValue(null);
 
       await expect(service.update('bad_id', {})).rejects.toThrow(
-        NotFoundException,
+        NotFoundDomainException,
       );
     });
 
     it('throws BadRequestException when booking is already PAID', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
-      mockBookingModel.findById.mockResolvedValue(booking);
+      mockBookingRepository.findById.mockResolvedValue(booking);
 
       await expect(service.update(booking._id.toString(), {})).rejects.toThrow(
         BadRequestException,

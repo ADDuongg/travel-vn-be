@@ -13,6 +13,8 @@ import {
 } from 'src/tour-guide/schema/tour-guide.schema';
 import { Hotel, HotelSchema } from 'src/hotel/schema/hotel.schema';
 import { ReviewSoftDeleteCleanupService } from './review-soft-delete-cleanup.service';
+import { ReviewRepository } from './review.repository';
+import { ReviewTargetRepository } from './review-target.repository';
 
 @Module({
   imports: [
@@ -29,7 +31,12 @@ import { ReviewSoftDeleteCleanupService } from './review-soft-delete-cleanup.ser
     ReviewClientController,
     ReviewAdminController,
   ],
-  providers: [ReviewService, ReviewSoftDeleteCleanupService],
+  providers: [
+    ReviewRepository,
+    ReviewTargetRepository,
+    ReviewService,
+    ReviewSoftDeleteCleanupService,
+  ],
   exports: [ReviewService],
 })
 export class ReviewModule {}

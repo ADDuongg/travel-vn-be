@@ -7,11 +7,12 @@ import { PermissionModule } from 'src/permission/permission.module';
 import { UserAdminController } from './user.admin.controller';
 import { UserClientController } from './user.client.controller';
 import { UserService } from './user.service';
+import { UserRepository } from './user.repository';
 import { User, UserSchema } from './schema/user.schema';
 
 @Module({
   controllers: [UserClientController, UserAdminController],
-  providers: [UserService],
+  providers: [UserService, UserRepository],
   exports: [UserService],
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
