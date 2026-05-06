@@ -31,10 +31,18 @@ export class TourIndexProcessor extends WorkerHost {
       return;
     }
 
-    const { tourId, operation } = job.data;
+    const { tourId, operation, requestId, eventId } = job.data;
     try {
       await this.tourSearch.upsertFromMongo(tourId);
       this.syncSuccessTotal.inc({ operation });
+      this.logger.log({
+        requestId,
+        eventId,
+        tourId,
+        operation,
+        jobId: job.id,
+        message: 'Tour ES sync completed',
+      });
     } catch (err) {
       const maxAttempts = job.opts.attempts ?? 3;
       const attempt = job.attemptsMade + 1;
@@ -43,12 +51,29 @@ export class TourIndexProcessor extends WorkerHost {
       if (isLastAttempt) {
         this.syncFailedTotal.inc({ operation });
         this.logger.error(
-          `Tour ES sync exhausted retries tourId=${tourId} operation=${operation} attempts=${attempt}/${maxAttempts}: ${err instanceof Error ? err.message : String(err)}`,
+          {
+            requestId,
+            eventId,
+            tourId,
+            operation,
+            attempt,
+            maxAttempts,
+            jobId: job.id,
+            message: err instanceof Error ? err.message : String(err),
+          },
+          'Tour ES sync exhausted retries',
         );
       } else {
-        this.logger.warn(
-          `Tour ES sync attempt failed tourId=${tourId} operation=${operation} attempt=${attempt}/${maxAttempts}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        this.logger.warn({
+          requestId,
+          eventId,
+          tourId,
+          operation,
+          attempt,
+          maxAttempts,
+          jobId: job.id,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
       throw err;
     }

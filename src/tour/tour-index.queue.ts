@@ -25,13 +25,19 @@ export class TourIndexQueueService {
   async enqueue(
     tourId: string,
     operation: TourIndexSyncOperation,
+    context?: { requestId?: string; eventId?: string },
   ): Promise<void> {
     if (!Types.ObjectId.isValid(tourId)) return;
 
     try {
       await this.tourIndexQueue.add(
         TOUR_INDEX_SYNC_JOB,
-        { tourId, operation },
+        {
+          tourId,
+          operation,
+          requestId: context?.requestId,
+          eventId: context?.eventId,
+        },
         {
           jobId: `tour-es:${tourId}`,
           attempts: 3,

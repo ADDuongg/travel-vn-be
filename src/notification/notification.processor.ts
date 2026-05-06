@@ -16,6 +16,10 @@ import {
 import { EnvService } from 'src/env/env.service';
 import { MailService } from 'src/mail/mail.service';
 import { IdempotencyService } from 'src/idempotency/idempotency.service';
+import {
+  normalizeNotificationJobData,
+  NotificationJobEnvelope,
+} from './notification.contracts';
 
 interface GuideRegisteredInAppJobData {
   recipientId: string;
@@ -65,126 +69,131 @@ export class NotificationProcessor extends WorkerHost {
     super();
   }
 
-  async process(
-    job: Job<
-      | GuideRegisteredInAppJobData
-      | GuideRegisteredEmailJobData
-      | GuideVerifiedInAppJobData
-      | GuideVerifiedEmailJobData
-      | OtpIssuedJobData
-      | any
-    >,
-  ) {
-    this.logger.log(`Processing job ${job.name} [${job.id}]`);
+  private normalizeJobData<T>(job: Job<unknown>): NotificationJobEnvelope<T> {
+    return normalizeNotificationJobData<T>(job.data, {
+      eventName: job.name,
+      source: NotificationProcessor.name,
+    });
+  }
 
-    const jobId = String(job.id ?? job.name + '-' + JSON.stringify(job.data));
+  async process(job: Job<unknown>) {
+    const normalized = this.normalizeJobData<unknown>(job);
+    this.logger.log({
+      requestId: normalized.requestId,
+      eventId: normalized.eventId,
+      eventName: normalized.eventName,
+      jobId: job.id,
+      jobName: job.name,
+      message: 'Processing notification job',
+    });
+
+    const jobId = String(
+      job.id ?? `${job.name}:${normalized.eventId}:${normalized.occurredAt}`,
+    );
     await this.idempotencyService.executeJobOnce(jobId, job.name, async () => {
       await this.processJob(job);
     });
   }
 
-  private async processJob(
-    job: Job<
-      | GuideRegisteredInAppJobData
-      | GuideRegisteredEmailJobData
-      | GuideVerifiedInAppJobData
-      | GuideVerifiedEmailJobData
-      | OtpIssuedJobData
-      | any
-    >,
-  ): Promise<void> {
+  private async processJob(job: Job<unknown>): Promise<void> {
     switch (job.name) {
       case 'guide-registered-inapp':
         await this.handleGuideRegisteredInApp(
-          job.data as GuideRegisteredInAppJobData,
+          this.normalizeJobData<GuideRegisteredInAppJobData>(job).payload,
         );
         break;
       case 'guide-registered-email':
         await this.handleGuideRegisteredEmail(
-          job.data as GuideRegisteredEmailJobData,
+          this.normalizeJobData<GuideRegisteredEmailJobData>(job).payload,
         );
         break;
       case 'guide-verified-inapp':
         await this.handleGuideVerifiedInApp(
-          job.data as GuideVerifiedInAppJobData,
+          this.normalizeJobData<GuideVerifiedInAppJobData>(job).payload,
         );
         break;
       case 'guide-verified-email':
         await this.handleGuideVerifiedEmail(
-          job.data as GuideVerifiedEmailJobData,
+          this.normalizeJobData<GuideVerifiedEmailJobData>(job).payload,
         );
         break;
       case 'auth-otp-issued':
-        await this.handleOtpIssued(job.data as OtpIssuedJobData);
+        await this.handleOtpIssued(
+          this.normalizeJobData<OtpIssuedJobData>(job).payload,
+        );
         break;
       case 'tour-created':
         await this.handleTourCreatedOrUpdated(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_CREATED,
         );
         break;
       case 'tour-updated':
         await this.handleTourCreatedOrUpdated(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_UPDATED,
         );
         break;
       case 'tour-deleted':
-        await this.handleTourDeleted(job.data as any);
+        await this.handleTourDeleted(this.normalizeJobData<any>(job).payload);
         break;
       case 'tour-inventory-low':
         await this.handleTourInventoryEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_INVENTORY_LOW,
         );
         break;
       case 'tour-inventory-sold-out':
         await this.handleTourInventoryEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_INVENTORY_SOLD_OUT,
         );
         break;
       case 'tour-inventory-restocked':
         await this.handleTourInventoryEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_INVENTORY_RESTOCKED,
         );
         break;
       case 'tour-booking-created':
         await this.handleTourBookingEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_BOOKING_CREATED,
         );
         break;
       case 'tour-booking-confirmed':
         await this.handleTourBookingEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_BOOKING_CONFIRMED,
         );
         break;
       case 'tour-booking-cancelled':
         await this.handleTourBookingEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_BOOKING_CANCELLED,
         );
         break;
       case 'tour-booking-payment-failed':
         await this.handleTourBookingEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_BOOKING_PAYMENT_FAILED,
         );
         break;
       case 'tour-booking-overbooking':
         await this.handleTourBookingEvent(
-          job.data as any,
+          this.normalizeJobData<any>(job).payload,
           NotificationType.TOUR_BOOKING_OVERBOOKING,
         );
         break;
       case 'tour-booking-payment-expired-user':
-        await this.handleTourBookingPaymentExpiredUser(job.data as any);
+        await this.handleTourBookingPaymentExpiredUser(
+          this.normalizeJobData<any>(job).payload,
+        );
         break;
       case 'room-booking-payment-expired-user':
-        await this.handleRoomBookingPaymentExpiredUser(job.data as any);
+        await this.handleRoomBookingPaymentExpiredUser(
+          this.normalizeJobData<any>(job).payload,
+        );
         break;
       default:
         this.logger.warn(`Unknown job name: ${job.name}`);
@@ -461,13 +470,29 @@ export class NotificationProcessor extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
-    this.logger.error(
-      `Job ${job.name} [${job.id}] failed (attempt ${job.attemptsMade}/${job.opts.attempts}): ${error.message}`,
-    );
+    const normalized = this.normalizeJobData<unknown>(job as Job<unknown>);
+    this.logger.error({
+      requestId: normalized.requestId,
+      eventId: normalized.eventId,
+      eventName: normalized.eventName,
+      jobId: job.id,
+      jobName: job.name,
+      attemptsMade: job.attemptsMade,
+      attempts: job.opts.attempts,
+      error: error.message,
+    });
   }
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job) {
-    this.logger.log(`Job ${job.name} [${job.id}] completed`);
+    const normalized = this.normalizeJobData<unknown>(job as Job<unknown>);
+    this.logger.log({
+      requestId: normalized.requestId,
+      eventId: normalized.eventId,
+      eventName: normalized.eventName,
+      jobId: job.id,
+      jobName: job.name,
+      message: 'Notification job completed',
+    });
   }
 }

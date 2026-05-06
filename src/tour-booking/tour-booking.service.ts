@@ -28,6 +28,8 @@ import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { PaymentTourBookingDto } from './dto/payment-tour-booking.dto';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourBookingNotificationEvent } from 'src/notification/events/tour-booking-notification.event';
 
@@ -45,7 +47,23 @@ export class TourBookingService {
     private readonly tourInventoryService: TourInventoryService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
+
+  private emitNotificationEvent(
+    eventName: NotificationEvent,
+    payload: TourBookingNotificationEvent,
+  ) {
+    this.eventEmitter.emit(
+      eventName,
+      createDomainEventEnvelope({
+        eventName: String(eventName),
+        source: TourBookingService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload,
+      }),
+    );
+  }
 
   private async generateBookingCode(): Promise<string> {
     for (let i = 0; i < 10; i++) {
@@ -191,7 +209,7 @@ export class TourBookingService {
     const enName = (tour.translations as any)?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
+    this.emitNotificationEvent(
       NotificationEvent.TOUR_BOOKING_CREATED,
       new TourBookingNotificationEvent(
         String(booking._id),
@@ -305,7 +323,7 @@ export class TourBookingService {
     const enName = (populated.tourId as any)?.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
+    this.emitNotificationEvent(
       NotificationEvent.TOUR_BOOKING_CONFIRMED,
       new TourBookingNotificationEvent(
         String(saved._id),
@@ -367,7 +385,7 @@ export class TourBookingService {
     const enName = (populated.tourId as any)?.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
+    this.emitNotificationEvent(
       NotificationEvent.TOUR_BOOKING_CANCELLED,
       new TourBookingNotificationEvent(
         String(saved._id),
@@ -416,7 +434,7 @@ export class TourBookingService {
       const enName = (populated.tourId as any)?.translations?.en?.name;
       const tourName = viName || enName;
 
-      this.eventEmitter.emit(
+      this.emitNotificationEvent(
         NotificationEvent.TOUR_BOOKING_CONFIRMED,
         new TourBookingNotificationEvent(
           String(saved._id),
@@ -471,7 +489,7 @@ export class TourBookingService {
       const enName = (populated.tourId as any)?.translations?.en?.name;
       const tourName = viName || enName;
 
-      this.eventEmitter.emit(
+      this.emitNotificationEvent(
         NotificationEvent.TOUR_BOOKING_CONFIRMED,
         new TourBookingNotificationEvent(
           String(saved._id),
@@ -517,7 +535,7 @@ export class TourBookingService {
     const enName = (populated.tourId as any)?.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
+    this.emitNotificationEvent(
       NotificationEvent.TOUR_BOOKING_PAYMENT_FAILED,
       new TourBookingNotificationEvent(
         String(saved._id),

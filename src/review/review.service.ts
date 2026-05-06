@@ -6,6 +6,8 @@ import {
 import { Types } from 'mongoose';
 import { ReviewEntityType, ReviewStatus } from './schema/ewview.schema';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
 import {
   TOUR_INDEX_SYNC_EVENT,
   TourIndexSyncPayload,
@@ -30,6 +32,7 @@ export class ReviewService {
     private readonly reviewRepository: ReviewRepository,
     private readonly reviewTargetRepository: ReviewTargetRepository,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
 
   async upsertReview(params: {
@@ -514,7 +517,12 @@ export class ReviewService {
 
     this.eventEmitter.emit(
       TOUR_INDEX_SYNC_EVENT,
-      new TourIndexSyncPayload(tourId),
+      createDomainEventEnvelope({
+        eventName: TOUR_INDEX_SYNC_EVENT,
+        source: ReviewService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload: new TourIndexSyncPayload(tourId),
+      }),
     );
   }
 

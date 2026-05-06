@@ -15,8 +15,14 @@ export type TourIndexSyncOperation =
 export interface TourIndexSyncJobData {
   tourId: string;
   operation: TourIndexSyncOperation;
+  requestId?: string;
+  eventId?: string;
 }
 
 export class TourIndexSyncPayload {
-  constructor(public readonly tourId: string) {}
+  constructor(
+    public readonly tourId: string,
+    public readonly requestId?: string,
+    public readonly eventId?: string,
+  ) {}
 }

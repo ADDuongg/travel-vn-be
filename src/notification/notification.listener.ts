@@ -5,6 +5,15 @@ import { Queue } from 'bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EnvService } from 'src/env/env.service';
+import { normalizeDomainEventEnvelope } from 'src/common/events/domain-event';
+import {
+  createNotificationJobEnvelope,
+  NotificationJobEnvelope,
+} from './notification.contracts';
+import {
+  buildStableJobId,
+  DEFAULT_QUEUE_JOB_OPTIONS,
+} from 'src/common/queue/queue-policy';
 import { User, UserDocument } from 'src/user/schema/user.schema';
 import {
   NOTIFICATION_QUEUE,
@@ -30,12 +39,30 @@ export class NotificationListener {
   ) {}
 
   private getBullOpts() {
-    return {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 1000 },
-      removeOnComplete: 100,
-      removeOnFail: 200,
-    };
+    return { ...DEFAULT_QUEUE_JOB_OPTIONS };
+  }
+
+  private normalizeEvent<T>(
+    event: unknown,
+    expectedEventName: NotificationEvent,
+  ) {
+    return normalizeDomainEventEnvelope<T>({
+      event,
+      expectedEventName: String(expectedEventName),
+      source: NotificationListener.name,
+      legacyPayloadFactory: (legacyEvent) => legacyEvent as T,
+    });
+  }
+
+  private async enqueueNotificationJob<T>(
+    jobName: string,
+    data: NotificationJobEnvelope<T>,
+    stableIdParts: Array<string | number | undefined>,
+  ) {
+    return this.notificationQueue.add(jobName, data, {
+      ...this.getBullOpts(),
+      jobId: buildStableJobId(jobName, ...stableIdParts),
+    });
   }
 
   /** Run queue adds in parallel; log rejections but do not fail the whole batch. */
@@ -54,8 +81,13 @@ export class NotificationListener {
   }
 
   @OnEvent(NotificationEvent.GUIDE_REGISTERED)
-  async onGuideRegistered(event: TourGuideNotificationEvent) {
-    this.logger.log(`Guide registered event: ${event.guideId}`);
+  async onGuideRegistered(event: unknown) {
+    const normalized = this.normalizeEvent<TourGuideNotificationEvent>(
+      event,
+      NotificationEvent.GUIDE_REGISTERED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Guide registered event: ${payload.guideId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -66,15 +98,22 @@ export class NotificationListener {
 
     // 1) In-app notifications (per recipient)
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'guide-registered-inapp',
-        {
-          recipientId: String(admin._id),
-          guideId: event.guideId,
-          userId: event.userId,
-          userName: event.userName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            guideId: payload.guideId,
+            userId: payload.userId,
+            userName: payload.userName,
+          },
+        }),
+        [String(admin._id), payload.guideId, normalized.eventId],
       ),
     );
 
@@ -88,56 +127,87 @@ export class NotificationListener {
     }
 
     await this.addJobsAllSettled([...emailRecipients], (to) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'guide-registered-email',
-        {
-          to,
-          guideId: event.guideId,
-          userId: event.userId,
-          userName: event.userName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            to,
+            guideId: payload.guideId,
+            userId: payload.userId,
+            userName: payload.userName,
+          },
+        }),
+        [to, payload.guideId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.GUIDE_VERIFIED)
-  async onGuideVerified(event: TourGuideNotificationEvent) {
+  async onGuideVerified(event: unknown) {
+    const normalized = this.normalizeEvent<TourGuideNotificationEvent>(
+      event,
+      NotificationEvent.GUIDE_VERIFIED,
+    );
+    const payload = normalized.payload;
     this.logger.log(
-      `Guide verified event: ${event.guideId}, verified=${event.isVerified}`,
+      `Guide verified event: ${payload.guideId}, verified=${payload.isVerified}`,
     );
 
     // In-app notification (single recipient)
-    await this.notificationQueue.add(
+    await this.enqueueNotificationJob(
       'guide-verified-inapp',
-      {
-        recipientId: event.userId,
-        guideId: event.guideId,
-        userName: event.userName,
-        userEmail: event.userEmail,
-        isVerified: event.isVerified,
-      },
-      this.getBullOpts(),
+      createNotificationJobEnvelope({
+        eventName: normalized.eventName,
+        eventId: normalized.eventId,
+        occurredAt: normalized.occurredAt,
+        requestId: normalized.requestId,
+        source: normalized.source,
+        payload: {
+          recipientId: payload.userId,
+          guideId: payload.guideId,
+          userName: payload.userName,
+          userEmail: payload.userEmail,
+          isVerified: payload.isVerified,
+        },
+      }),
+      [payload.userId, payload.guideId, normalized.eventId],
     );
 
     // Email (single recipient, only if available)
-    if (event.userEmail) {
-      await this.notificationQueue.add(
+    if (payload.userEmail) {
+      await this.enqueueNotificationJob(
         'guide-verified-email',
-        {
-          to: event.userEmail,
-          guideId: event.guideId,
-          userName: event.userName,
-          isVerified: event.isVerified,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            to: payload.userEmail,
+            guideId: payload.guideId,
+            userName: payload.userName,
+            isVerified: payload.isVerified,
+          },
+        }),
+        [payload.userEmail, payload.guideId, normalized.eventId],
       );
     }
   }
 
   @OnEvent(NotificationEvent.TOUR_CREATED)
-  async onTourCreated(event: TourNotificationEvent) {
-    this.logger.log(`Tour created event: ${event.tourId}`);
+  async onTourCreated(event: unknown) {
+    const normalized = this.normalizeEvent<TourNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_CREATED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour created event: ${payload.tourId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -145,22 +215,34 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-created',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          tourCode: event.tourCode,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            tourCode: payload.tourCode,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.tourId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_UPDATED)
-  async onTourUpdated(event: TourNotificationEvent) {
-    this.logger.log(`Tour updated event: ${event.tourId}`);
+  async onTourUpdated(event: unknown) {
+    const normalized = this.normalizeEvent<TourNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_UPDATED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour updated event: ${payload.tourId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -168,22 +250,34 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-updated',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          tourCode: event.tourCode,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            tourCode: payload.tourCode,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.tourId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_DELETED)
-  async onTourDeleted(event: TourNotificationEvent) {
-    this.logger.log(`Tour deleted event: ${event.tourId}`);
+  async onTourDeleted(event: unknown) {
+    const normalized = this.normalizeEvent<TourNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_DELETED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour deleted event: ${payload.tourId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -191,23 +285,35 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-deleted',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          tourCode: event.tourCode,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            tourCode: payload.tourCode,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.tourId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_INVENTORY_LOW)
-  async onTourInventoryLow(event: TourInventoryNotificationEvent) {
+  async onTourInventoryLow(event: unknown) {
+    const normalized = this.normalizeEvent<TourInventoryNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_INVENTORY_LOW,
+    );
+    const payload = normalized.payload;
     this.logger.log(
-      `Tour inventory LOW: ${event.tourId} on ${event.departureDate}`,
+      `Tour inventory LOW: ${payload.tourId} on ${payload.departureDate}`,
     );
 
     const adminUsers = await this.userModel
@@ -216,24 +322,41 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-inventory-low',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          departureDate: event.departureDate,
-          totalSlots: event.totalSlots,
-          availableSlots: event.availableSlots,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            departureDate: payload.departureDate,
+            totalSlots: payload.totalSlots,
+            availableSlots: payload.availableSlots,
+          },
+        }),
+        [
+          String(admin._id),
+          payload.tourId,
+          payload.departureDate,
+          normalized.eventId,
+        ],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_INVENTORY_SOLD_OUT)
-  async onTourInventorySoldOut(event: TourInventoryNotificationEvent) {
+  async onTourInventorySoldOut(event: unknown) {
+    const normalized = this.normalizeEvent<TourInventoryNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_INVENTORY_SOLD_OUT,
+    );
+    const payload = normalized.payload;
     this.logger.log(
-      `Tour inventory SOLD OUT: ${event.tourId} on ${event.departureDate}`,
+      `Tour inventory SOLD OUT: ${payload.tourId} on ${payload.departureDate}`,
     );
 
     const adminUsers = await this.userModel
@@ -242,24 +365,41 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-inventory-sold-out',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          departureDate: event.departureDate,
-          totalSlots: event.totalSlots,
-          availableSlots: event.availableSlots,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            departureDate: payload.departureDate,
+            totalSlots: payload.totalSlots,
+            availableSlots: payload.availableSlots,
+          },
+        }),
+        [
+          String(admin._id),
+          payload.tourId,
+          payload.departureDate,
+          normalized.eventId,
+        ],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_INVENTORY_RESTOCKED)
-  async onTourInventoryRestocked(event: TourInventoryNotificationEvent) {
+  async onTourInventoryRestocked(event: unknown) {
+    const normalized = this.normalizeEvent<TourInventoryNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_INVENTORY_RESTOCKED,
+    );
+    const payload = normalized.payload;
     this.logger.log(
-      `Tour inventory RESTOCKED: ${event.tourId} on ${event.departureDate}`,
+      `Tour inventory RESTOCKED: ${payload.tourId} on ${payload.departureDate}`,
     );
 
     const adminUsers = await this.userModel
@@ -268,23 +408,40 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-inventory-restocked',
-        {
-          recipientId: String(admin._id),
-          tourId: event.tourId,
-          departureDate: event.departureDate,
-          totalSlots: event.totalSlots,
-          availableSlots: event.availableSlots,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            tourId: payload.tourId,
+            departureDate: payload.departureDate,
+            totalSlots: payload.totalSlots,
+            availableSlots: payload.availableSlots,
+          },
+        }),
+        [
+          String(admin._id),
+          payload.tourId,
+          payload.departureDate,
+          normalized.eventId,
+        ],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CREATED)
-  async onTourBookingCreated(event: TourBookingNotificationEvent) {
-    this.logger.log(`Tour booking created: ${event.bookingId}`);
+  async onTourBookingCreated(event: unknown) {
+    const normalized = this.normalizeEvent<TourBookingNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_BOOKING_CREATED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour booking created: ${payload.bookingId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -292,23 +449,35 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-booking-created',
-        {
-          recipientId: String(admin._id),
-          bookingId: event.bookingId,
-          bookingCode: event.bookingCode,
-          tourId: event.tourId,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            bookingId: payload.bookingId,
+            bookingCode: payload.bookingCode,
+            tourId: payload.tourId,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.bookingId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CONFIRMED)
-  async onTourBookingConfirmed(event: TourBookingNotificationEvent) {
-    this.logger.log(`Tour booking confirmed: ${event.bookingId}`);
+  async onTourBookingConfirmed(event: unknown) {
+    const normalized = this.normalizeEvent<TourBookingNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_BOOKING_CONFIRMED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour booking confirmed: ${payload.bookingId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -316,23 +485,35 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-booking-confirmed',
-        {
-          recipientId: String(admin._id),
-          bookingId: event.bookingId,
-          bookingCode: event.bookingCode,
-          tourId: event.tourId,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            bookingId: payload.bookingId,
+            bookingCode: payload.bookingCode,
+            tourId: payload.tourId,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.bookingId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_CANCELLED)
-  async onTourBookingCancelled(event: TourBookingNotificationEvent) {
-    this.logger.log(`Tour booking cancelled: ${event.bookingId}`);
+  async onTourBookingCancelled(event: unknown) {
+    const normalized = this.normalizeEvent<TourBookingNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_BOOKING_CANCELLED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour booking cancelled: ${payload.bookingId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -340,23 +521,35 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-booking-cancelled',
-        {
-          recipientId: String(admin._id),
-          bookingId: event.bookingId,
-          bookingCode: event.bookingCode,
-          tourId: event.tourId,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            bookingId: payload.bookingId,
+            bookingCode: payload.bookingCode,
+            tourId: payload.tourId,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.bookingId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_PAYMENT_FAILED)
-  async onTourBookingPaymentFailed(event: TourBookingNotificationEvent) {
-    this.logger.log(`Tour booking payment failed: ${event.bookingId}`);
+  async onTourBookingPaymentFailed(event: unknown) {
+    const normalized = this.normalizeEvent<TourBookingNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_BOOKING_PAYMENT_FAILED,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour booking payment failed: ${payload.bookingId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -364,23 +557,35 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-booking-payment-failed',
-        {
-          recipientId: String(admin._id),
-          bookingId: event.bookingId,
-          bookingCode: event.bookingCode,
-          tourId: event.tourId,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            bookingId: payload.bookingId,
+            bookingCode: payload.bookingCode,
+            tourId: payload.tourId,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.bookingId, normalized.eventId],
       ),
     );
   }
 
   @OnEvent(NotificationEvent.TOUR_BOOKING_OVERBOOKING)
-  async onTourBookingOverbooking(event: TourBookingNotificationEvent) {
-    this.logger.log(`Tour booking overbooking: ${event.bookingId}`);
+  async onTourBookingOverbooking(event: unknown) {
+    const normalized = this.normalizeEvent<TourBookingNotificationEvent>(
+      event,
+      NotificationEvent.TOUR_BOOKING_OVERBOOKING,
+    );
+    const payload = normalized.payload;
+    this.logger.log(`Tour booking overbooking: ${payload.bookingId}`);
 
     const adminUsers = await this.userModel
       .find({ roles: 'ADMIN', isActive: true })
@@ -388,87 +593,120 @@ export class NotificationListener {
       .lean();
 
     await this.addJobsAllSettled(adminUsers, (admin) =>
-      this.notificationQueue.add(
+      this.enqueueNotificationJob(
         'tour-booking-overbooking',
-        {
-          recipientId: String(admin._id),
-          bookingId: event.bookingId,
-          bookingCode: event.bookingCode,
-          tourId: event.tourId,
-          tourName: event.tourName,
-        },
-        this.getBullOpts(),
+        createNotificationJobEnvelope({
+          eventName: normalized.eventName,
+          eventId: normalized.eventId,
+          occurredAt: normalized.occurredAt,
+          requestId: normalized.requestId,
+          source: normalized.source,
+          payload: {
+            recipientId: String(admin._id),
+            bookingId: payload.bookingId,
+            bookingCode: payload.bookingCode,
+            tourId: payload.tourId,
+            tourName: payload.tourName,
+          },
+        }),
+        [String(admin._id), payload.bookingId, normalized.eventId],
       ),
     );
   }
 
   /** User client — đơn tour hết hạn thanh toán (cron). */
   @OnEvent(NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED)
-  async onTourBookingPaymentExpiredClient(
-    event: TourBookingPaymentExpiredClientEvent,
-  ) {
+  async onTourBookingPaymentExpiredClient(event: unknown) {
+    const normalized =
+      this.normalizeEvent<TourBookingPaymentExpiredClientEvent>(
+        event,
+        NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED,
+      );
+    const payload = normalized.payload;
     this.logger.log(
-      `Tour booking payment expired (user notify): ${event.bookingId}`,
+      `Tour booking payment expired (user notify): ${payload.bookingId}`,
     );
 
-    await this.notificationQueue.add(
+    await this.enqueueNotificationJob(
       'tour-booking-payment-expired-user',
-      {
-        recipientId: event.userId,
-        bookingId: event.bookingId,
-        bookingCode: event.bookingCode,
-        tourId: event.tourId,
-        tourName: event.tourName,
-      },
-      this.getBullOpts(),
+      createNotificationJobEnvelope({
+        eventName: normalized.eventName,
+        eventId: normalized.eventId,
+        occurredAt: normalized.occurredAt,
+        requestId: normalized.requestId,
+        source: normalized.source,
+        payload: {
+          recipientId: payload.userId,
+          bookingId: payload.bookingId,
+          bookingCode: payload.bookingCode,
+          tourId: payload.tourId,
+          tourName: payload.tourName,
+        },
+      }),
+      [payload.userId, payload.bookingId, normalized.eventId],
     );
   }
 
   /** User client — đặt phòng hết hạn thanh toán (cron). */
   @OnEvent(NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED)
-  async onRoomBookingPaymentExpiredClient(
-    event: RoomBookingPaymentExpiredClientEvent,
-  ) {
+  async onRoomBookingPaymentExpiredClient(event: unknown) {
+    const normalized =
+      this.normalizeEvent<RoomBookingPaymentExpiredClientEvent>(
+        event,
+        NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED,
+      );
+    const payload = normalized.payload;
     this.logger.log(
-      `Room booking payment expired (user notify): ${event.bookingId}`,
+      `Room booking payment expired (user notify): ${payload.bookingId}`,
     );
 
-    await this.notificationQueue.add(
+    await this.enqueueNotificationJob(
       'room-booking-payment-expired-user',
-      {
-        recipientId: event.userId,
-        bookingId: event.bookingId,
-      },
-      this.getBullOpts(),
+      createNotificationJobEnvelope({
+        eventName: normalized.eventName,
+        eventId: normalized.eventId,
+        occurredAt: normalized.occurredAt,
+        requestId: normalized.requestId,
+        source: normalized.source,
+        payload: {
+          recipientId: payload.userId,
+          bookingId: payload.bookingId,
+        },
+      }),
+      [payload.userId, payload.bookingId, normalized.eventId],
     );
   }
 
   @OnEvent(NotificationEvent.OTP_ISSUED)
-  async onOtpIssued(event: {
-    purpose: string;
-    target: string;
-    code: string;
-    meta?: Record<string, unknown>;
-    expiresAt: string;
-  }) {
+  async onOtpIssued(event: unknown) {
+    const normalized = this.normalizeEvent<{
+      purpose: string;
+      target: string;
+      code: string;
+      meta?: Record<string, unknown>;
+      expiresAt: string;
+    }>(event, NotificationEvent.OTP_ISSUED);
+    const payload = normalized.payload;
     this.logger.log(
-      `OTP issued for purpose=${event.purpose} target=${event.target}`,
+      `OTP issued for purpose=${payload.purpose} target=${payload.target}`,
     );
 
-    await this.notificationQueue.add(
+    await this.enqueueNotificationJob(
       'auth-otp-issued',
-      {
-        purpose: event.purpose,
-        target: event.target,
-        code: event.code,
-        expiresAt: event.expiresAt,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-        removeOnComplete: 100,
-        removeOnFail: 200,
-      },
+      createNotificationJobEnvelope({
+        eventName: normalized.eventName,
+        eventId: normalized.eventId,
+        occurredAt: normalized.occurredAt,
+        requestId: normalized.requestId,
+        source: normalized.source,
+        payload: {
+          purpose: payload.purpose,
+          target: payload.target,
+          code: payload.code,
+          expiresAt: payload.expiresAt,
+        },
+      }),
+      [payload.target, payload.purpose, normalized.eventId],
     );
   }
 }

@@ -15,6 +15,8 @@ import {
 import { BlockSlotsDto } from './dto/block-slots.dto';
 import { ReleaseSlotsDto } from './dto/release-slots.dto';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourInventoryNotificationEvent } from 'src/notification/events/tour-inventory-notification.event';
 
@@ -26,6 +28,7 @@ export class TourInventoryService {
     @InjectModel(Tour.name)
     private readonly tourModel: Model<TourDocument>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
   ) {}
 
   private updateInventoryStatus(inv: TourInventoryDocument): void {
@@ -133,10 +136,23 @@ export class TourInventoryService {
       if (inv.status === TourInventoryStatus.FULL) {
         this.eventEmitter.emit(
           NotificationEvent.TOUR_INVENTORY_SOLD_OUT,
-          event,
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.TOUR_INVENTORY_SOLD_OUT),
+            source: TourInventoryService.name,
+            requestId: this.correlationContext.getRequestId(),
+            payload: event,
+          }),
         );
       } else if (inv.status === TourInventoryStatus.LIMITED) {
-        this.eventEmitter.emit(NotificationEvent.TOUR_INVENTORY_LOW, event);
+        this.eventEmitter.emit(
+          NotificationEvent.TOUR_INVENTORY_LOW,
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.TOUR_INVENTORY_LOW),
+            source: TourInventoryService.name,
+            requestId: this.correlationContext.getRequestId(),
+            payload: event,
+          }),
+        );
       }
     }
 
@@ -179,7 +195,12 @@ export class TourInventoryService {
       if (prevStatus === TourInventoryStatus.FULL) {
         this.eventEmitter.emit(
           NotificationEvent.TOUR_INVENTORY_RESTOCKED,
-          event,
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.TOUR_INVENTORY_RESTOCKED),
+            source: TourInventoryService.name,
+            requestId: this.correlationContext.getRequestId(),
+            payload: event,
+          }),
         );
       } else if (
         prevStatus === TourInventoryStatus.LIMITED &&
@@ -187,7 +208,12 @@ export class TourInventoryService {
       ) {
         this.eventEmitter.emit(
           NotificationEvent.TOUR_INVENTORY_RESTOCKED,
-          event,
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.TOUR_INVENTORY_RESTOCKED),
+            source: TourInventoryService.name,
+            requestId: this.correlationContext.getRequestId(),
+            payload: event,
+          }),
         );
       }
     }

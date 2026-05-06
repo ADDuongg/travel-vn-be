@@ -5,6 +5,7 @@
 1. [Lấy data từ Staging về Local](#1-lấy-data-từ-staging-về-local)
 2. [Code Flow (Git Branch Strategy)](#2-code-flow-git-branch-strategy)
 3. [Migration Flow (Thay đổi Schema MongoDB)](#3-migration-flow-thay-đổi-schema-mongodb)
+4. [Grafana + Prometheus monitoring](#4-grafana--prometheus-monitoring)
 
 ---
 
@@ -151,7 +152,7 @@ git push origin staging
 yarn add migrate-mongo
 
 # Khởi tạo config
-npx migrate-mongo init
+yarn run migrate-mongo init
 ```
 
 Cấu hình `migrate-mongo-config.js`:
@@ -171,7 +172,7 @@ module.exports = {
 ### Tạo file migration mới
 
 ```bash
-npx migrate-mongo create ten-migration
+yarn run migrate-mongo create ten-migration
 # Tạo ra: migrations/20240101000000-ten-migration.js
 ```
 
@@ -202,13 +203,13 @@ module.exports = {
 
 ```bash
 # Xem trạng thái migration
-npx migrate-mongo status
+yarn run migrate-mongo status
 
 # Chạy tất cả migration chưa chạy
-npx migrate-mongo up
+yarn run migrate-mongo up
 
 # Rollback migration gần nhất
-npx migrate-mongo down
+yarn run migrate-mongo down
 ```
 
 ### Tích hợp vào CI/CD (`.gitlab-ci.yml`)
@@ -231,7 +232,7 @@ deploy:staging:
         --network travel-vn-dev-network \
         --env-file .env \
         $CI_REGISTRY_IMAGE:staging \
-        npx migrate-mongo up
+        yarn run migrate-mongo up
 
     - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
     # ... health check ...
@@ -244,10 +245,10 @@ deploy:staging:
    └── migrations/xxx-ten-thay-doi.js
 
 2. Test migration trên local
-   └── npx migrate-mongo up
+   └── yarn run migrate-mongo up
    └── Kiểm tra data
-   └── npx migrate-mongo down (test rollback)
-   └── npx migrate-mongo up (chạy lại)
+   └── yarn run migrate-mongo down (test rollback)
+   └── yarn run migrate-mongo up (chạy lại)
 
 3. Merge vào staging
    └── CI/CD chạy migration tự động trước khi deploy
@@ -262,3 +263,22 @@ deploy:staging:
 > - Mỗi file migration chỉ chạy **một lần duy nhất** (được track trong collection `migrations_changelog`)  
 > - Luôn viết hàm `down()` để có thể rollback khi cần  
 > - Không bao giờ sửa file migration đã được deploy lên production
+
+---
+
+## 4. Grafana + Prometheus monitoring
+
+Tài liệu đầy đủ (local / staging / production, biến môi trường, bảo mật): **[docs/MONITORING-GRAFANA.md](./docs/MONITORING-GRAFANA.md)**.
+
+Tóm tắt nhanh:
+
+```bash
+# Local: stack DB + Prometheus/Grafana (API chạy trên host yarn start:dev :9001)
+docker compose -f docker-compose.yml -f docker-compose.monitoring.local.yml up -d
+
+# Staging / production: thêm overlay monitoring cùng compose hiện có
+docker compose -f docker-compose.staging.yml -f docker-compose.monitoring.staging.yml up -d
+docker compose -f docker-compose.production.yml -f docker-compose.monitoring.production.yml up -d
+```
+
+Biến Grafana xem trong [.env.docker.example](./.env.docker.example) (`MONITORING_*`).

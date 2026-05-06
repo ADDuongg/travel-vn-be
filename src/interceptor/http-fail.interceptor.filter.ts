@@ -34,9 +34,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof res === 'object' && res !== null) {
         if (Array.isArray((res as Record<string, unknown>).message)) {
-          message = (
-            (res as Record<string, unknown>).message as string[]
-          ).join(', ');
+          message = ((res as Record<string, unknown>).message as string[]).join(
+            ', ',
+          );
         } else {
           message =
             ((res as Record<string, unknown>).message as string) ??
@@ -54,8 +54,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = (exception as Error).message;
     }
 
-    const safeClientMessage =
-      status >= 500 ? 'Internal server error' : message;
+    const safeClientMessage = status >= 500 ? 'Internal server error' : message;
 
     if (status >= 500) {
       this.logger.error({
@@ -64,11 +63,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
         url: request.url,
         status,
         message:
-          exception instanceof AppException
-            ? exception.message
-            : message,
-        stack:
-          exception instanceof Error ? exception.stack : undefined,
+          exception instanceof AppException ? exception.message : message,
+        stack: exception instanceof Error ? exception.stack : undefined,
         infraCause:
           exception &&
           typeof exception === 'object' &&
@@ -102,7 +98,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (errorCode && status < 500) {
       body.errorCode = errorCode;
     }
-    if (exception instanceof AppException && exception.errorCode && status >= 500) {
+    if (
+      exception instanceof AppException &&
+      exception.errorCode &&
+      status >= 500
+    ) {
       body.errorCode = exception.errorCode;
     }
 

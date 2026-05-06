@@ -34,24 +34,102 @@ Backend NestJS cho nền tảng du lịch, gồm **tour**, **lưu trú (hotel/ro
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
-## Project setup
+## Local Development Workflow
+
+### Prerequisites
+
+- Node.js 20+
+- Yarn 1.x
+- Docker Desktop (hoặc Docker Engine + Docker Compose plugin)
+
+### 1) Install dependencies
 
 ```bash
-$ yarn install
+yarn install
 ```
 
-## Compile and run the project
+### 2) Prepare environment variables
+
+Đảm bảo `.env` có tối thiểu các biến sau để migration + app cùng chạy đúng:
+
+```env
+MONGO_URI_LOCAL=mongodb://<user>:<password>@localhost:27017/travel_vn_local?authSource=admin
+MONGO_DB_LOCAL=travel_vn_local
+DB_URI=mongodb://localhost:27017/travel_vn_local?authSource=admin
+REDIS_HOST=localhost
+REDIS_PORT=6379
+ELASTICSEARCH_URL=http://localhost:9200
+```
+
+### 3) Create Docker network (only once per machine)
+
+`docker-compose.yml` đang dùng external network `travel-vn-local-network`, nên cần tạo trước nếu máy chưa có:
 
 ```bash
-# development
-$ yarn run start
-
-# watch mode
-$ yarn run start:dev
-
-# production mode
-$ yarn run start:prod
+docker network create travel-vn-local-network
 ```
+
+### 4) Start local infrastructure
+
+Chạy MongoDB + Redis + Elasticsearch bằng Docker:
+
+```bash
+docker compose up -d
+```
+
+### 5) Run migrations (check/apply schema changes)
+
+```bash
+yarn db:migrate
+```
+
+### 6) Seed data (one command)
+
+```bash
+yarn db:seed
+```
+
+Lệnh trên sẽ:
+- seed dữ liệu local (`db:seed:data`)
+- seed RBAC catalog mặc định (`db:seed:rbac`)
+
+Nếu cần **rebuild matrix quyền mặc định** (ghi đè custom role-permissions), chạy thêm:
+
+```bash
+yarn db:seed:rbac:matrix
+```
+
+### 7) Start backend app
+
+```bash
+yarn start:dev
+```
+
+API mặc định chạy tại: `http://localhost:9001`
+
+### Quick verification
+
+- MongoDB: `localhost:27017`
+- Redis: `localhost:6379`
+- Elasticsearch: `http://localhost:9200`
+- API health/manual check: mở `http://localhost:9001`
+
+### Troubleshooting Checklist
+
+1. `docker compose up -d` báo lỗi network not found
+ - Chạy: `docker network create travel-vn-local-network`
+
+2. `yarn db:migrate` báo thiếu `MONGO_URI_LOCAL`
+ - Kiểm tra `.env` có `MONGO_URI_LOCAL` và `MONGO_DB_LOCAL`
+ - Kiểm tra Mongo container đã chạy: `docker compose ps`
+
+3. App không kết nối DB/Redis
+ - Kiểm tra `DB_URI` trỏ đúng local Mongo (`localhost:27017`)
+ - Kiểm tra `REDIS_HOST=localhost`, `REDIS_PORT=6379`
+
+4. Seed lỗi do schema chưa khớp
+ - Chạy lại migration trước: `yarn db:migrate`
+ - Sau đó chạy lại: `yarn db:seed`
 
 ## Run tests
 

@@ -23,7 +23,7 @@ describe('TourIndexQueueService', () => {
 
     expect(add).toHaveBeenCalledWith(
       TOUR_INDEX_SYNC_JOB,
-      { tourId, operation: 'create' },
+      expect.objectContaining({ tourId, operation: 'create' }),
       expect.objectContaining({
         jobId: `tour-es:${tourId}`,
         attempts: 3,

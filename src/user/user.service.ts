@@ -1,25 +1,22 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { ForbiddenDomainException } from 'src/common/exceptions';
 import * as bcrypt from 'bcryptjs';
-import { Model, Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { PermissionService } from 'src/permission/permission.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthUser, UserWithPassword } from './interfaces/user-interface';
-import { User, UserDocument } from './schema/user.schema';
+import { User } from './schema/user.schema';
 import { hasPortalStaffRole } from 'src/rbac/staff-role.util';
+import { UserRepository } from './user.repository';
 
 @Injectable()
 export class UserService {
   private static readonly DEFAULT_RESET_PASSWORD = '123123123';
 
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly userRepository: UserRepository,
     private readonly permissionService: PermissionService,
     private readonly cloudinaryService: CloudinaryService,
   ) {}
@@ -28,63 +25,45 @@ export class UserService {
    * Enforces `/api/v1/admin/*` access — active portal staff (`super_admin`…`viewer` or `User.isSuperAdmin`).
    */
   async assertAdminPortalAccess(userId: string): Promise<void> {
-    const u = await this.userModel
-      .findById(userId)
-      .select('isActive deletedAt roles isSuperAdmin')
-      .lean<{
-        isActive?: boolean;
-        deletedAt?: Date | null;
-        roles?: string[];
-        isSuperAdmin?: boolean;
-      }>()
-      .exec();
+    const u = await this.userRepository.findByIdForAdminAccess(userId);
 
     if (!u) {
-      throw new ForbiddenException('Admin access required');
+      throw new ForbiddenDomainException('Admin access required');
     }
     if (u.deletedAt || !u.isActive) {
-      throw new ForbiddenException('Account inactive');
+      throw new ForbiddenDomainException('Account inactive');
     }
     if (u.isSuperAdmin) {
       return;
     }
     if (!hasPortalStaffRole(u.roles ?? [])) {
-      throw new ForbiddenException('Admin access required');
+      throw new ForbiddenDomainException('Admin access required');
     }
   }
 
   async create(userDto: CreateUserDto): Promise<User> {
-    const existedUser = await this.userModel.findOne({
-      $or: [{ username: userDto.username }, { email: userDto.email }],
-    });
+    const existedUser = await this.userRepository.findOneByUsernameOrEmail(
+      userDto.username,
+      userDto.email,
+    );
     if (existedUser) {
       throw new BadRequestException('Username hoặc email đã tồn tại');
     }
 
-    const { password, ...rest } = userDto;
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(userDto.password, 10);
 
-    const createdUser = new this.userModel({
-      ...rest,
-      password: hashedPassword,
-    });
-    const savedUser = await createdUser.save();
-    return savedUser;
+    return this.userRepository.create(userDto, hashedPassword);
   }
   async findForAuth(username: string) {
-    return this.userModel.findOne({ username }).select('+password').lean();
+    return this.userRepository.findForAuth(username);
   }
 
   findAll() {
-    return this.userModel.find().exec();
+    return this.userRepository.findAll();
   }
 
   async findOneById(id: string): Promise<AuthUser | null> {
-    const user = await this.userModel
-      .findById(id)
-      .select('_id username roles isSuperAdmin isActive deletedAt')
-      .lean<Omit<AuthUser, 'permissions'> | null>()
-      .exec();
+    const user = await this.userRepository.findOneByIdForAuth(id);
     if (!user) return null;
 
     const permissions = await this.permissionService.resolvePermissions(
@@ -105,7 +84,7 @@ export class UserService {
   }
 
   async findOne(username: string): Promise<UserWithPassword | null> {
-    const user = await this.userModel.findOne({ username });
+    const user = await this.userRepository.findOneDocumentByUsername(username);
     if (!user) return null;
 
     const permissions = await this.permissionService.resolvePermissions(
@@ -119,7 +98,7 @@ export class UserService {
   }
 
   update(id: string, updateUserDto: UpdateUserDto) {
-    return this.userModel.findByIdAndUpdate(id, updateUserDto, { new: true });
+    return this.userRepository.update(id, updateUserDto);
   }
 
   async updateProfile(
@@ -130,10 +109,7 @@ export class UserService {
     const dto = { ...updateUserDto };
 
     if (file) {
-      const current = await this.userModel
-        .findById(userId)
-        .select('avatar')
-        .lean();
+      const current = await this.userRepository.findByIdSelectAvatar(userId);
       if (current?.avatar?.publicId) {
         await this.cloudinaryService
           .deleteFile(current.avatar.publicId)
@@ -150,10 +126,10 @@ export class UserService {
       orConditions.push({ username: dto.username });
     if (dto.email !== undefined) orConditions.push({ email: dto.email });
     if (orConditions.length > 0) {
-      const existed = await this.userModel.findOne({
-        _id: { $ne: userId },
-        $or: orConditions,
-      });
+      const existed = await this.userRepository.findDuplicateUsernameOrEmail(
+        userId,
+        orConditions,
+      );
       if (existed) {
         throw new BadRequestException('Username hoặc email đã tồn tại');
       }
@@ -181,18 +157,11 @@ export class UserService {
       $set.password = await bcrypt.hash(dto.password, 10);
     }
 
-    const updated = await this.userModel
-      .findByIdAndUpdate(userId, { $set }, { new: true })
-      .select(
-        '_id username roles fullName phone avatar email dateOfBirth gender address isActive',
-      )
-      .lean();
-
-    return updated;
+    return this.userRepository.updateProfileById(userId, $set);
   }
 
   remove(id: string) {
-    return this.userModel.findByIdAndDelete(id).exec();
+    return this.userRepository.remove(id);
   }
 
   async resetPasswordToDefault(id: string) {
@@ -200,51 +169,26 @@ export class UserService {
       UserService.DEFAULT_RESET_PASSWORD,
       10,
     );
-    return this.userModel
-      .findByIdAndUpdate(
-        id,
-        { $set: { password: hashedPassword } },
-        { new: true },
-      )
-      .select('_id username email fullName roles isActive')
-      .lean()
-      .exec();
+    return this.userRepository.resetPasswordHashed(id, hashedPassword);
   }
 
   /** Thêm role vào user (dùng cho TourGuide register). */
   async addRole(userId: string, role: string): Promise<void> {
-    const user = await this.userModel.findById(userId).exec();
-    if (!user) return;
-    const roles = user.roles || [];
-    if (roles.includes(role)) return;
-    await this.userModel
-      .findByIdAndUpdate(userId, { $addToSet: { roles: role } })
-      .exec();
+    await this.userRepository.addRoleIfMissing(userId, role);
   }
 
   /** Bỏ role khỏi user (dùng cho TourGuide soft delete). */
   async removeRole(userId: string, role: string): Promise<void> {
-    await this.userModel
-      .findByIdAndUpdate(userId, { $pull: { roles: role } })
-      .exec();
+    await this.userRepository.removeRole(userId, role);
   }
 
   /** Lấy thông tin cơ bản của user (cho notification). */
   async findBasicInfo(userId: string) {
-    return this.userModel
-      .findById(userId)
-      .select('_id username fullName email')
-      .lean()
-      .exec();
+    return this.userRepository.findBasicInfo(userId);
   }
 
   /** Tìm _id của users có fullName khớp search (cho TourGuide search). */
   async findIdsByFullNameSearch(search: string): Promise<Types.ObjectId[]> {
-    if (!search?.trim()) return [];
-    const users = await this.userModel
-      .find({ fullName: new RegExp(search.trim(), 'i') })
-      .select('_id')
-      .lean();
-    return users.map((u) => u._id as Types.ObjectId);
+    return this.userRepository.findIdsByFullNameSearch(search);
   }
 }

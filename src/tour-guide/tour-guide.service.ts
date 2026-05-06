@@ -6,6 +6,8 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { UserService } from 'src/user/user.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { CreateTourGuideDto } from './dto/create-tour-guide.dto';
@@ -40,6 +42,7 @@ export class TourGuideService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly reviewService: ReviewService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
     private readonly favoriteService: FavoriteService,
   ) {}
 
@@ -215,12 +218,17 @@ export class TourGuideService {
     const user = await this.userService.findBasicInfo(userId);
     this.eventEmitter.emit(
       NotificationEvent.GUIDE_REGISTERED,
-      new TourGuideNotificationEvent(
-        String(created._id),
-        userId,
-        user?.fullName || user?.username || 'Người dùng',
-        user?.email,
-      ),
+      createDomainEventEnvelope({
+        eventName: String(NotificationEvent.GUIDE_REGISTERED),
+        source: TourGuideService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload: new TourGuideNotificationEvent(
+          String(created._id),
+          userId,
+          user?.fullName || user?.username || 'Người dùng',
+          user?.email,
+        ),
+      }),
     );
 
     return created.toObject();
@@ -279,13 +287,18 @@ export class TourGuideService {
     const user = await this.userService.findBasicInfo(String(guide.userId));
     this.eventEmitter.emit(
       NotificationEvent.GUIDE_VERIFIED,
-      new TourGuideNotificationEvent(
-        id,
-        String(guide.userId),
-        user?.fullName || user?.username || 'Người dùng',
-        user?.email,
-        isVerified,
-      ),
+      createDomainEventEnvelope({
+        eventName: String(NotificationEvent.GUIDE_VERIFIED),
+        source: TourGuideService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload: new TourGuideNotificationEvent(
+          id,
+          String(guide.userId),
+          user?.fullName || user?.username || 'Người dùng',
+          user?.email,
+          isVerified,
+        ),
+      }),
     );
 
     return saved.toObject();

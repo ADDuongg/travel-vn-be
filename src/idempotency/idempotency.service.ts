@@ -19,6 +19,7 @@ export class IdempotencyService {
     private readonly idempotencyModel: Model<IdempotencyDocument>,
   ) {}
 
+  /* use with HTTP request */
   async execute<T>(
     key: string,
     userId: string,
@@ -61,6 +62,7 @@ export class IdempotencyService {
    * Run a job handler at most once per (jobId, jobName).
    * Used by Bull workers: on success mark COMPLETED so retries skip; on failure delete so retry can run again.
    */
+  /* use with BullMQ job and something like background job */
   async executeJobOnce(
     jobId: string,
     jobName: string,

@@ -2,6 +2,7 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 
 import {
   BookingPaymentStatus,
@@ -51,10 +52,14 @@ export class ExpirePendingBookings {
       if (booking.userId) {
         this.eventEmitter.emit(
           NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED,
-          new RoomBookingPaymentExpiredClientEvent(
-            String(booking.userId),
-            String(booking._id),
-          ),
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED),
+            source: ExpirePendingBookings.name,
+            payload: new RoomBookingPaymentExpiredClientEvent(
+              String(booking.userId),
+              String(booking._id),
+            ),
+          }),
         );
       }
     }

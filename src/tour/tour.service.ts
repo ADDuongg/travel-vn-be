@@ -15,6 +15,8 @@ import { TourRepository } from './tour.repository';
 import { ProvincesService } from 'src/provinces/provinces.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourNotificationEvent } from 'src/notification/events/tour-notification.event';
 import { FavoriteService } from 'src/favorite/favorite.service';
@@ -44,12 +46,28 @@ export class TourService {
     private readonly provincesService: ProvincesService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
     private readonly favoriteService: FavoriteService,
     private readonly tourSearch: TourSearchService,
     private readonly tourIndexQueue: TourIndexQueueService,
     @InjectMetric(ES_FALLBACK_TOTAL)
     private readonly esFallbackTotal: Counter<string>,
   ) {}
+
+  private emitNotificationEvent<TPayload>(
+    eventName: NotificationEvent,
+    payload: TPayload,
+  ) {
+    this.eventEmitter.emit(
+      String(eventName),
+      createDomainEventEnvelope({
+        eventName: String(eventName),
+        source: TourService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload,
+      }),
+    );
+  }
 
   /**
    * Create a new tour
@@ -127,13 +145,15 @@ export class TourService {
     const enName = dto.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
-      String(NotificationEvent.TOUR_CREATED),
+    this.emitNotificationEvent(
+      NotificationEvent.TOUR_CREATED,
       new TourNotificationEvent(String(created._id), created.code, tourName),
     );
 
     if (this.tourSearch.isUsable()) {
-      void this.tourIndexQueue.enqueue(String(created._id), 'create');
+      void this.tourIndexQueue.enqueue(String(created._id), 'create', {
+        requestId: this.correlationContext.getRequestId(),
+      });
     }
 
     return created;
@@ -468,18 +488,17 @@ export class TourService {
     const enName = saved.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
-      String(NotificationEvent.TOUR_UPDATED),
+    this.emitNotificationEvent(
+      NotificationEvent.TOUR_UPDATED,
       new TourNotificationEvent(String(saved._id), saved.code, tourName),
     );
 
     if (dto.isActive !== undefined && dto.isActive !== prevIsActive) {
-      this.eventEmitter.emit(
-        String(
-          dto.isActive
-            ? NotificationEvent.TOUR_CREATED
-            : NotificationEvent.TOUR_DELETED,
-        ),
+      const eventName = dto.isActive
+        ? NotificationEvent.TOUR_CREATED
+        : NotificationEvent.TOUR_DELETED;
+      this.emitNotificationEvent(
+        eventName,
         new TourNotificationEvent(
           String(saved._id),
           saved.code,
@@ -490,7 +509,9 @@ export class TourService {
     }
 
     if (this.tourSearch.isUsable()) {
-      void this.tourIndexQueue.enqueue(String(saved._id), 'update');
+      void this.tourIndexQueue.enqueue(String(saved._id), 'update', {
+        requestId: this.correlationContext.getRequestId(),
+      });
     }
 
     return saved;
@@ -512,13 +533,15 @@ export class TourService {
     const enName = tour.translations?.en?.name;
     const tourName = viName || enName;
 
-    this.eventEmitter.emit(
-      String(NotificationEvent.TOUR_DELETED),
+    this.emitNotificationEvent(
+      NotificationEvent.TOUR_DELETED,
       new TourNotificationEvent(String(tour._id), tour.code, tourName, false),
     );
 
     if (this.tourSearch.isUsable()) {
-      void this.tourIndexQueue.enqueue(String(tour._id), 'delete');
+      void this.tourIndexQueue.enqueue(String(tour._id), 'delete', {
+        requestId: this.correlationContext.getRequestId(),
+      });
     }
   }
 

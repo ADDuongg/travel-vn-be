@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import {
   TourBooking,
   TourBookingDocument,
@@ -78,13 +79,17 @@ export class TourBookingExpireService {
         const tourName = tr?.vi?.name ?? tr?.en?.name ?? undefined;
         this.eventEmitter.emit(
           NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED,
-          new TourBookingPaymentExpiredClientEvent(
-            String(booking.userId),
-            String(booking._id),
-            booking.bookingCode,
-            String(booking.tourId),
-            tourName,
-          ),
+          createDomainEventEnvelope({
+            eventName: String(NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED),
+            source: TourBookingExpireService.name,
+            payload: new TourBookingPaymentExpiredClientEvent(
+              String(booking.userId),
+              String(booking._id),
+              booking.bookingCode,
+              String(booking.tourId),
+              tourName,
+            ),
+          }),
         );
       }
     }

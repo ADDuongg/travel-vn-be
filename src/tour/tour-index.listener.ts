@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { normalizeDomainEventEnvelope } from 'src/common/events/domain-event';
 import {
   TOUR_INDEX_SYNC_EVENT,
   TourIndexSyncPayload,
@@ -15,8 +16,19 @@ export class TourIndexListener {
   ) {}
 
   @OnEvent(TOUR_INDEX_SYNC_EVENT)
-  async handleTourIndexSync(payload: TourIndexSyncPayload): Promise<void> {
+  async handleTourIndexSync(event: unknown): Promise<void> {
+    const normalized = normalizeDomainEventEnvelope<TourIndexSyncPayload>({
+      event,
+      expectedEventName: TOUR_INDEX_SYNC_EVENT,
+      source: TourIndexListener.name,
+      legacyPayloadFactory: (legacyEvent) =>
+        legacyEvent as TourIndexSyncPayload,
+    });
+    const payload = normalized.payload;
     if (!this.tourSearch.isUsable()) return;
-    await this.tourIndexQueue.enqueue(payload.tourId, 'rating_recalc');
+    await this.tourIndexQueue.enqueue(payload.tourId, 'rating_recalc', {
+      requestId: payload.requestId ?? normalized.requestId,
+      eventId: payload.eventId ?? normalized.eventId,
+    });
   }
 }

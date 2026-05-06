@@ -1,5 +1,7 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
+import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { EnvService } from 'src/env/env.service';
 import { OtpRepository } from './otp.repository';
@@ -19,6 +21,7 @@ export class OtpService {
     private readonly repo: OtpRepository,
     private readonly env: EnvService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly correlationContext: CorrelationContextService,
   ) {
     this.ttlMinutes = this.env.get('OTP_TTL_MINUTES', 5);
     this.maxAttempts = this.env.get('OTP_MAX_ATTEMPTS', 5);
@@ -72,13 +75,21 @@ export class OtpService {
     await this.repo.save(record, this.ttlMinutes * 60);
 
     // Bắn event để Notification module xử lý gửi email/SMS.
-    this.eventEmitter.emit(String(NotificationEvent.OTP_ISSUED), {
-      purpose,
-      target,
-      code,
-      meta: options.meta,
-      expiresAt,
-    });
+    this.eventEmitter.emit(
+      String(NotificationEvent.OTP_ISSUED),
+      createDomainEventEnvelope({
+        eventName: String(NotificationEvent.OTP_ISSUED),
+        source: OtpService.name,
+        requestId: this.correlationContext.getRequestId(),
+        payload: {
+          purpose,
+          target,
+          code,
+          meta: options.meta,
+          expiresAt,
+        },
+      }),
+    );
 
     return record;
   }
