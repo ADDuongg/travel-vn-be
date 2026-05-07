@@ -58,6 +58,7 @@ import { AuditLogModule } from './audit-log/audit-log.module';
 import { BlogCategoryModule } from './blog-category/blog-category.module';
 import { BlogTagModule } from './blog-tag/blog-tag.module';
 import { BlogModule } from './blog/blog.module';
+import { CorrelationModule } from './common/correlation/correlation.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { BlogModule } from './blog/blog.module';
       validate: validateEnv,
     }),
     ScheduleModule.forRoot(),
+    CorrelationModule,
     EventEmitterModule.forRoot(),
     PrometheusModule.register({
       path: '/metrics',
