@@ -18,6 +18,7 @@ import { TourInventoryService } from 'src/tour-inventory/tour-inventory.service'
 import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourBookingPaymentExpiredClientEvent } from 'src/notification/events/booking-payment-expired-client.event';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 const EXPIRE_AFTER_MINUTES = 60;
 
@@ -34,6 +35,7 @@ export class TourBookingExpireService {
     private readonly tourModel: Model<TourDocument>,
     private readonly tourInventoryService: TourInventoryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly transactionService: DatabaseTransactionService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -52,20 +54,27 @@ export class TourBookingExpireService {
 
       const totalGuests =
         booking.adults + (booking.children ?? 0) + (booking.infants ?? 0);
-      const inv = await this.inventoryModel.findById(booking.tourInventoryId);
-      if (inv) {
-        await this.tourInventoryService.releaseSlots({
-          tourId: String(booking.tourId),
-          departureDate: inv.departureDate.toISOString().slice(0, 10),
-          slots: totalGuests,
-        });
-      }
+      await this.transactionService.runInTransaction(async (session) => {
+        const inv = await this.inventoryModel
+          .findById(booking.tourInventoryId)
+          .session(session);
+        if (inv) {
+          await this.tourInventoryService.releaseSlots(
+            {
+              tourId: String(booking.tourId),
+              departureDate: inv.departureDate.toISOString().slice(0, 10),
+              slots: totalGuests,
+            },
+            session,
+          );
+        }
 
-      booking.status = TourBookingStatus.CANCELLED;
-      booking.paymentStatus = TourPaymentStatus.EXPIRED;
-      booking.cancelledAt = new Date();
-      booking.cancelReason = 'Expired - no payment within 1 hour';
-      await booking.save();
+        booking.status = TourBookingStatus.CANCELLED;
+        booking.paymentStatus = TourPaymentStatus.EXPIRED;
+        booking.cancelledAt = new Date();
+        booking.cancelReason = 'Expired - no payment within 1 hour';
+        await booking.save({ session });
+      });
 
       this.logger.log(
         `Expired tour booking ${String(booking._id)} (${String(booking.bookingCode ?? '')})`,

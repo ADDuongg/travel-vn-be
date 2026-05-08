@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import {
   Payment,
   PaymentDocument,
@@ -18,8 +18,11 @@ export class PaymentRepository {
     return new this.paymentModel(doc);
   }
 
-  async save(payment: PaymentDocument): Promise<PaymentDocument> {
-    return payment.save();
+  async save(
+    payment: PaymentDocument,
+    session?: ClientSession,
+  ): Promise<PaymentDocument> {
+    return payment.save(session ? { session } : undefined);
   }
 
   async findOneByIntentId(intentId: string) {

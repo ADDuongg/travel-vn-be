@@ -7,8 +7,10 @@ import {
   IdempotencyStatus,
 } from './schema/idempotency.schema';
 import {
+  IDEMPOTENCY_FAILED_TTL_MS,
   IDEMPOTENCY_HTTP_COMPLETED_TTL_MS,
   IDEMPOTENCY_JOB_COMPLETED_TTL_MS,
+  IDEMPOTENCY_JOB_FAILED_TTL_MS,
   IDEMPOTENCY_PROCESSING_MAX_MS,
 } from './idempotency.constants';
 
@@ -26,36 +28,62 @@ export class IdempotencyService {
     endpoint: string,
     handler: () => Promise<T>,
   ): Promise<T> {
-    const existing = await this.idempotencyModel.findOne({ key, userId });
+    try {
+      await this.idempotencyModel.create({
+        key,
+        userId,
+        endpoint,
+        status: IdempotencyStatus.PROCESSING,
+        expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
+      });
+    } catch (error: any) {
+      // Mongo duplicate key error
+      if (error.code === 11000) {
+        const existing = await this.idempotencyModel.findOne({
+          key,
+          userId,
+        });
 
-    if (existing) {
-      if (existing.status === IdempotencyStatus.COMPLETED) {
-        return existing.response;
+        if (!existing) {
+          throw new ConflictException('Idempotency record not found');
+        }
+
+        if (existing.status === IdempotencyStatus.COMPLETED) {
+          return existing.response;
+        }
+
+        throw new ConflictException('Request is being processed');
       }
 
-      throw new ConflictException('Request is being processed');
+      throw error;
     }
 
-    await this.idempotencyModel.create({
-      key,
-      userId,
-      endpoint,
-      status: 'PROCESSING',
-      expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
-    });
+    try {
+      const result = await handler();
 
-    const result = await handler();
+      await this.idempotencyModel.updateOne(
+        { key, userId },
+        {
+          status: IdempotencyStatus.COMPLETED,
+          response: result,
+          expireAt: new Date(Date.now() + IDEMPOTENCY_HTTP_COMPLETED_TTL_MS),
+        },
+      );
 
-    await this.idempotencyModel.updateOne(
-      { key, userId },
-      {
-        status: 'COMPLETED',
-        response: result,
-        expireAt: new Date(Date.now() + IDEMPOTENCY_HTTP_COMPLETED_TTL_MS),
-      },
-    );
+      return result;
+    } catch (error) {
+      // cleanup nếu business fail
+      await this.idempotencyModel.updateOne(
+        { key, userId },
+        {
+          status: IdempotencyStatus.FAILED,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          expireAt: new Date(Date.now() + IDEMPOTENCY_FAILED_TTL_MS),
+        },
+      );
 
-    return result;
+      throw error;
+    }
   }
 
   /**
@@ -72,29 +100,49 @@ export class IdempotencyService {
     const userId = 'bull-notification';
     const endpoint = jobName;
 
-    const existing = await this.idempotencyModel.findOne({
-      key,
-      userId,
-      endpoint,
-    });
+    try {
+      await this.idempotencyModel.create({
+        key,
+        userId,
+        endpoint,
+        status: IdempotencyStatus.PROCESSING,
+        expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
+      });
+    } catch (error: any) {
+      // duplicate key
+      if (error.code === 11000) {
+        const existing = await this.idempotencyModel.findOne({
+          key,
+          userId,
+          endpoint,
+        });
 
-    if (existing?.status === IdempotencyStatus.COMPLETED) {
-      return;
-    }
-    if (existing?.status === IdempotencyStatus.PROCESSING) {
-      return; // retry overlap, skip duplicate
-    }
+        if (!existing) {
+          return;
+        }
 
-    await this.idempotencyModel.create({
-      key,
-      userId,
-      endpoint,
-      status: IdempotencyStatus.PROCESSING,
-      expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
-    });
+        if (existing.status === IdempotencyStatus.COMPLETED) {
+          return;
+        }
+
+        if (existing.status === IdempotencyStatus.PROCESSING) {
+          // another worker processing
+          return;
+        }
+
+        if (existing.status === IdempotencyStatus.FAILED) {
+          return;
+        }
+
+        return;
+      }
+
+      throw error;
+    }
 
     try {
       await handler();
+
       await this.idempotencyModel.updateOne(
         { key, userId, endpoint },
         {
@@ -102,9 +150,16 @@ export class IdempotencyService {
           expireAt: new Date(Date.now() + IDEMPOTENCY_JOB_COMPLETED_TTL_MS),
         },
       );
-    } catch (err) {
-      await this.idempotencyModel.deleteOne({ key, userId, endpoint });
-      throw err;
+    } catch (error) {
+      await this.idempotencyModel.updateOne(
+        { key, userId, endpoint },
+        {
+          status: IdempotencyStatus.FAILED,
+          expireAt: new Date(Date.now() + IDEMPOTENCY_JOB_FAILED_TTL_MS),
+        },
+      );
+
+      throw error;
     }
   }
 }

@@ -3,17 +3,34 @@ services:
   mongo:
     image: mongo:7.0
     container_name: backend-local-mongo
-    command: ['mongod', '--auth', '--bind_ip_all']
+    command: ['mongod', '--auth', '--bind_ip_all', '--replSet', 'rs0']
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: duongnv
-      MONGO_INITDB_ROOT_PASSWORD: Duong@88999
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     ports:
       - '27017:27017' # expose ra ngoài để dùng Compass
     volumes:
       - mongo_data:/data/db
+    networks:
+      - travel-vn-local-network
+  mongo-rs-init:
+    image: mongo:7.0
+    container_name: backend-local-mongo-rs-init
+    restart: "no"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command:
+      [
+        'bash',
+        '-lc',
+        'for i in {1..30}; do mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "mongodb://mongo:27017/admin" --eval "try { rs.status().ok } catch (e) { rs.initiate({_id: \"rs0\", members:[{_id:0, host:\"mongo:27017\"}]}); }" && exit 0; sleep 2; done; exit 1',
+      ]
     networks:
       - travel-vn-local-network
 

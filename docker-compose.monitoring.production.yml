@@ -52,11 +52,58 @@ services:
       - travel-vn-network
     depends_on:
       - prometheus
+      - loki
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 384M
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  loki:
+    image: grafana/loki:2.9.10
+    container_name: monitoring-production-loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    volumes:
+      - ./monitoring/loki/loki.production.yml:/etc/loki/loki.yml:ro
+      - loki_production_data:/loki
+    networks:
+      - travel-vn-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 768M
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  promtail:
+    image: grafana/promtail:2.9.10
+    container_name: monitoring-production-promtail
+    restart: unless-stopped
+    command: ['-config.file=/etc/promtail/promtail.yml']
+    volumes:
+      - ./monitoring/promtail/promtail.production.yml:/etc/promtail/promtail.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail_production_positions:/tmp
+    networks:
+      - travel-vn-network
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 256M
     logging:
       driver: json-file
       options:
@@ -108,3 +155,5 @@ networks:
 
 volumes:
   grafana_production_data:
+  loki_production_data:
+  promtail_production_positions:

@@ -10,6 +10,7 @@ import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
 import { PaymentRepository } from './payment.repository';
 import { NotFoundDomainException } from 'src/common/exceptions';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 jest.mock('../stripe.service', () => ({
   stripe: {
@@ -67,6 +68,9 @@ const mockTourBookingService = {
 };
 
 const mockAuditLogService = { log: jest.fn() };
+const mockTransactionService = {
+  runInTransaction: jest.fn().mockImplementation((runner) => runner({})),
+};
 
 describe('PaymentService', () => {
   let service: PaymentService;
@@ -85,6 +89,10 @@ describe('PaymentService', () => {
         { provide: BookingService, useValue: mockBookingService },
         { provide: TourBookingService, useValue: mockTourBookingService },
         { provide: AuditLogService, useValue: mockAuditLogService },
+        {
+          provide: DatabaseTransactionService,
+          useValue: mockTransactionService,
+        },
       ],
     }).compile();
 
@@ -169,9 +177,13 @@ describe('PaymentService', () => {
       await service.handleStripeWebhook('sig', Buffer.from('payload'));
 
       expect(payment.status).toBe(PaymentStatus.SUCCEEDED);
-      expect(mockPaymentRepository.save).toHaveBeenCalledWith(payment);
+      expect(mockPaymentRepository.save).toHaveBeenCalledWith(
+        payment,
+        expect.any(Object),
+      );
       expect(mockBookingService.markAsPaid).toHaveBeenCalledWith(
         bookingId.toString(),
+        expect.any(Object),
       );
     });
 
@@ -188,6 +200,7 @@ describe('PaymentService', () => {
       expect(payment.status).toBe(PaymentStatus.FAILED);
       expect(mockBookingService.markAsFailed).toHaveBeenCalledWith(
         bookingId.toString(),
+        expect.any(Object),
       );
     });
 
@@ -210,6 +223,7 @@ describe('PaymentService', () => {
         tourBookingId.toString(),
         payment.amount,
         payment.intentId,
+        expect.any(Object),
       );
       expect(mockBookingService.markAsPaid).not.toHaveBeenCalled();
     });
@@ -289,6 +303,7 @@ describe('PaymentService', () => {
       expect(mockBookingService.markAsRefunded).toHaveBeenCalledWith(
         bookingId.toString(),
         true,
+        expect.any(Object),
       );
       expect(result).toMatchObject({ id: 're_test_123' });
     });
@@ -312,6 +327,7 @@ describe('PaymentService', () => {
       expect(mockBookingService.markAsRefunded).toHaveBeenCalledWith(
         bookingId.toString(),
         false,
+        expect.any(Object),
       );
     });
   });

@@ -13,6 +13,7 @@ import { RoomInventoryService } from 'src/room-inventory/room-inventory.service'
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { RoomBookingPaymentExpiredClientEvent } from 'src/notification/events/booking-payment-expired-client.event';
 import { BookingRepository } from './booking.repository';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 @Injectable()
 export class ExpirePendingBookings {
@@ -20,6 +21,7 @@ export class ExpirePendingBookings {
     private readonly bookingRepository: BookingRepository,
     private readonly roomInventoryService: RoomInventoryService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly transactionService: DatabaseTransactionService,
   ) {}
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -37,17 +39,20 @@ export class ExpirePendingBookings {
       const quantity = booking.rooms.length;
       const room = booking.rooms[0];
 
-      await this.roomInventoryService.rollbackInventoryRange(
-        room.roomId,
-        room.checkIn,
-        room.checkOut,
-        quantity,
-      );
+      await this.transactionService.runInTransaction(async (session) => {
+        await this.roomInventoryService.rollbackInventoryRange(
+          room.roomId,
+          room.checkIn,
+          room.checkOut,
+          quantity,
+          session,
+        );
 
-      booking.status = BookingStatus.CANCELLED;
-      booking.paymentStatus = BookingPaymentStatus.EXPIRED;
+        booking.status = BookingStatus.CANCELLED;
+        booking.paymentStatus = BookingPaymentStatus.EXPIRED;
 
-      await this.bookingRepository.save(booking);
+        await this.bookingRepository.save(booking, session);
+      });
 
       if (booking.userId) {
         this.eventEmitter.emit(

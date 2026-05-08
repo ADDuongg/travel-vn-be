@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
@@ -76,15 +74,38 @@ export class NotificationProcessor extends WorkerHost {
     });
   }
 
+  private notificationJobCtx(job: Job<unknown>) {
+    const maxAttempts = job.opts.attempts ?? 3;
+    return {
+      queueName: NOTIFICATION_QUEUE,
+      jobId: job.id,
+      jobName: job.name,
+      attempt: job.attemptsMade + 1,
+      maxAttempts,
+    };
+  }
+
+  private bullJobWallDurationMs(job: Job): number | undefined {
+    if (
+      typeof job.processedOn === 'number' &&
+      typeof job.finishedOn === 'number'
+    ) {
+      return job.finishedOn - job.processedOn;
+    }
+    return undefined;
+  }
+
   async process(job: Job<unknown>) {
     const normalized = this.normalizeJobData<unknown>(job);
+    const ctx = this.notificationJobCtx(job);
+    const started = Date.now();
+
     this.logger.log({
+      ...ctx,
       requestId: normalized.requestId,
       eventId: normalized.eventId,
       eventName: normalized.eventName,
-      jobId: job.id,
-      jobName: job.name,
-      message: 'Processing notification job',
+      message: 'Notification job started',
     });
 
     const jobId = String(
@@ -92,6 +113,16 @@ export class NotificationProcessor extends WorkerHost {
     );
     await this.idempotencyService.executeJobOnce(jobId, job.name, async () => {
       await this.processJob(job);
+    });
+
+    this.logger.log({
+      ...ctx,
+      requestId: normalized.requestId,
+      eventId: normalized.eventId,
+      eventName: normalized.eventName,
+      durationMs: Date.now() - started,
+      wallDurationMs: this.bullJobWallDurationMs(job),
+      message: 'Notification job completed',
     });
   }
 
@@ -471,28 +502,15 @@ export class NotificationProcessor extends WorkerHost {
   @OnWorkerEvent('failed')
   onFailed(job: Job, error: Error) {
     const normalized = this.normalizeJobData<unknown>(job as Job<unknown>);
+    const ctx = this.notificationJobCtx(job as Job<unknown>);
     this.logger.error({
+      ...ctx,
       requestId: normalized.requestId,
       eventId: normalized.eventId,
       eventName: normalized.eventName,
-      jobId: job.id,
-      jobName: job.name,
-      attemptsMade: job.attemptsMade,
-      attempts: job.opts.attempts,
-      error: error.message,
-    });
-  }
-
-  @OnWorkerEvent('completed')
-  onCompleted(job: Job) {
-    const normalized = this.normalizeJobData<unknown>(job as Job<unknown>);
-    this.logger.log({
-      requestId: normalized.requestId,
-      eventId: normalized.eventId,
-      eventName: normalized.eventName,
-      jobId: job.id,
-      jobName: job.name,
-      message: 'Notification job completed',
+      wallDurationMs: this.bullJobWallDurationMs(job),
+      err: error,
+      message: error.message,
     });
   }
 }

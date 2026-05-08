@@ -23,7 +23,7 @@ services:
     image: mongo:7.0
     container_name: backend-production-mongo
     restart: unless-stopped
-    command: ['mongod', '--auth']
+    command: ['mongod', '--auth', '--replSet', 'rs0']
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
@@ -58,6 +58,23 @@ services:
       options:
         max-size: '50m'
         max-file: '5'
+  mongo-rs-init:
+    image: mongo:7.0
+    container_name: backend-production-mongo-rs-init
+    restart: "no"
+    depends_on:
+      - mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command:
+      [
+        'bash',
+        '-lc',
+        'for i in {1..30}; do mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "mongodb://mongo:27017/admin" --eval "try { rs.status().ok } catch (e) { rs.initiate({_id: \"rs0\", members:[{_id:0, host:\"mongo:27017\"}]}); }" && exit 0; sleep 2; done; exit 1',
+      ]
+    networks:
+      - travel-vn-network
 
   redis:
     image: redis:7-alpine

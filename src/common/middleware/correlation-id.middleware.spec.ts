@@ -17,6 +17,9 @@ describe('CorrelationIdMiddleware', () => {
           req.headers[REQUEST_ID_HEADER],
         );
         expect(context.getRequestId()).toBe(req.headers[REQUEST_ID_HEADER]);
+        expect(context.getStore()).toEqual({
+          requestId: req.headers[REQUEST_ID_HEADER],
+        });
         done();
       }, 0);
     });

@@ -6,6 +6,7 @@ export type IdempotencyDocument = Idempotency & Document;
 export enum IdempotencyStatus {
   PROCESSING = 'PROCESSING',
   COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
 }
 
 @Schema({

@@ -1,8 +1,9 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
+import pino from 'pino';
 import { validateEnv } from './config/env.validation';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
@@ -20,9 +21,7 @@ import { CorrelationIdMiddleware } from './common/middleware/correlation-id.midd
 import { EnvModule } from './env/env.module';
 import { HealthModule } from './health/health.module';
 import { LanguageModule } from './language/language.module';
-import { loggerMiddleware } from './middleware/logger.middleware';
 import { PermissionModule } from './permission/permission.module';
-import { ProductController } from './product/product.controller';
 import { ProductModule } from './product/product.module';
 import { RolesModule } from './roles/roles.module';
 import { RbacModule } from './rbac/rbac.module';
@@ -59,6 +58,10 @@ import { BlogCategoryModule } from './blog-category/blog-category.module';
 import { BlogTagModule } from './blog-tag/blog-tag.module';
 import { BlogModule } from './blog/blog.module';
 import { CorrelationModule } from './common/correlation/correlation.module';
+import { CorrelationContextService } from './common/correlation/correlation-context.service';
+import { AuthContextInterceptor } from './common/interceptors/auth-context.interceptor';
+import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
+import { DatabaseTransactionModule } from './common/database/database-transaction.module';
 
 @Module({
   imports: [
@@ -70,6 +73,7 @@ import { CorrelationModule } from './common/correlation/correlation.module';
     }),
     ScheduleModule.forRoot(),
     CorrelationModule,
+    DatabaseTransactionModule,
     EventEmitterModule.forRoot(),
     PrometheusModule.register({
       path: '/metrics',
@@ -99,18 +103,39 @@ import { CorrelationModule } from './common/correlation/correlation.module';
       }),
     }),
     LoggerModule.forRootAsync({
-      imports: [EnvModule],
-      inject: [EnvService],
-      useFactory: (env: EnvService) => {
+      imports: [EnvModule, CorrelationModule],
+      inject: [EnvService, CorrelationContextService],
+      useFactory: (
+        env: EnvService,
+        correlationContext: CorrelationContextService,
+      ) => {
         const isProduction = env.isProduction();
         const logLevel =
           env.get('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
         // pino-pretty is devDependency — only use for local NODE_ENV=development.
         // Docker/production images must not load it (would crash: "unable to determine transport target").
         const usePinoPretty = env.get('NODE_ENV') === 'development';
+        const mixin = (): Record<string, unknown> => {
+          const store = correlationContext.getStore();
+          if (!store) return {};
+          const m: Record<string, unknown> = { requestId: store.requestId };
+          if (store.userId !== undefined) m.userId = store.userId;
+          if (store.username !== undefined) m.username = store.username;
+          if (store.userRole !== undefined) m.userRole = store.userRole;
+          if (store.userRoles !== undefined) m.userRoles = store.userRoles;
+          if (store.isSuperAdmin === true) m.isSuperAdmin = true;
+          return m;
+        };
+
         return {
           pinoHttp: {
             level: logLevel,
+            base: {
+              service: env.get('SERVICE_NAME'),
+              environment: env.get('NODE_ENV'),
+              version: env.get('APP_VERSION') ?? 'unknown',
+            },
+            mixin,
             transport: usePinoPretty
               ? {
                   target: 'pino-pretty',
@@ -147,9 +172,6 @@ import { CorrelationModule } from './common/correlation/correlation.module';
                 code: err.code,
               }),
             },
-            customProps: (req: any) => ({
-              requestId: req.headers['x-request-id'],
-            }),
           },
         };
       },
@@ -162,16 +184,27 @@ import { CorrelationModule } from './common/correlation/correlation.module';
         serverSelectionTimeoutMS: 25_000,
         socketTimeoutMS: 45_000,
         connectionFactory: (connection: Connection) => {
-          // stderr: visible even when Nest bufferLogs / Pino hasn't attached yet
-          console.error(
-            '[bootstrap] Mongoose: opening connection (if this stalls, check MongoDB is up and DB_URI is reachable)',
+          const logLevel =
+            env.get('LOG_LEVEL') || (env.isProduction() ? 'info' : 'debug');
+          const mongoLog = pino({
+            level: logLevel,
+            base: {
+              service: env.get('SERVICE_NAME'),
+              environment: env.get('NODE_ENV'),
+              version: env.get('APP_VERSION') ?? 'unknown',
+              phase: 'bootstrap',
+              module: 'mongodb',
+            },
+          });
+          mongoLog.info(
+            'Mongoose: opening connection (if stalls, verify MongoDB is up and DB_URI is reachable)',
           );
-          connection.on('connected', () =>
-            console.error('[bootstrap] Mongoose: MongoDB connection ready'),
-          );
-          connection.on('error', (err: Error) =>
-            console.error('[bootstrap] Mongoose: error', err?.message ?? err),
-          );
+          connection.on('connected', () => {
+            mongoLog.info('Mongoose: MongoDB connection ready');
+          });
+          connection.on('error', (err: Error) => {
+            mongoLog.error({ err }, 'Mongoose: connection error');
+          });
           return connection;
         },
       }),
@@ -222,11 +255,16 @@ import { CorrelationModule } from './common/correlation/correlation.module';
     BlogModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    /** Runs after JWT guard on protected routes — fills ALS fields for Pino mixin. */
+    { provide: APP_INTERCEPTOR, useClass: AuthContextInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(CorrelationIdMiddleware).forRoutes('*');
-    consumer.apply(loggerMiddleware).forRoutes(ProductController);
   }
 }

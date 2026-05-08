@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import {
   Booking,
   BookingDocument,
@@ -20,8 +20,11 @@ export class BookingRepository {
     return new this.bookingModel(data);
   }
 
-  async save(booking: BookingDocument): Promise<BookingDocument> {
-    return booking.save();
+  async save(
+    booking: BookingDocument,
+    session?: ClientSession,
+  ): Promise<BookingDocument> {
+    return booking.save(session ? { session } : undefined);
   }
 
   async findManyAdminList(params: {

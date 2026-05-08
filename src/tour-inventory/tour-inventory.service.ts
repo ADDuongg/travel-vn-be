@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { parseDateOnly } from 'src/utils/date.util';
 import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
 import {
@@ -96,14 +96,19 @@ export class TourInventoryService {
   /**
    * Block (giảm) số chỗ khi có booking
    */
-  async blockSlots(dto: BlockSlotsDto): Promise<TourInventoryDocument> {
+  async blockSlots(
+    dto: BlockSlotsDto,
+    session?: ClientSession,
+  ): Promise<TourInventoryDocument> {
     const departureDate = parseDateOnly(dto.departureDate);
     const tourId = new Types.ObjectId(dto.tourId);
 
-    const inv = await this.inventoryModel.findOne({
-      tourId,
-      departureDate,
-    });
+    const inv = await this.inventoryModel
+      .findOne({
+        tourId,
+        departureDate,
+      })
+      .session(session ?? null);
 
     if (!inv) {
       throw new NotFoundException(
@@ -125,7 +130,7 @@ export class TourInventoryService {
     inv.availableSlots -= dto.slots;
     this.updateInventoryStatus(inv);
 
-    if (prevStatus !== inv.status) {
+    if (!session && prevStatus !== inv.status) {
       const event = new TourInventoryNotificationEvent(
         String(inv.tourId),
         departureDate.toISOString().slice(0, 10),
@@ -156,20 +161,25 @@ export class TourInventoryService {
       }
     }
 
-    return inv.save();
+    return inv.save(session ? { session } : undefined);
   }
 
   /**
    * Release (trả lại) số chỗ khi cancel booking
    */
-  async releaseSlots(dto: ReleaseSlotsDto): Promise<TourInventoryDocument> {
+  async releaseSlots(
+    dto: ReleaseSlotsDto,
+    session?: ClientSession,
+  ): Promise<TourInventoryDocument> {
     const departureDate = parseDateOnly(dto.departureDate);
     const tourId = new Types.ObjectId(dto.tourId);
 
-    const inv = await this.inventoryModel.findOne({
-      tourId,
-      departureDate,
-    });
+    const inv = await this.inventoryModel
+      .findOne({
+        tourId,
+        departureDate,
+      })
+      .session(session ?? null);
 
     if (!inv) {
       throw new NotFoundException(
@@ -184,7 +194,7 @@ export class TourInventoryService {
     );
     this.updateInventoryStatus(inv);
 
-    if (prevStatus !== inv.status) {
+    if (!session && prevStatus !== inv.status) {
       const event = new TourInventoryNotificationEvent(
         String(inv.tourId),
         departureDate.toISOString().slice(0, 10),
@@ -218,7 +228,7 @@ export class TourInventoryService {
       }
     }
 
-    return inv.save();
+    return inv.save(session ? { session } : undefined);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import {
   RoomInventory,
   RoomInventoryDocument,
@@ -33,6 +33,7 @@ export class RoomInventoryService {
     roomId: Types.ObjectId,
     from: Date,
     to: Date,
+    session?: ClientSession,
   ): Promise<void> {
     const nights = buildNights(from, to);
     if (nights.length === 0) return;
@@ -43,11 +44,11 @@ export class RoomInventoryService {
         date: { $in: nights },
       },
       { date: 1 },
-    );
+    ).session(session ?? null);
 
     const existingDates = new Set(existing.map((i) => i.date.getTime()));
 
-    const room = await this.roomModel.findById(roomId);
+    const room = await this.roomModel.findById(roomId).session(session ?? null);
     if (!room) throw new BadRequestException('Room not found');
 
     const toCreate = nights
@@ -63,6 +64,7 @@ export class RoomInventoryService {
 
     await this.RoomInventoryModel.insertMany(toCreate, {
       ordered: false,
+      session,
     });
   }
 
@@ -217,6 +219,7 @@ export class RoomInventoryService {
     checkIn: Date,
     checkOut: Date,
     quantity: number,
+    session?: ClientSession,
   ) {
     const dates = getDatesInRange(checkIn, checkOut);
 
@@ -230,6 +233,7 @@ export class RoomInventoryService {
         {
           $inc: { available: -quantity },
         },
+        { session },
       );
 
       if (res.modifiedCount === 0) {
@@ -243,6 +247,7 @@ export class RoomInventoryService {
     checkIn: Date,
     checkOut: Date,
     quantity: number,
+    session?: ClientSession,
   ) {
     const dates = getDatesInRange(checkIn, checkOut);
 
@@ -254,6 +259,7 @@ export class RoomInventoryService {
       {
         $inc: { available: quantity },
       },
+      { session },
     );
   }
 

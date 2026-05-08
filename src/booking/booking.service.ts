@@ -3,7 +3,7 @@ import {
   ForbiddenDomainException,
   NotFoundDomainException,
 } from 'src/common/exceptions';
-import { Types } from 'mongoose';
+import { ClientSession, Types } from 'mongoose';
 
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
 import { parseDateOnly, todayInVietnam } from 'src/utils/date.util';
@@ -21,6 +21,7 @@ import {
 } from './schema/booking.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { BookingRepository } from './booking.repository';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 @Injectable()
 export class BookingService {
@@ -29,6 +30,7 @@ export class BookingService {
     private readonly roomService: RoomService,
     private readonly roomInventoryService: RoomInventoryService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly transactionService: DatabaseTransactionService,
   ) {}
 
   /* ===== Helpers: pricing ===== */
@@ -121,12 +123,6 @@ export class BookingService {
 
     const quantity = dto.rooms.length;
 
-    await this.roomInventoryService.ensureInventoryExists(
-      room._id as Types.ObjectId,
-      checkIn,
-      checkOut,
-    );
-
     const isAvailable = await this.roomInventoryService.checkAvailability(
       room._id as Types.ObjectId,
       checkIn,
@@ -136,13 +132,6 @@ export class BookingService {
     if (!isAvailable) {
       throw new BadRequestException('Room not available');
     }
-
-    await this.roomInventoryService.reserveInventoryRange(
-      room._id as Types.ObjectId,
-      checkIn,
-      checkOut,
-      quantity,
-    );
 
     if (quantity > room.inventory.totalRooms) {
       throw new BadRequestException(
@@ -209,8 +198,22 @@ export class BookingService {
 
       userId: new Types.ObjectId(userId),
     });
-
-    return this.bookingRepository.save(booking);
+    return this.transactionService.runInTransaction(async (session) => {
+      await this.roomInventoryService.ensureInventoryExists(
+        room._id as Types.ObjectId,
+        checkIn,
+        checkOut,
+        session,
+      );
+      await this.roomInventoryService.reserveInventoryRange(
+        room._id as Types.ObjectId,
+        checkIn,
+        checkOut,
+        quantity,
+        session,
+      );
+      return this.bookingRepository.save(booking, session);
+    });
   }
 
   /* ================= ADMIN LIST ================= */
@@ -441,7 +444,13 @@ export class BookingService {
 
   /* ================= CANCEL ================= */
 
-  async cancel(id: string, userId: string, role?: string, roles?: string[]) {
+  async cancel(
+    id: string,
+    userId: string,
+    role?: string,
+    roles?: string[],
+    session?: ClientSession,
+  ) {
     const booking = await this.bookingRepository.findById(id);
     if (!booking) throw new NotFoundDomainException('Booking not found');
 
@@ -486,22 +495,29 @@ export class BookingService {
       }
     }
 
-    for (const g of groups.values()) {
-      if (new Date(g.checkIn) > now) {
-        await this.roomInventoryService.rollbackInventoryRange(
-          g.roomId,
-          g.checkIn,
-          g.checkOut,
-          g.quantity,
-        );
+    const run = async (txSession: ClientSession) => {
+      for (const g of groups.values()) {
+        if (new Date(g.checkIn) > now) {
+          await this.roomInventoryService.rollbackInventoryRange(
+            g.roomId,
+            g.checkIn,
+            g.checkOut,
+            g.quantity,
+            txSession,
+          );
+        }
       }
-    }
 
-    booking.status = BookingStatus.CANCELLED;
-    return this.bookingRepository.save(booking);
+      booking.status = BookingStatus.CANCELLED;
+      return this.bookingRepository.save(booking, txSession);
+    };
+
+    return session
+      ? run(session)
+      : this.transactionService.runInTransaction((txSession) => run(txSession));
   }
 
-  async markAsPaid(id: string) {
+  async markAsPaid(id: string, session?: ClientSession) {
     const booking = await this.findOne(id);
 
     if (!booking) throw new NotFoundDomainException('Booking not found');
@@ -509,10 +525,10 @@ export class BookingService {
     booking.paymentStatus = BookingPaymentStatus.PAID;
     booking.status = BookingStatus.CONFIRMED;
 
-    return this.bookingRepository.save(booking);
+    return this.bookingRepository.save(booking, session);
   }
 
-  async markAsFailed(bookingId: string) {
+  async markAsFailed(bookingId: string, session?: ClientSession) {
     const booking =
       await this.bookingRepository.findByIdAsDocument(bookingId);
     if (!booking) throw new NotFoundDomainException('Booking not found');
@@ -522,17 +538,26 @@ export class BookingService {
     booking.status = BookingStatus.CANCELLED;
     booking.paymentStatus = BookingPaymentStatus.FAILED;
 
-    await this.bookingRepository.save(booking);
+    await this.bookingRepository.save(booking, session);
   }
 
-  async markAsRefunded(bookingId: string, fullyRefunded: boolean) {
+  async markAsRefunded(
+    bookingId: string,
+    fullyRefunded: boolean,
+    session?: ClientSession,
+  ) {
     const booking =
       await this.bookingRepository.findByIdAsDocument(bookingId);
     if (!booking) throw new NotFoundDomainException('Booking not found');
 
     booking.paymentStatus = BookingPaymentStatus.REFUNDED;
 
-    if (fullyRefunded) {
+    const run = async (txSession: ClientSession) => {
+      if (!fullyRefunded) {
+        await this.bookingRepository.save(booking, txSession);
+        return;
+      }
+
       const now = todayInVietnam();
       const groups = new Map<
         string,
@@ -566,14 +591,20 @@ export class BookingService {
             g.checkIn,
             g.checkOut,
             g.quantity,
+            txSession,
           );
         }
       }
 
       booking.status = BookingStatus.CANCELLED;
-    }
+      await this.bookingRepository.save(booking, txSession);
+    };
 
-    await this.bookingRepository.save(booking);
+    if (session) {
+      await run(session);
+      return;
+    }
+    await this.transactionService.runInTransaction((txSession) => run(txSession));
   }
 
   async uploadReceipt(bookingId: string, file: Express.Multer.File) {

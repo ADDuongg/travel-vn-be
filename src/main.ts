@@ -11,16 +11,14 @@ import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { EnvService } from './env/env.service';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
-import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
+import { bootstrapLogger } from './main-bootstrap-logger';
 
 async function bootstrap() {
-  // stderr so logs appear even if Nest bufferLogs never flushes (startup hang/crash)
-  const mark = (msg: string) => console.error(`[bootstrap] ${msg}`);
-  mark('NestFactory.create…');
+  bootstrapLogger.info('NestFactory.create…');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
   });
-  mark('NestFactory.create OK');
+  bootstrapLogger.info('NestFactory.create OK');
 
   app.setGlobalPrefix('api/v1', {
     exclude: [
@@ -129,7 +127,6 @@ async function bootstrap() {
   }
 
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/' });
-  app.useGlobalInterceptors(new ResponseTransformInterceptor());
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalPipes(
     new ValidationPipe({
@@ -140,12 +137,13 @@ async function bootstrap() {
     }),
   );
 
-  mark(`listen(${port}, 0.0.0.0)…`);
+  bootstrapLogger.info(`listen(${port}, 0.0.0.0)…`);
   await app.listen(port, '0.0.0.0');
-  mark(`listening on 0.0.0.0:${port}`);
+  bootstrapLogger.info(
+    `Application listening http://0.0.0.0:${port} (NODE_ENV=${isProduction ? 'production' : 'development'})`,
+  );
 }
 bootstrap().catch((err) => {
-  // Ensure the error is visible even when bufferLogs swallows NestJS output
-  console.error('Bootstrap failed:', err);
+  bootstrapLogger.error({ err }, 'Bootstrap failed');
   process.exit(1);
 });

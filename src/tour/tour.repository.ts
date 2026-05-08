@@ -32,8 +32,7 @@ export class TourRepository {
       .lean();
     const rank = new Map(ids.map((id, i) => [id.toString(), i]));
     rows.sort(
-      (a, b) =>
-        (rank.get(String(a._id)) ?? 0) - (rank.get(String(b._id)) ?? 0),
+      (a, b) => (rank.get(String(a._id)) ?? 0) - (rank.get(String(b._id)) ?? 0),
     );
     return rows;
   }

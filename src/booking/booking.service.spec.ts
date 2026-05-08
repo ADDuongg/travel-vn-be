@@ -16,6 +16,7 @@ import {
   ForbiddenDomainException,
   NotFoundDomainException,
 } from 'src/common/exceptions';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 const roomId = new Types.ObjectId('000000000000000000000001');
 
@@ -75,6 +76,9 @@ const mockRoomInventoryService = {
   rollbackInventoryRange: jest.fn().mockResolvedValue(undefined),
 };
 const mockCloudinaryService = { uploadFile: jest.fn() };
+const mockTransactionService = {
+  runInTransaction: jest.fn().mockImplementation((runner) => runner({})),
+};
 
 describe('BookingService', () => {
   let service: BookingService;
@@ -93,6 +97,10 @@ describe('BookingService', () => {
         { provide: RoomService, useValue: mockRoomService },
         { provide: RoomInventoryService, useValue: mockRoomInventoryService },
         { provide: CloudinaryService, useValue: mockCloudinaryService },
+        {
+          provide: DatabaseTransactionService,
+          useValue: mockTransactionService,
+        },
       ],
     }).compile();
 
@@ -306,7 +314,13 @@ describe('BookingService', () => {
 
       expect(
         mockRoomInventoryService.rollbackInventoryRange,
-      ).toHaveBeenCalledWith(roomId, futureCheckIn, futureCheckOut, 1);
+      ).toHaveBeenCalledWith(
+        roomId,
+        futureCheckIn,
+        futureCheckOut,
+        1,
+        expect.any(Object),
+      );
       expect(booking.status).toBe(BookingStatus.CANCELLED);
     });
 
@@ -360,7 +374,7 @@ describe('BookingService', () => {
 
       expect(booking.status).toBe(BookingStatus.CONFIRMED);
       expect(booking.paymentStatus).toBe(BookingPaymentStatus.PAID);
-      expect(mockBookingRepository.save).toHaveBeenCalledWith(booking);
+      expect(mockBookingRepository.save).toHaveBeenCalledWith(booking, undefined);
     });
   });
 

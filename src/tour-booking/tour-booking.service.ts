@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { ClientSession, Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { parseDateOnly } from 'src/utils/date.util';
 import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
@@ -32,6 +32,7 @@ import { CorrelationContextService } from 'src/common/correlation/correlation-co
 import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { NotificationEvent } from 'src/notification/notification.constants';
 import { TourBookingNotificationEvent } from 'src/notification/events/tour-booking-notification.event';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 @Injectable()
 export class TourBookingService {
@@ -48,6 +49,7 @@ export class TourBookingService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly eventEmitter: EventEmitter2,
     private readonly correlationContext: CorrelationContextService,
+    private readonly transactionService: DatabaseTransactionService,
   ) {}
 
   private emitNotificationEvent(
@@ -125,6 +127,7 @@ export class TourBookingService {
   async create(
     dto: CreateTourBookingDto,
     userId: string,
+    session?: ClientSession,
   ): Promise<TourBooking> {
     const tourId = new Types.ObjectId(dto.tourId);
     const departureDate = parseDateOnly(dto.departureDate);
@@ -170,12 +173,6 @@ export class TourBookingService {
 
     const bookingCode = await this.generateBookingCode();
 
-    await this.tourInventoryService.blockSlots({
-      tourId: dto.tourId,
-      departureDate: dto.departureDate,
-      slots: totalGuests,
-    });
-
     const bookingPayload: any = {
       bookingCode,
       tourId,
@@ -203,7 +200,25 @@ export class TourBookingService {
       bookingPayload.guideId = new Types.ObjectId(dto.guideId);
     }
 
-    const booking = await this.bookingModel.create(bookingPayload);
+    const run = async (txSession: ClientSession) => {
+      await this.tourInventoryService.blockSlots(
+        {
+          tourId: dto.tourId,
+          departureDate: dto.departureDate,
+          slots: totalGuests,
+        },
+        txSession,
+      );
+      const [booking] = await this.bookingModel.create([bookingPayload], {
+        session: txSession,
+      });
+      return booking;
+    };
+    const booking = session
+      ? await run(session)
+      : await this.transactionService.runInTransaction((txSession) =>
+          run(txSession),
+        );
 
     const viName = (tour.translations as any)?.vi?.name;
     const enName = (tour.translations as any)?.en?.name;
@@ -345,6 +360,7 @@ export class TourBookingService {
     userId?: string,
     role?: string,
     roles?: string[],
+    session?: ClientSession,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
@@ -366,19 +382,31 @@ export class TourBookingService {
     }
 
     const totalGuests = booking.adults + booking.children + booking.infants;
-    const inv = await this.inventoryModel.findById(booking.tourInventoryId);
-    if (inv) {
-      await this.tourInventoryService.releaseSlots({
-        tourId: String(booking.tourId),
-        departureDate: inv.departureDate.toISOString().slice(0, 10),
-        slots: totalGuests,
-      });
-    }
+    const run = async (txSession: ClientSession) => {
+      const inv = await this.inventoryModel
+        .findById(booking.tourInventoryId)
+        .session(txSession);
+      if (inv) {
+        await this.tourInventoryService.releaseSlots(
+          {
+            tourId: String(booking.tourId),
+            departureDate: inv.departureDate.toISOString().slice(0, 10),
+            slots: totalGuests,
+          },
+          txSession,
+        );
+      }
 
-    booking.status = TourBookingStatus.CANCELLED;
-    booking.cancelledAt = new Date();
-    booking.cancelReason = reason;
-    const saved = await booking.save();
+      booking.status = TourBookingStatus.CANCELLED;
+      booking.cancelledAt = new Date();
+      booking.cancelReason = reason;
+      return booking.save({ session: txSession });
+    };
+    const saved = session
+      ? await run(session)
+      : await this.transactionService.runInTransaction((txSession) =>
+          run(txSession),
+        );
 
     const populated = await saved.populate('tourId', 'translations');
     const viName = (populated.tourId as any)?.translations?.vi?.name;
@@ -456,6 +484,7 @@ export class TourBookingService {
     tourBookingId: string,
     amount: number,
     transactionId: string,
+    session?: ClientSession,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(tourBookingId);
     if (!booking) throw new NotFoundException('Tour booking not found');
@@ -478,7 +507,7 @@ export class TourBookingService {
     } else {
       booking.status = TourBookingStatus.CONFIRMED;
     }
-    const saved = await booking.save();
+    const saved = await booking.save(session ? { session } : undefined);
 
     if (
       saved.status === TourBookingStatus.CONFIRMED ||
@@ -507,7 +536,10 @@ export class TourBookingService {
    * Gọi từ Payment webhook khi Stripe payment_intent.payment_failed.
    * Hủy đơn và release slots để người khác có thể đặt.
    */
-  async markAsFailed(tourBookingId: string): Promise<TourBooking> {
+  async markAsFailed(
+    tourBookingId: string,
+    session?: ClientSession,
+  ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(tourBookingId);
     if (!booking) throw new NotFoundException('Tour booking not found');
     if (booking.status !== TourBookingStatus.PENDING) {
@@ -515,20 +547,32 @@ export class TourBookingService {
     }
 
     const totalGuests = booking.adults + booking.children + booking.infants;
-    const inv = await this.inventoryModel.findById(booking.tourInventoryId);
-    if (inv) {
-      await this.tourInventoryService.releaseSlots({
-        tourId: String(booking.tourId),
-        departureDate: inv.departureDate.toISOString().slice(0, 10),
-        slots: totalGuests,
-      });
-    }
+    const run = async (txSession: ClientSession) => {
+      const inv = await this.inventoryModel
+        .findById(booking.tourInventoryId)
+        .session(txSession);
+      if (inv) {
+        await this.tourInventoryService.releaseSlots(
+          {
+            tourId: String(booking.tourId),
+            departureDate: inv.departureDate.toISOString().slice(0, 10),
+            slots: totalGuests,
+          },
+          txSession,
+        );
+      }
 
-    booking.status = TourBookingStatus.CANCELLED;
-    booking.paymentStatus = TourPaymentStatus.FAILED;
-    booking.cancelledAt = new Date();
-    booking.cancelReason = 'Payment failed';
-    const saved = await booking.save();
+      booking.status = TourBookingStatus.CANCELLED;
+      booking.paymentStatus = TourPaymentStatus.FAILED;
+      booking.cancelledAt = new Date();
+      booking.cancelReason = 'Payment failed';
+      return booking.save({ session: txSession });
+    };
+    const saved = session
+      ? await run(session)
+      : await this.transactionService.runInTransaction((txSession) =>
+          run(txSession),
+        );
 
     const populated = await saved.populate('tourId', 'translations');
     const viName = (populated.tourId as any)?.translations?.vi?.name;

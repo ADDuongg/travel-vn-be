@@ -40,6 +40,12 @@ export const envSchema = z
       .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
       .optional(),
 
+    /** Shown on every structured log line (Loki/Grafana cardinality). Default: tours-api */
+    SERVICE_NAME: z.string().min(1).default('tours-api'),
+
+    /** Release/version label for observability (e.g. Docker image tag, git SHA). */
+    APP_VERSION: z.string().optional(),
+
     // Redis (for BullMQ)
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().default(6379),

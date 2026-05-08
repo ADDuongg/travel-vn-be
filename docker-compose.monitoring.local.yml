@@ -43,6 +43,35 @@ services:
       - travel-vn-local-network
     depends_on:
       - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:2.9.10
+    container_name: monitoring-local-loki
+    restart: unless-stopped
+    command: ['-config.file=/etc/loki/loki.yml']
+    volumes:
+      - ./monitoring/loki/loki.local.yml:/etc/loki/loki.yml:ro
+      - loki_local_data:/loki
+    ports:
+      - '127.0.0.1:${MONITORING_LOKI_PORT_LOCAL:-3100}:3100'
+    networks:
+      - travel-vn-local-network
+
+  promtail:
+    image: grafana/promtail:2.9.10
+    container_name: monitoring-local-promtail
+    restart: unless-stopped
+    command: ['-config.file=/etc/promtail/promtail.yml']
+    volumes:
+      - ./monitoring/promtail/promtail.local.yml:/etc/promtail/promtail.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail_local_positions:/tmp
+    networks:
+      - travel-vn-local-network
+    depends_on:
+      - loki
 
   node-exporter:
     image: prom/node-exporter:v1.8.2
@@ -78,3 +107,5 @@ networks:
 
 volumes:
   grafana_local_data:
+  loki_local_data:
+  promtail_local_positions:
