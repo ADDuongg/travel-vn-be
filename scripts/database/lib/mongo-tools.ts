@@ -1,7 +1,28 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import { parseMongoUri } from './config';
 import { log } from './logger';
+
+const TOOLS_INSTALL_HINT =
+  'Install MongoDB Database Tools: https://www.mongodb.com/try/download/database-tools ' +
+  '(extract/add the `bin` folder to PATH on Windows, then open a new terminal).';
+
+let mongoToolsVerified = false;
+
+function ensureMongoDatabaseTools(): void {
+  if (mongoToolsVerified) {
+    return;
+  }
+  try {
+    execFileSync('mongodump', ['--version'], { stdio: 'pipe' });
+    execFileSync('mongorestore', ['--version'], { stdio: 'pipe' });
+    mongoToolsVerified = true;
+  } catch {
+    throw new Error(
+      `[mongo-tools] mongodump/mongorestore not found on PATH. ${TOOLS_INSTALL_HINT}`,
+    );
+  }
+}
 
 function buildAuthArgs(parsed: ReturnType<typeof parseMongoUri>): string[] {
   const args: string[] = [];
@@ -18,6 +39,8 @@ function buildAuthArgs(parsed: ReturnType<typeof parseMongoUri>): string[] {
 }
 
 export function mongodump(uri: string, outputDir: string): void {
+  ensureMongoDatabaseTools();
+
   const parsed = parseMongoUri(uri);
 
   if (fs.existsSync(outputDir)) {
@@ -25,8 +48,7 @@ export function mongodump(uri: string, outputDir: string): void {
   }
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const args = [
-    'mongodump',
+  const argv = [
     ...buildAuthArgs(parsed),
     '--db',
     parsed.database,
@@ -37,7 +59,7 @@ export function mongodump(uri: string, outputDir: string): void {
   log.info(
     `Dumping database "${parsed.database}" from ${parsed.host}:${parsed.port}`,
   );
-  execSync(args.join(' '), { stdio: 'inherit' });
+  execFileSync('mongodump', argv, { stdio: 'inherit' });
   log.success(`Dump saved to ${outputDir}`);
 }
 
@@ -47,11 +69,12 @@ export function mongorestore(
   targetDb: string,
   options: { drop?: boolean } = {},
 ): void {
+  ensureMongoDatabaseTools();
+
   const parsed = parseMongoUri(uri);
   const dumpDbDir = findDumpDbDir(inputDir);
 
-  const args = [
-    'mongorestore',
+  const argv = [
     ...buildAuthArgs(parsed),
     '--db',
     targetDb,
@@ -62,7 +85,7 @@ export function mongorestore(
   log.info(
     `Restoring to database "${targetDb}" on ${parsed.host}:${parsed.port}`,
   );
-  execSync(args.join(' '), { stdio: 'inherit' });
+  execFileSync('mongorestore', argv, { stdio: 'inherit' });
   log.success(`Restored to "${targetDb}"`);
 }
 

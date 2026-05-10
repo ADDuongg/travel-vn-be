@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { config } from './lib/config';
+import { config, mongooseLocalConnectOptions } from './lib/config';
 import { log } from './lib/logger';
 import { confirm } from './lib/confirm';
 
@@ -16,7 +16,7 @@ async function main() {
   }
 
   log.step('Connecting to local MongoDB...');
-  await mongoose.connect(config.mongoUriLocal);
+  await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   log.success('Connected.');
 
   log.step('Dropping database...');

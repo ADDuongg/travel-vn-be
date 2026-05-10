@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as path from 'path';
 import mongoose from 'mongoose';
-import { config, PATHS } from './lib/config';
+import { config, mongooseLocalConnectOptions, PATHS } from './lib/config';
 import { log } from './lib/logger';
 import { confirm } from './lib/confirm';
 import { mongodump, mongorestore } from './lib/mongo-tools';
@@ -69,7 +69,7 @@ async function main() {
 
   // Step 5: Print summary
   log.step('Collecting summary...');
-  await mongoose.connect(debugUri);
+  await mongoose.connect(debugUri, mongooseLocalConnectOptions);
   const collections = await mongoose.connection.db!.listCollections().toArray();
   const counts: Record<string, string | number> = {};
   for (const col of collections) {

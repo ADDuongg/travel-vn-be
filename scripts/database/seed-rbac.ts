@@ -2,8 +2,6 @@
  * Idempotent RBAC seed: collections `permissions`, `role_permissions`; upserts Role docs (`roles`).
  * Requires DB_URI — same Mongo as the NestJS app (.env).
  */
-import * as dotenv from 'dotenv';
-import * as path from 'path';
 import mongoose from 'mongoose';
 
 import {
@@ -11,8 +9,7 @@ import {
   RBAC_ROLE_KEY_MATRIX,
 } from '../../src/rbac/rbac-seed.data';
 import { RBAC_ROLE_CODES } from '../../src/rbac/constants';
-
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+import { mongooseLocalConnectOptions, resolveAppMongoUri } from './lib/config';
 
 /** Rebuild `role_permissions` from rbac-seed.data (overwrites custom admin assignments). */
 const syncDefaultMatrix =
@@ -20,13 +17,9 @@ const syncDefaultMatrix =
   process.env.RBAC_SEED_SYNC_MATRIX === 'true';
 
 async function seed() {
-  const uri = process.env.DB_URI || process.env.MONGO_URI_LOCAL;
-  if (!uri) {
-    console.error('Missing DB_URI (or MONGO_URI_LOCAL)');
-    process.exit(1);
-  }
+  const uri = resolveAppMongoUri();
 
-  await mongoose.connect(uri);
+  await mongoose.connect(uri, mongooseLocalConnectOptions);
   console.log('[seed-rbac] connected');
 
   const db = mongoose.connection.db;

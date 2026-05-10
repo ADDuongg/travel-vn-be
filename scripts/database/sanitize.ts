@@ -52,10 +52,10 @@ export async function sanitizeDatabase(db: mongoose.Connection): Promise<void> {
 
 if (require.main === module) {
   (async () => {
-    const { config } = await import('./lib/config');
+    const { config, mongooseLocalConnectOptions } = await import('./lib/config');
     log.header('SANITIZE LOCAL DATABASE');
 
-    await mongoose.connect(config.mongoUriLocal);
+    await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
     await sanitizeDatabase(mongoose.connection);
     await mongoose.disconnect();
 

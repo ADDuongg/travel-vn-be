@@ -1,21 +1,91 @@
 import * as dotenv from 'dotenv';
+import * as fs from 'fs';
+import type { ConnectOptions } from 'mongoose';
 import * as path from 'path';
 
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+const ENV_PATH = path.resolve(__dirname, '../../../.env');
 
-function requireEnv(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    console.error(`\x1b[31m[ERROR]\x1b[0m Missing required env var: ${key}`);
+dotenv.config({ path: ENV_PATH, override: true });
+
+function runningInDocker(): boolean {
+  return fs.existsSync('/.dockerenv');
+}
+
+function readDotenvFromDisk(): Record<string, string> {
+  if (!fs.existsSync(ENV_PATH)) {
+    return {};
+  }
+  return dotenv.parse(fs.readFileSync(ENV_PATH));
+}
+
+const disk = readDotenvFromDisk();
+
+/** Docker Compose service name; only resolvable inside the container network. */
+export function rewriteMongoHostForHostMachine(uri: string): string {
+  if (!uri || runningInDocker()) {
+    return uri;
+  }
+  try {
+    const u = new URL(uri);
+    if (u.hostname === 'mongo') {
+      u.hostname = 'localhost';
+      return u.toString();
+    }
+  } catch {
+    return uri;
+  }
+  return uri;
+}
+
+/**
+ * Prefer `.env` on disk so host-side scripts work even when preload/dotenvx injects `mongo`.
+ */
+function resolveMongoUriLocal(): string {
+  const raw = disk.MONGO_URI_LOCAL || process.env.MONGO_URI_LOCAL;
+  if (!raw) {
+    console.error(`\x1b[31m[ERROR]\x1b[0m Missing MONGO_URI_LOCAL in .env`);
     process.exit(1);
   }
-  return value;
+  return rewriteMongoHostForHostMachine(raw);
+}
+
+/**
+ * Options for connecting from the host to a single-node replica set published on localhost.
+ * Without this, the driver follows RS hostnames (e.g. `mongo`) and fails with ENOTFOUND.
+ */
+export const mongooseLocalConnectOptions: ConnectOptions = runningInDocker()
+  ? {}
+  : { directConnection: true };
+
+/**
+ * Same Mongo as Nest `DB_URI` when set, else `MONGO_URI_LOCAL` (for seed-rbac / app parity).
+ */
+export function resolveAppMongoUri(): string {
+  const raw =
+    disk.DB_URI ||
+    disk.MONGO_URI_LOCAL ||
+    process.env.DB_URI ||
+    process.env.MONGO_URI_LOCAL;
+  if (!raw) {
+    console.error(
+      `\x1b[31m[ERROR]\x1b[0m Missing DB_URI or MONGO_URI_LOCAL in .env`,
+    );
+    process.exit(1);
+  }
+  return rewriteMongoHostForHostMachine(raw);
+}
+
+const dbLocal =
+  disk.MONGO_DB_LOCAL || process.env.MONGO_DB_LOCAL;
+if (!dbLocal) {
+  console.error(`\x1b[31m[ERROR]\x1b[0m Missing MONGO_DB_LOCAL in .env`);
+  process.exit(1);
 }
 
 export const config = {
-  mongoUriLocal: requireEnv('MONGO_URI_LOCAL'),
+  mongoUriLocal: resolveMongoUriLocal(),
   mongoUriStaging: process.env.MONGO_URI_STAGING || '',
-  dbLocal: requireEnv('MONGO_DB_LOCAL'),
+  dbLocal,
   dbDebug: process.env.MONGO_DB_DEBUG || 'travel_vn_debug',
 };
 

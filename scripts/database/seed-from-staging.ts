@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as path from 'path';
 import mongoose from 'mongoose';
-import { config, PATHS } from './lib/config';
+import { config, mongooseLocalConnectOptions, PATHS } from './lib/config';
 import { log } from './lib/logger';
 import { confirm } from './lib/confirm';
 import { mongodump, mongorestore } from './lib/mongo-tools';
@@ -45,7 +45,7 @@ async function main() {
 
   // Step 3: Sanitize
   log.step('Connecting to local DB for sanitization...');
-  await mongoose.connect(config.mongoUriLocal);
+  await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   await sanitizeDatabase(mongoose.connection);
 
   // Step 4: Run migrations

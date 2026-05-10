@@ -51,15 +51,19 @@ async function bootstrap() {
   const port = env.get('PORT', 9001);
   const isProduction = env.isProduction();
 
-  // Security headers
-  app.use(helmet());
+  // Security headers — CORP same-origin blocks cross-origin fetch reading JSON in some browsers
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
   app.use(cookieParser());
 
   // CORS from env (comma-separated origins, fallback to localhost for dev)
   const corsOrigins = env
     .get(
       'CORS_ORIGINS',
-      'http://localhost:5173,http://localhost:5174,http://localhost:5175',
+      'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,http://127.0.0.1:3000',
     )
     .split(',')
     .map((o) => o.trim());

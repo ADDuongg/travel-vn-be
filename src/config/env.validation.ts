@@ -28,11 +28,11 @@ export const envSchema = z
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
 
-    // CORS
+    // CORS — keep in sync with main.ts fallback (must include Next/Vite + CRA ports)
     CORS_ORIGINS: z
       .string()
       .default(
-        'http://localhost:5173,http://localhost:5174,http://localhost:5175',
+        'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,http://127.0.0.1:3000',
       ),
 
     // Logging — override log level at runtime without redeploy (e.g. LOG_LEVEL=debug on prod)

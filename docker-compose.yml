@@ -3,7 +3,13 @@ services:
   mongo:
     image: mongo:7.0
     container_name: backend-local-mongo
-    command: ['mongod', '--auth', '--bind_ip_all', '--replSet', 'rs0']
+    # Keyfile must be chmod 400; bind mounts from Windows are often "too open" for mongod.
+    command:
+      [
+        'bash',
+        '-lc',
+        'install -m 0400 -o mongodb -g mongodb /etc/mongo-rs/rs0-dev.keyfile /tmp/rs0-dev.keyfile && exec docker-entrypoint.sh mongod --auth --bind_ip_all --replSet rs0 --keyFile /tmp/rs0-dev.keyfile',
+      ]
     restart: unless-stopped
     env_file:
       - .env
@@ -14,14 +20,26 @@ services:
       - '27017:27017' # expose ra ngoài để dùng Compass
     volumes:
       - mongo_data:/data/db
+      - ./docker/mongo-local/rs0-dev.keyfile:/etc/mongo-rs/rs0-dev.keyfile:ro
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mongosh --quiet -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin "mongodb://127.0.0.1:27017/admin" --eval "db.adminCommand({ ping: 1 }).ok" | grep -q 1',
+        ]
+      interval: 3s
+      timeout: 10s
+      retries: 20
+      start_period: 40s
     networks:
       - travel-vn-local-network
   mongo-rs-init:
     image: mongo:7.0
     container_name: backend-local-mongo-rs-init
-    restart: "no"
+    restart: 'no'
     depends_on:
-      - mongo
+      mongo:
+        condition: service_healthy
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}

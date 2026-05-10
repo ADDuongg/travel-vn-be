@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import mongoose from 'mongoose';
-import { config, PATHS } from './lib/config';
+import { config, mongooseLocalConnectOptions, PATHS } from './lib/config';
 import { log } from './lib/logger';
 import { confirm } from './lib/confirm';
 import { mongorestore } from './lib/mongo-tools';
@@ -26,7 +26,7 @@ async function main() {
 
   // Step 1: Reset
   log.step('Dropping local database...');
-  await mongoose.connect(config.mongoUriLocal);
+  await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   await mongoose.connection.db!.dropDatabase();
   log.success(`Database "${config.dbLocal}" dropped.`);
   await mongoose.disconnect();
@@ -69,7 +69,7 @@ async function main() {
 
   // Step 4: Summary
   log.step('Collecting summary...');
-  await mongoose.connect(config.mongoUriLocal);
+  await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   const collections = await mongoose.connection.db!.listCollections().toArray();
   const counts: Record<string, string | number> = {};
   for (const col of collections) {
