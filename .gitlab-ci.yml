@@ -137,7 +137,7 @@ build:staging:
   script:
     - >
       docker build
-      -t $CI_REGISTRY_IMAGE:staging
+      -t $CI_REGISTRY_IMAGE:staging-latest
       -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
       .
     - |
@@ -174,7 +174,7 @@ build:production:
   script:
     - >
       docker build
-      -t $CI_REGISTRY_IMAGE:production
+      -t $CI_REGISTRY_IMAGE:production-latest
       -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
       .
     - |
