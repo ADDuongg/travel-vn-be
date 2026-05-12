@@ -62,10 +62,22 @@ export class RoomInventoryService {
 
     if (toCreate.length === 0) return;
 
-    await this.RoomInventoryModel.insertMany(toCreate, {
-      ordered: false,
-      session,
-    });
+    // Upserts avoid E11000 duplicate key under concurrent transactions (insertMany would abort txn → 500).
+    await this.RoomInventoryModel.bulkWrite(
+      toCreate.map((doc) => ({
+        updateOne: {
+          filter: { roomId: doc.roomId, date: doc.date },
+          update: {
+            $setOnInsert: {
+              total: doc.total,
+              available: doc.available,
+            },
+          },
+          upsert: true,
+        },
+      })),
+      session ? { session } : {},
+    );
   }
 
   /* ======================================================

@@ -10,6 +10,16 @@ export const envSchema = z
     // Database
     DB_URI: z.string().min(1, 'DB_URI is required'),
 
+    /**
+     * Multi-document transactions require a replica set or mongos.
+     * When unset: enabled only in production (local standalone Mongo → set false or use docker-compose Mongo with --replSet).
+     */
+    MONGO_TRANSACTIONS_ENABLED: z.preprocess((v) => {
+      if (v === undefined || v === '') return undefined;
+      if (v === false || v === 'false' || v === '0') return false;
+      return v === true || v === 'true' || v === '1';
+    }, z.boolean().optional()),
+
     // JWT
     JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters'),
     JWT_REFRESH_SECRET: z
@@ -91,6 +101,11 @@ export const envSchema = z
 
     ELASTICSEARCH_TOURS_INDEX: z.string().default('tours'),
   })
+  .transform((data) => ({
+    ...data,
+    MONGO_TRANSACTIONS_ENABLED:
+      data.MONGO_TRANSACTIONS_ENABLED ?? data.NODE_ENV === 'production',
+  }))
   .superRefine((data, ctx) => {
     if (data.ELASTICSEARCH_ENABLED && !data.ELASTICSEARCH_URL?.trim()) {
       ctx.addIssue({

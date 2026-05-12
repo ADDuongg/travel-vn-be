@@ -14,7 +14,6 @@ import { CreateRoomBookingDto } from './dto/create-room-booking.dto';
 import { UpdateBookingDto } from './dto/update-booking.dto';
 import {
   Booking,
-  BookingDocument,
   BookingPaymentStatus,
   BookingStatus,
   BookingType,
@@ -109,19 +108,23 @@ export class BookingService {
       throw new BadRequestException('Invalid check-in / check-out');
     }
 
-    if (nights < room.bookingConfig.minNights) {
-      throw new BadRequestException(
-        `Minimum stay is ${room.bookingConfig.minNights} nights`,
-      );
+    const minNights = room.bookingConfig?.minNights ?? 1;
+    const maxNights = room.bookingConfig?.maxNights;
+
+    if (nights < minNights) {
+      throw new BadRequestException(`Minimum stay is ${minNights} nights`);
     }
 
-    if (room.bookingConfig.maxNights && nights > room.bookingConfig.maxNights) {
-      throw new BadRequestException(
-        `Maximum stay is ${room.bookingConfig.maxNights} nights`,
-      );
+    if (maxNights && nights > maxNights) {
+      throw new BadRequestException(`Maximum stay is ${maxNights} nights`);
     }
 
     const quantity = dto.rooms.length;
+
+    const totalRooms = room.inventory?.totalRooms;
+    if (typeof totalRooms !== 'number') {
+      throw new BadRequestException('Room inventory is not configured');
+    }
 
     const isAvailable = await this.roomInventoryService.checkAvailability(
       room._id as Types.ObjectId,
@@ -133,10 +136,8 @@ export class BookingService {
       throw new BadRequestException('Room not available');
     }
 
-    if (quantity > room.inventory.totalRooms) {
-      throw new BadRequestException(
-        `Only ${room.inventory.totalRooms} rooms available`,
-      );
+    if (quantity > totalRooms) {
+      throw new BadRequestException(`Only ${totalRooms} rooms available`);
     }
 
     for (const r of dto.rooms) {
@@ -192,7 +193,7 @@ export class BookingService {
       paymentStatus: BookingPaymentStatus.UNPAID,
 
       amount,
-      currency: room.pricing.currency,
+      currency: room.pricing?.currency ?? 'VND',
 
       rooms: bookedRooms,
 
@@ -384,8 +385,7 @@ export class BookingService {
 
   /* ================= ADMIN DETAIL ================= */
   async getBookingByIdForAdmin(bookingId: string) {
-    const booking =
-      await this.bookingRepository.findByIdForAdmin(bookingId);
+    const booking = await this.bookingRepository.findByIdForAdmin(bookingId);
 
     if (!booking) {
       throw new NotFoundDomainException('Booking not found');
@@ -495,7 +495,7 @@ export class BookingService {
       }
     }
 
-    const run = async (txSession: ClientSession) => {
+    const run = async (txSession: ClientSession | undefined) => {
       for (const g of groups.values()) {
         if (new Date(g.checkIn) > now) {
           await this.roomInventoryService.rollbackInventoryRange(
@@ -529,8 +529,7 @@ export class BookingService {
   }
 
   async markAsFailed(bookingId: string, session?: ClientSession) {
-    const booking =
-      await this.bookingRepository.findByIdAsDocument(bookingId);
+    const booking = await this.bookingRepository.findByIdAsDocument(bookingId);
     if (!booking) throw new NotFoundDomainException('Booking not found');
 
     if (booking.status !== BookingStatus.PENDING) return;
@@ -546,13 +545,12 @@ export class BookingService {
     fullyRefunded: boolean,
     session?: ClientSession,
   ) {
-    const booking =
-      await this.bookingRepository.findByIdAsDocument(bookingId);
+    const booking = await this.bookingRepository.findByIdAsDocument(bookingId);
     if (!booking) throw new NotFoundDomainException('Booking not found');
 
     booking.paymentStatus = BookingPaymentStatus.REFUNDED;
 
-    const run = async (txSession: ClientSession) => {
+    const run = async (txSession: ClientSession | undefined) => {
       if (!fullyRefunded) {
         await this.bookingRepository.save(booking, txSession);
         return;
@@ -604,7 +602,9 @@ export class BookingService {
       await run(session);
       return;
     }
-    await this.transactionService.runInTransaction((txSession) => run(txSession));
+    await this.transactionService.runInTransaction((txSession) =>
+      run(txSession),
+    );
   }
 
   async uploadReceipt(bookingId: string, file: Express.Multer.File) {
@@ -612,8 +612,7 @@ export class BookingService {
       throw new BadRequestException('Receipt image is required');
     }
 
-    const booking =
-      await this.bookingRepository.uploadReceiptFind(bookingId);
+    const booking = await this.bookingRepository.uploadReceiptFind(bookingId);
     if (!booking) {
       throw new NotFoundDomainException('Booking not found');
     }

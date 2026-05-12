@@ -200,7 +200,7 @@ export class TourBookingService {
       bookingPayload.guideId = new Types.ObjectId(dto.guideId);
     }
 
-    const run = async (txSession: ClientSession) => {
+    const run = async (txSession: ClientSession | undefined) => {
       await this.tourInventoryService.blockSlots(
         {
           tourId: dto.tourId,
@@ -210,7 +210,7 @@ export class TourBookingService {
         txSession,
       );
       const [booking] = await this.bookingModel.create([bookingPayload], {
-        session: txSession,
+        ...(txSession ? { session: txSession } : {}),
       });
       return booking;
     };
@@ -382,10 +382,10 @@ export class TourBookingService {
     }
 
     const totalGuests = booking.adults + booking.children + booking.infants;
-    const run = async (txSession: ClientSession) => {
+    const run = async (txSession: ClientSession | undefined) => {
       const inv = await this.inventoryModel
         .findById(booking.tourInventoryId)
-        .session(txSession);
+        .session(txSession ?? null);
       if (inv) {
         await this.tourInventoryService.releaseSlots(
           {
@@ -400,7 +400,7 @@ export class TourBookingService {
       booking.status = TourBookingStatus.CANCELLED;
       booking.cancelledAt = new Date();
       booking.cancelReason = reason;
-      return booking.save({ session: txSession });
+      return booking.save(txSession ? { session: txSession } : undefined);
     };
     const saved = session
       ? await run(session)
@@ -547,10 +547,10 @@ export class TourBookingService {
     }
 
     const totalGuests = booking.adults + booking.children + booking.infants;
-    const run = async (txSession: ClientSession) => {
+    const run = async (txSession: ClientSession | undefined) => {
       const inv = await this.inventoryModel
         .findById(booking.tourInventoryId)
-        .session(txSession);
+        .session(txSession ?? null);
       if (inv) {
         await this.tourInventoryService.releaseSlots(
           {
@@ -566,7 +566,7 @@ export class TourBookingService {
       booking.paymentStatus = TourPaymentStatus.FAILED;
       booking.cancelledAt = new Date();
       booking.cancelReason = 'Payment failed';
-      return booking.save({ session: txSession });
+      return booking.save(txSession ? { session: txSession } : undefined);
     };
     const saved = session
       ? await run(session)
