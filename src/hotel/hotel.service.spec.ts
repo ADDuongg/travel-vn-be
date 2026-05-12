@@ -4,6 +4,7 @@ import { HotelService } from './hotel.service';
 import { Hotel } from './schema/hotel.schema';
 import { ProvincesService } from 'src/provinces/provinces.service';
 import { FavoriteService } from 'src/favorite/favorite.service';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 describe('HotelService', () => {
   let service: HotelService;
@@ -18,6 +19,10 @@ describe('HotelService', () => {
           useValue: { findAllForDropdown: jest.fn().mockResolvedValue([]) },
         },
         { provide: FavoriteService, useValue: {} },
+        {
+          provide: CloudinaryService,
+          useValue: { deleteFile: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

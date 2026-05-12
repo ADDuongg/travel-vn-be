@@ -1,15 +1,18 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsMongoId,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
-import { TransformValue } from 'src/utils/transform.util';
 
 /** Một block translation theo mã ngôn ngữ (giống Room). */
 export interface TourGuideTranslationDto {
@@ -17,6 +20,47 @@ export interface TourGuideTranslationDto {
   shortBio?: string;
   specialties?: string;
   specialtyItems?: string[];
+}
+
+/* ===== Media reference DTOs (upload qua MediaModule trước, CRUD chỉ nhận JSON refs) ===== */
+
+export class GalleryItemDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  order?: number;
+}
+
+export class CvRefDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  filename?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  format?: string;
 }
 
 export class CreateTourGuideDto {
@@ -27,24 +71,20 @@ export class CreateTourGuideDto {
 
   /** Theo langCode (vi, en, ...): bio, shortBio, specialties, shortDescription, description, specialtyItems — giống Room */
   @IsOptional()
-  @TransformValue()
   @IsObject()
   translations?: Record<string, TourGuideTranslationDto>;
 
   @IsOptional()
-  @TransformValue()
   @IsArray()
   @IsString({ each: true })
   languages?: string[];
 
   @IsOptional()
-  @TransformValue()
   @IsArray()
   @IsMongoId({ each: true })
   specializedProvinces?: string[];
 
   @IsOptional()
-  @TransformValue()
   @IsArray()
   @IsString({ each: true })
   certifications?: string[];
@@ -54,19 +94,25 @@ export class CreateTourGuideDto {
   licenseNumber?: string;
 
   @IsOptional()
-  @TransformValue()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   yearsOfExperience?: number;
 
   @IsOptional()
-  @TransformValue()
   @IsArray()
-  gallery?: Array<{ url: string; publicId?: string; alt?: string }>;
+  @ValidateNested({ each: true })
+  @Type(() => GalleryItemDto)
+  gallery?: GalleryItemDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => CvRefDto)
+  cv?: CvRefDto | null;
 
   /** Thống kê: tỷ lệ phản hồi (0–100). */
   @IsOptional()
-  @TransformValue()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   @Max(100)
@@ -74,26 +120,25 @@ export class CreateTourGuideDto {
 
   /** Thống kê: số chuyến đi hoàn tất. */
   @IsOptional()
-  @TransformValue()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   completedTripsCount?: number;
 
   /** Thống kê: tỷ lệ khách quay lại (0–100). */
   @IsOptional()
-  @TransformValue()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   @Max(100)
   returningCustomerRate?: number;
 
   @IsOptional()
-  @TransformValue()
   @IsBoolean()
   isAvailable?: boolean;
 
   @IsOptional()
-  @TransformValue()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   dailyRate?: number;
@@ -103,7 +148,6 @@ export class CreateTourGuideDto {
   currency?: string;
 
   @IsOptional()
-  @TransformValue()
   @IsArray()
   @IsString({ each: true })
   contactMethods?: string[];

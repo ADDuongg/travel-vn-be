@@ -1,18 +1,107 @@
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
   IsMongoId,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { TransformValue } from 'src/utils/transform.util';
+
+/* =======================
+   MEDIA REF DTOs (upload via /admin/media first)
+======================= */
+
+export class ThumbnailRefDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+}
+
+export class GalleryItemDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  order?: number;
+}
+
+/* =======================
+   SALE & SCHEDULE
+======================= */
+
+export class TourSaleDto {
+  @IsBoolean()
+  isActive: boolean;
+
+  @IsIn(['PERCENT', 'FIXED'])
+  type: 'PERCENT' | 'FIXED';
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  value: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  startDate?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  endDate?: Date;
+}
+
+export class TourFixedDepartureDto {
+  @Type(() => Date)
+  date: Date;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  availableSlots: number;
+
+  @IsString()
+  status: string;
+}
+
+export class TourScheduleDto {
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  departureDays?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TourFixedDepartureDto)
+  fixedDepartures?: TourFixedDepartureDto[];
+}
 
 /* =======================
    SUB DTOs
@@ -49,8 +138,6 @@ export class TourDestinationDto {
   @IsString()
   provinceId: string;
 
-  // @TransformValue()
-  @Transform(({ value }) => value === 'true' || value === true)
   @IsOptional()
   @IsBoolean()
   isMainDestination?: boolean;
@@ -123,7 +210,6 @@ export class TourCapacityDto {
   @Min(1)
   maxGuests: number;
 
-  @TransformValue()
   @IsOptional()
   @IsBoolean()
   privateAvailable?: boolean;
@@ -136,12 +222,10 @@ export class TourBookingConfigDto {
   @Min(0)
   advanceBookingDays?: number;
 
-  @TransformValue()
   @IsOptional()
   @IsBoolean()
   allowInstantBooking?: boolean;
 
-  @TransformValue()
   @IsOptional()
   @IsBoolean()
   requireDeposit?: boolean;
@@ -222,7 +306,6 @@ export class CreateTourDto {
   @IsString()
   code: string;
 
-  @TransformValue()
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
@@ -231,14 +314,10 @@ export class CreateTourDto {
   @IsEnum(['DOMESTIC', 'INTERNATIONAL', 'DAILY'])
   tourType: string;
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => TourDurationDto)
   duration: TourDurationDto;
 
-  @Transform(({ value }) => JSON.parse(value))
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TourDestinationDto)
@@ -247,63 +326,39 @@ export class CreateTourDto {
   @IsMongoId()
   departureProvinceId: string;
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsObject()
   translations: Record<string, TourTranslationDto>;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TourItineraryDayDto)
   itinerary?: TourItineraryDayDto[];
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => TourCapacityDto)
   capacity: TourCapacityDto;
 
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => TourPricingDto)
   pricing: TourPricingDto;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => TourContactDto)
   contact?: TourContactDto;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsArray()
   @IsMongoId({ each: true })
   amenities?: string[];
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsArray()
   @IsString({ each: true })
   transportTypes?: string[];
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => TourBookingConfigDto)
   bookingConfig?: TourBookingConfigDto;
@@ -312,4 +367,25 @@ export class CreateTourDto {
   @IsString()
   @IsEnum(['EASY', 'MODERATE', 'CHALLENGING', 'DIFFICULT'])
   difficulty?: string;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TourSaleDto)
+  sale?: TourSaleDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TourScheduleDto)
+  schedule?: TourScheduleDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ThumbnailRefDto)
+  thumbnail?: ThumbnailRefDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GalleryItemDto)
+  gallery?: GalleryItemDto[];
 }

@@ -1,15 +1,136 @@
-import { Transform, Type } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
-  Allow,
   IsArray,
   IsBoolean,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
-import { TransformValue } from 'src/utils/transform.util';
+
+/* ===== Media reference DTOs (FE upload ảnh qua /admin/media trước, rồi gửi reference) ===== */
+
+export class ThumbnailRefDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+}
+
+export class GalleryItemDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  order?: number;
+}
+
+/* ===== Nested object DTOs ===== */
+
+export class RoomCapacityDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  baseAdults: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  baseChildren?: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  maxAdults: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxChildren?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  roomSize?: number;
+}
+
+export class RoomBookingConfigDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  minNights: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  maxNights?: number;
+
+  @IsBoolean()
+  allowInstantBooking: boolean;
+}
+
+export class RoomSaleDto {
+  @IsBoolean()
+  isActive: boolean;
+
+  @IsIn(['PERCENT', 'FIXED'])
+  type: 'PERCENT' | 'FIXED';
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  value: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  startDate?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  endDate?: Date;
+}
+
+export class RoomTranslationDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsString()
+  shortDescription?: string;
+}
+
+/* ===== Main DTO ===== */
 
 export class CreateRoomDto {
   /* ========= CORE ========= */
@@ -24,100 +145,75 @@ export class CreateRoomDto {
 
   @IsString()
   @IsNotEmpty()
-  roomType: string; // e.g., "Master", "Deluxe"
+  roomType: string;
 
-  @TransformValue()
   @IsBoolean()
   isActive: boolean;
 
-  /* ========= CAPACITY ========= */
-  @TransformValue()
-  @IsObject()
-  capacity: {
-    baseAdults: number;
-    baseChildren?: number;
-    maxAdults: number;
-    maxChildren?: number;
-    roomSize?: number;
-  };
+  /* ========= RELATION ========= */
 
   @IsString()
   @IsNotEmpty()
   hotelId: string;
 
+  /* ========= CAPACITY ========= */
+
+  @ValidateNested()
+  @Type(() => RoomCapacityDto)
+  capacity: RoomCapacityDto;
+
   /* ========= PRICING ========= */
 
-  @TransformValue()
-  // @Transform(toNumber)
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(0)
   basePrice: number;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   currency?: string;
 
   /* ========= INVENTORY ========= */
 
-  @TransformValue()
-  // @Transform(toNumber)
-  @IsOptional()
   @Type(() => Number)
   @IsNumber()
+  @Min(0)
   totalRooms: number;
 
   /* ========= TRANSLATIONS ========= */
-  // FE gửi JSON string
-  @Transform(({ value }) => JSON.parse(value))
+
   @IsObject()
-  translations: Record<
-    string,
-    {
-      name: string;
-      description: string;
-      shortDescription?: string;
-    }
-  >;
+  translations: Record<string, RoomTranslationDto>;
 
   /* ========= BOOKING CONFIG ========= */
-  @Transform(({ value }) => JSON.parse(value))
-  @IsObject()
-  bookingConfig: {
-    minNights: number;
-    maxNights?: number;
-    allowInstantBooking: boolean;
-  };
+
+  @ValidateNested()
+  @Type(() => RoomBookingConfigDto)
+  bookingConfig: RoomBookingConfigDto;
 
   /* ========= AMENITIES ========= */
-
-  //   @Transform(toArray)
-  @IsArray()
+  // Giữ kiểu mở giống behavior cũ: FE có thể gửi mảng ObjectId string hoặc {code, icon}.
   @IsOptional()
-  amenities?: { code: string; icon?: string }[];
+  @IsArray()
+  amenities?: Array<string | { code: string; icon?: string }>;
 
   /* ========= SALE ========= */
-  @Transform(({ value }) => {
-    if (!value) return undefined;
 
-    if (typeof value === 'string') {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return undefined;
-      }
-    }
-
-    return value;
-  })
   @IsOptional()
-  @IsObject()
-  @Allow()
-  sale?: {
-    isActive: boolean;
-    type: 'PERCENT' | 'FIXED';
-    value: number;
-    startDate?: Date;
-    endDate?: Date;
-  };
+  @ValidateNested()
+  @Type(() => RoomSaleDto)
+  sale?: RoomSaleDto;
+
+  /* ========= MEDIA (reference đã upload qua /admin/media) ========= */
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ThumbnailRefDto)
+  thumbnail?: ThumbnailRefDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GalleryItemDto)
+  gallery?: GalleryItemDto[];
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-floating-promises */
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { NotFoundDomainException } from 'src/common/exceptions';
 import { Types } from 'mongoose';
@@ -5,9 +6,7 @@ import Stripe from 'stripe';
 import { BookingService } from '../booking/booking.service';
 import { TourBookingService } from '../tour-booking/tour-booking.service';
 import { stripe } from '../stripe.service';
-import {
-  PaymentStatus,
-} from './schema/payment.schema';
+import { PaymentStatus } from './schema/payment.schema';
 import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
 import {
   TourBookingStatus,
@@ -20,6 +19,7 @@ import {
   PaymentAuditAction,
 } from 'src/audit-log/enums/audit-log.enum';
 import { PaymentRepository } from './payment.repository';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 @Injectable()
 export class PaymentService {
@@ -28,6 +28,7 @@ export class PaymentService {
     private readonly bookingService: BookingService,
     private readonly tourBookingService: TourBookingService,
     private readonly auditLogService: AuditLogService,
+    private readonly transactionService: DatabaseTransactionService,
   ) {}
 
   async createPaymentIntent(bookingId: string) {
@@ -200,21 +201,34 @@ export class PaymentService {
           intent.id,
         );
         if (!payment) return;
+        if (
+          payment.status === PaymentStatus.SUCCEEDED ||
+          payment.status === PaymentStatus.REFUNDED ||
+          payment.status === PaymentStatus.FULLY_REFUNDED
+        ) {
+          return;
+        }
 
         const oldStatus = payment.status;
-        payment.status = PaymentStatus.SUCCEEDED;
-        payment.processedAt = new Date();
-        await this.paymentRepository.save(payment);
+        await this.transactionService.runInTransaction(async (session) => {
+          payment.status = PaymentStatus.SUCCEEDED;
+          payment.processedAt = new Date();
+          await this.paymentRepository.save(payment, session);
 
-        if (payment.bookingId) {
-          await this.bookingService.markAsPaid(payment.bookingId.toString());
-        } else if (payment.tourBookingId) {
-          await this.tourBookingService.markAsPaid(
-            payment.tourBookingId.toString(),
-            payment.amount,
-            payment.intentId,
-          );
-        }
+          if (payment.bookingId) {
+            await this.bookingService.markAsPaid(
+              payment.bookingId.toString(),
+              session,
+            );
+          } else if (payment.tourBookingId) {
+            await this.tourBookingService.markAsPaid(
+              payment.tourBookingId.toString(),
+              payment.amount,
+              payment.intentId,
+              session,
+            );
+          }
+        });
 
         this.auditLogService.log({
           category: AuditCategory.PAYMENT,
@@ -239,19 +253,28 @@ export class PaymentService {
           intent.id,
         );
         if (!payment) return;
+        if (payment.status === PaymentStatus.FAILED) {
+          return;
+        }
 
         const oldStatus = payment.status;
-        payment.status = PaymentStatus.FAILED;
-        payment.processedAt = new Date();
-        await this.paymentRepository.save(payment);
+        await this.transactionService.runInTransaction(async (session) => {
+          payment.status = PaymentStatus.FAILED;
+          payment.processedAt = new Date();
+          await this.paymentRepository.save(payment, session);
 
-        if (payment.bookingId) {
-          await this.bookingService.markAsFailed(payment.bookingId.toString());
-        } else if (payment.tourBookingId) {
-          await this.tourBookingService.markAsFailed(
-            payment.tourBookingId.toString(),
-          );
-        }
+          if (payment.bookingId) {
+            await this.bookingService.markAsFailed(
+              payment.bookingId.toString(),
+              session,
+            );
+          } else if (payment.tourBookingId) {
+            await this.tourBookingService.markAsFailed(
+              payment.tourBookingId.toString(),
+              session,
+            );
+          }
+        });
 
         this.auditLogService.log({
           category: AuditCategory.PAYMENT,
@@ -357,10 +380,9 @@ export class PaymentService {
       throw new BadRequestException('Invalid tourBookingId');
     }
 
-    const payment =
-      await this.paymentRepository.findStatusByTourBookingId(
-        new Types.ObjectId(tourBookingId),
-      );
+    const payment = await this.paymentRepository.findStatusByTourBookingId(
+      new Types.ObjectId(tourBookingId),
+    );
 
     if (!payment) {
       return {
@@ -410,19 +432,22 @@ export class PaymentService {
       amount: Math.round(refundAmount),
     });
 
-    payment.refundedAmount = alreadyRefunded + refundAmount;
+    await this.transactionService.runInTransaction(async (session) => {
+      payment.refundedAmount = alreadyRefunded + refundAmount;
 
-    payment.status =
-      payment.refundedAmount >= payment.amount
-        ? PaymentStatus.FULLY_REFUNDED
-        : PaymentStatus.REFUNDED;
+      payment.status =
+        payment.refundedAmount >= payment.amount
+          ? PaymentStatus.FULLY_REFUNDED
+          : PaymentStatus.REFUNDED;
 
-    await this.paymentRepository.save(payment);
+      await this.paymentRepository.save(payment, session);
 
-    await this.bookingService.markAsRefunded(
-      bookingId,
-      payment.status === PaymentStatus.FULLY_REFUNDED,
-    );
+      await this.bookingService.markAsRefunded(
+        bookingId,
+        payment.status === PaymentStatus.FULLY_REFUNDED,
+        session,
+      );
+    });
 
     this.auditLogService.log({
       category: AuditCategory.PAYMENT,

@@ -16,7 +16,7 @@ describe('RoomService', () => {
       providers: [
         RoomService,
         { provide: getModelToken(Room.name), useValue: {} },
-        { provide: CloudinaryService, useValue: { uploadFile: jest.fn() } },
+        { provide: CloudinaryService, useValue: { deleteFile: jest.fn() } },
         { provide: HotelService, useValue: { findById: jest.fn() } },
         {
           provide: RoomInventoryService,

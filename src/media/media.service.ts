@@ -17,13 +17,18 @@ export type MediaUploadItem = {
 export class MediaService {
   constructor(private readonly cloudinaryService: CloudinaryService) {}
 
-  async uploadFile(file: Express.Multer.File): Promise<MediaUploadItem> {
+  async uploadFile(file?: Express.Multer.File): Promise<MediaUploadItem> {
+    if (!file) {
+      throw new BadRequestException('file is required');
+    }
     const result = await this.cloudinaryService.uploadFile(file);
     return this.toMediaUploadItem(result);
   }
 
-  async uploadFiles(files: Express.Multer.File[]): Promise<MediaUploadItem[]> {
-    if (!files?.length) return [];
+  async uploadFiles(files?: Express.Multer.File[]): Promise<MediaUploadItem[]> {
+    if (!files?.length) {
+      throw new BadRequestException('files are required');
+    }
     return Promise.all(files.map((f) => this.uploadFile(f)));
   }
 

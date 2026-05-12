@@ -14,7 +14,7 @@ Please implement scripts, folder structure, and documentation.
 - Backend: NestJS
 - Database: MongoDB
 - Local dev uses Docker Compose for MongoDB + Redis
-- Backend runs locally with `npm run start:dev`
+- Backend runs locally with `yarn start:dev`
 - Existing migration tool may be `migrate-mongo` (reuse if available)
 
 ---
@@ -48,9 +48,9 @@ IMPORTANT: Migration names are manually provided by the developer. Use clear des
 Need commands for:
 
 ```bash
-npm run db:migrate
-npm run db:migrate:down
-npm run db:migrate:create -- add-slug-to-hotels
+yarn db:migrate
+yarn db:migrate:down
+yarn db:migrate:create -- add-slug-to-hotels
 ```
 
 Requirements:
@@ -65,7 +65,7 @@ Requirements:
 Command:
 
 ```bash
-npm run db:seed:from-staging
+yarn db:seed:from-staging
 ```
 
 Flow:
@@ -94,7 +94,7 @@ Requirements:
 Command:
 
 ```bash
-npm run db:pull:staging
+yarn db:pull:staging
 ```
 
 Flow:
@@ -115,7 +115,7 @@ Requirements:
 Command:
 
 ```bash
-npm run db:seed
+yarn db:seed
 ```
 
 Flow:
@@ -129,7 +129,7 @@ Flow:
 Command:
 
 ```bash
-npm run db:reset
+yarn db:reset
 ```
 
 Drops local dev DB safely and recreates empty DB.

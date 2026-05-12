@@ -1,4 +1,4 @@
-import { Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
@@ -8,11 +8,47 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { TransformValue } from 'src/utils/transform.util';
+
+/* =======================
+   MEDIA REF (upload qua /admin/media trước)
+======================= */
+
+export class ThumbnailRefDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+}
+
+export class GalleryItemDto {
+  @IsString()
+  url: string;
+
+  @IsOptional()
+  @IsString()
+  publicId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  alt?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  order?: number;
+}
 
 /* =======================
    SUB DTO
@@ -80,12 +116,10 @@ export class CreateHotelDto {
   @IsString()
   slug: string;
 
-  @TransformValue()
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
 
-  @TransformValue()
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -96,34 +130,32 @@ export class CreateHotelDto {
   @IsMongoId()
   provinceId: string;
 
-  /** FE sends JSON string when using form-data */
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsObject()
   translations: Record<string, TranslationItemDto>;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => HotelContactDto)
   contact?: HotelContactDto;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @ValidateNested()
   @Type(() => HotelLocationDto)
   location?: HotelLocationDto;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    typeof value === 'string' ? JSON.parse(value) : value,
-  )
   @IsArray()
   @IsMongoId({ each: true })
   amenities?: string[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ThumbnailRefDto)
+  thumbnail?: ThumbnailRefDto;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => GalleryItemDto)
+  gallery?: GalleryItemDto[];
 }

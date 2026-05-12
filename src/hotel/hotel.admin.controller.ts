@@ -1,4 +1,13 @@
-import { Body, Controller, Param, Patch, Post, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiCode } from 'src/common/decorators/api-code.decorator';
 import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
@@ -35,5 +44,13 @@ export class HotelAdminController {
   @ApiCode('hotel.admin.update')
   update(@Param('id') id: string, @Body() dto: UpdateHotelDto) {
     return this.hotelService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('hotel.delete')
+  @AuditLog(AuditResourceType.HOTEL)
+  @ApiCode('hotel.admin.delete')
+  remove(@Param('id') id: string) {
+    return this.hotelService.remove(id);
   }
 }

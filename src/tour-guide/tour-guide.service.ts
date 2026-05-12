@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,7 +11,11 @@ import { CorrelationContextService } from 'src/common/correlation/correlation-co
 import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { UserService } from 'src/user/user.service';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { CreateTourGuideDto } from './dto/create-tour-guide.dto';
+import {
+  CreateTourGuideDto,
+  CvRefDto,
+  GalleryItemDto,
+} from './dto/create-tour-guide.dto';
 import { UpdateTourGuideDto } from './dto/update-tour-guide.dto';
 import { TourGuideQueryDto, TourGuideSortBy } from './dto/tour-guide-query.dto';
 import { TourGuide, TourGuideDocument } from './schema/tour-guide.schema';
@@ -33,8 +38,23 @@ const PROVINCE_POPULATE = {
   model: 'Province',
 };
 
+type StoredGalleryItem = {
+  url: string;
+  publicId?: string;
+  alt?: string;
+  order?: number;
+};
+type StoredCv = {
+  url: string;
+  publicId?: string;
+  filename?: string;
+  format?: string;
+};
+
 @Injectable()
 export class TourGuideService {
+  private readonly logger = new Logger(TourGuideService.name);
+
   constructor(
     @InjectModel(TourGuide.name)
     private readonly tourGuideModel: Model<TourGuideDocument>,
@@ -160,12 +180,8 @@ export class TourGuideService {
     return { ...guide, isFavorited: isFavorited.isFavorited };
   }
 
-  /** Admin: tạo guide cho user (truyền userId trong body) + optional CV + gallery (upload Cloudinary). */
-  async create(
-    dto: CreateTourGuideDto,
-    cvFile?: Express.Multer.File,
-    galleryFiles?: Express.Multer.File[],
-  ) {
+  /** Admin: tạo guide cho user (truyền userId trong body) + media refs đã upload trước. */
+  async create(dto: CreateTourGuideDto) {
     const userId = dto.userId;
     if (!userId || !Types.ObjectId.isValid(userId)) {
       throw new BadRequestException('userId is required');
@@ -176,26 +192,16 @@ export class TourGuideService {
     if (existing) {
       throw new BadRequestException('User already has a tour guide profile');
     }
+    const gallery = this.normalizeGallery(dto.gallery);
+    const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
     const doc = this.toDoc(dto, new Types.ObjectId(userId));
-    if (galleryFiles?.length) {
-      doc.gallery = await this.uploadGallery(galleryFiles);
-    }
-    const created = await this.tourGuideModel.create(doc);
+    const created = await this.tourGuideModel.create({ ...doc, gallery, cv });
     await this.userService.addRole(userId, 'guide');
-    if (cvFile) {
-      await this.applyCvFile(created, cvFile);
-      await created.save();
-    }
     return created.toObject();
   }
 
-  /** User đăng ký làm guide (userId từ JWT, isVerified: false) + optional CV + gallery (upload Cloudinary). */
-  async register(
-    userId: string,
-    dto: CreateTourGuideDto,
-    cvFile?: Express.Multer.File,
-    galleryFiles?: Express.Multer.File[],
-  ) {
+  /** User đăng ký làm guide (userId từ JWT, isVerified: false) + media refs đã upload trước. */
+  async register(userId: string, dto: CreateTourGuideDto) {
     const existing = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .exec();
@@ -204,16 +210,11 @@ export class TourGuideService {
         'You already have a tour guide profile. Wait for admin verification.',
       );
     }
+    const gallery = this.normalizeGallery(dto.gallery);
+    const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
     const doc = this.toDoc(dto, new Types.ObjectId(userId), false);
-    if (galleryFiles?.length) {
-      doc.gallery = await this.uploadGallery(galleryFiles);
-    }
-    const created = await this.tourGuideModel.create(doc);
+    const created = await this.tourGuideModel.create({ ...doc, gallery, cv });
     await this.userService.addRole(userId, 'guide');
-    if (cvFile) {
-      await this.applyCvFile(created, cvFile);
-      await created.save();
-    }
 
     const user = await this.userService.findBasicInfo(userId);
     this.eventEmitter.emit(
@@ -234,46 +235,28 @@ export class TourGuideService {
     return created.toObject();
   }
 
-  /** Guide cập nhật profile của mình (CV + gallery upload Cloudinary nếu gửi kèm). */
-  async updateMyProfile(
-    userId: string,
-    dto: UpdateTourGuideDto,
-    cvFile?: Express.Multer.File,
-    galleryFiles?: Express.Multer.File[],
-  ) {
+  /** Guide cập nhật profile của mình bằng JSON refs. */
+  async updateMyProfile(userId: string, dto: UpdateTourGuideDto) {
     const guide = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId), isActive: true })
       .exec();
     if (!guide) throw new NotFoundException('Tour guide profile not found');
     await this.applyUpdate(guide, dto);
-    if (galleryFiles?.length) {
-      const uploaded = await this.uploadGallery(galleryFiles);
-      guide.gallery = [...(guide.gallery || []), ...uploaded];
-    }
-    if (cvFile) {
-      await this.applyCvFile(guide, cvFile);
-    }
-    return guide.save().then((g) => g.toObject());
+    const orphanPublicIds = this.applyMediaUpdate(guide, dto);
+    const saved = await guide.save();
+    await this.deletePublicIds(orphanPublicIds, 'media');
+    return saved.toObject();
   }
 
-  /** Admin: cập nhật bất kỳ guide nào (CV + gallery upload Cloudinary nếu gửi kèm). */
-  async update(
-    id: string,
-    dto: UpdateTourGuideDto,
-    cvFile?: Express.Multer.File,
-    galleryFiles?: Express.Multer.File[],
-  ) {
+  /** Admin: cập nhật bất kỳ guide nào bằng JSON refs. */
+  async update(id: string, dto: UpdateTourGuideDto) {
     const guide = await this.tourGuideModel.findById(id).exec();
     if (!guide) throw new NotFoundException('Tour guide not found');
     await this.applyUpdate(guide, dto);
-    if (galleryFiles?.length) {
-      const uploaded = await this.uploadGallery(galleryFiles);
-      guide.gallery = [...(guide.gallery || []), ...uploaded];
-    }
-    if (cvFile) {
-      await this.applyCvFile(guide, cvFile);
-    }
-    return guide.save().then((g) => g.toObject());
+    const orphanPublicIds = this.applyMediaUpdate(guide, dto);
+    const saved = await guide.save();
+    await this.deletePublicIds(orphanPublicIds, 'media');
+    return saved.toObject();
   }
 
   /** Admin: verify / unverify guide. */
@@ -312,67 +295,94 @@ export class TourGuideService {
     return guide.save().then((g) => g.toObject());
   }
 
-  /** Upload mảng ảnh lên Cloudinary (folder tour-guides/gallery), trả về mảng { url, publicId, alt }. */
-  private async uploadGallery(
-    files: Express.Multer.File[],
-  ): Promise<Array<{ url: string; publicId?: string; alt?: string }>> {
-    if (!files?.length) return [];
-    const result: Array<{ url: string; publicId?: string; alt?: string }> = [];
-    for (let i = 0; i < files.length; i++) {
-      const uploaded = await this.cloudinaryService.uploadFile(files[i], {
-        folder: 'tour-guides/gallery',
-      });
-      result.push({
-        url: uploaded.secure_url,
-        publicId: uploaded.public_id,
-        alt: files[i].originalname || undefined,
-      });
-    }
-    return result;
+  /* ===== Media helpers (JSON-only pattern) ===== */
+
+  private normalizeGallery(input?: GalleryItemDto[]): StoredGalleryItem[] {
+    if (!input?.length) return [];
+    return input.map((item, idx) => ({
+      url: item.url,
+      ...(item.publicId ? { publicId: item.publicId } : {}),
+      ...(item.alt ? { alt: item.alt } : {}),
+      order: item.order ?? idx,
+    }));
   }
 
-  /** Xóa trên Cloudinary các ảnh có publicId không còn nằm trong danh sách mới. */
-  private async deleteRemovedGalleryImages(
-    currentGallery: Array<{ url?: string; publicId?: string }> | undefined,
-    newGallery: Array<{ url?: string; publicId?: string }> | undefined,
-  ) {
-    if (!currentGallery?.length || !newGallery) return;
-    const newIds = new Set(
-      newGallery.map((img) => img.publicId).filter(Boolean),
-    );
-    const toDelete = currentGallery.filter(
-      (img) => img.publicId && !newIds.has(img.publicId),
-    );
-    await Promise.all(
-      toDelete.map((img) =>
-        img.publicId
-          ? this.cloudinaryService.deleteFile(img.publicId).catch(() => {})
-          : Promise.resolve(),
-      ),
-    );
-  }
-
-  private async applyCvFile(
-    guide: TourGuideDocument,
-    file?: Express.Multer.File,
-  ) {
-    if (!file) return;
-
-    if (guide.cv?.publicId) {
-      await this.cloudinaryService
-        .deleteFile(guide.cv.publicId)
-        .catch(() => {});
-    }
-
-    const result = await this.cloudinaryService.uploadFile(file, {
-      folder: 'tour-guides/cv',
-    });
-
-    guide.cv = {
-      url: result.secure_url,
-      publicId: result.public_id,
-      filename: file.originalname,
+  private pickCv(input: CvRefDto): StoredCv {
+    return {
+      url: input.url,
+      ...(input.publicId ? { publicId: input.publicId } : {}),
+      ...(input.filename ? { filename: input.filename } : {}),
+      ...(input.format ? { format: input.format } : {}),
     };
+  }
+
+  private applyMediaUpdate(
+    guide: TourGuideDocument,
+    dto: UpdateTourGuideDto,
+  ): string[] {
+    const orphanPublicIds: string[] = [];
+
+    if (dto.gallery !== undefined) {
+      const prevGallery = (guide.gallery ?? []) as StoredGalleryItem[];
+      const nextGallery = this.normalizeGallery(dto.gallery);
+      orphanPublicIds.push(
+        ...this.getOrphanGalleryPublicIds(prevGallery, nextGallery),
+      );
+      guide.gallery = nextGallery;
+    }
+
+    if (dto.cv !== undefined) {
+      const prevCv = guide.cv as StoredCv | undefined;
+      const nextCv = dto.cv ? this.pickCv(dto.cv) : undefined;
+      orphanPublicIds.push(...this.getOrphanCvPublicIds(prevCv, nextCv));
+      guide.cv = nextCv;
+    }
+
+    return orphanPublicIds;
+  }
+
+  private getOrphanGalleryPublicIds(
+    prevGallery: StoredGalleryItem[],
+    nextGallery: StoredGalleryItem[],
+  ): string[] {
+    const oldIds = new Set(
+      prevGallery
+        .filter((item): item is StoredGalleryItem & { publicId: string } =>
+          Boolean(item.publicId),
+        )
+        .map((item) => item.publicId),
+    );
+    const newIds = new Set(
+      nextGallery
+        .filter((item): item is StoredGalleryItem & { publicId: string } =>
+          Boolean(item.publicId),
+        )
+        .map((item) => item.publicId),
+    );
+
+    return [...oldIds].filter((id) => !newIds.has(id));
+  }
+
+  private getOrphanCvPublicIds(prevCv?: StoredCv, nextCv?: StoredCv): string[] {
+    if (!prevCv?.publicId || prevCv.publicId === nextCv?.publicId) return [];
+    return [prevCv.publicId];
+  }
+
+  private async deletePublicIds(publicIds: string[], label: string) {
+    if (!publicIds.length) return;
+
+    const results = await Promise.allSettled(
+      publicIds.map((id) => this.cloudinaryService.deleteFile(id)),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.logger.warn(
+          `Failed to delete orphan tour-guide ${label} media: ${String(
+            result.reason?.message ?? result.reason,
+          )}`,
+        );
+      }
+    }
   }
 
   /** Admin: soft delete + bỏ role guide khỏi User. */
@@ -432,7 +442,7 @@ export class TourGuideService {
       certifications: dto.certifications ?? [],
       licenseNumber: dto.licenseNumber,
       yearsOfExperience: dto.yearsOfExperience,
-      gallery: dto.gallery ?? [],
+      gallery: [],
       ratingSummary: { average: 0, total: 0 },
       responseRate: dto.responseRate ?? 0,
       completedTripsCount: dto.completedTripsCount ?? 0,
@@ -460,10 +470,6 @@ export class TourGuideService {
       guide.licenseNumber = dto.licenseNumber;
     if (dto.yearsOfExperience !== undefined)
       guide.yearsOfExperience = dto.yearsOfExperience;
-    if (dto.gallery !== undefined) {
-      await this.deleteRemovedGalleryImages(guide.gallery, dto.gallery);
-      guide.gallery = dto.gallery;
-    }
     if (dto.responseRate !== undefined) guide.responseRate = dto.responseRate;
     if (dto.completedTripsCount !== undefined)
       guide.completedTripsCount = dto.completedTripsCount;

@@ -119,7 +119,7 @@ export interface Tour {
   bookingConfig: TourBookingConfig;
   sale?: TourSale;
   ratingSummary: TourRatingSummary;
-  schedule: TourSchedule;
+  schedule?: TourSchedule;
   difficulty: 'EASY' | 'MODERATE' | 'CHALLENGING' | 'DIFFICULT';
   createdAt: Date;
   updatedAt: Date;

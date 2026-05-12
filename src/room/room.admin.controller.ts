@@ -5,11 +5,9 @@ import {
   Param,
   Patch,
   Post,
-  UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiCode } from 'src/common/decorators/api-code.decorator';
 import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
@@ -36,25 +34,16 @@ export class RoomAdminController {
   @RequirePermissions('room.create')
   @AuditLog(AuditResourceType.ROOM)
   @ApiCode('room.admin.create')
-  @UseInterceptors(FilesInterceptor('gallery', 10))
-  create(
-    @Body() createRoomDto: CreateRoomDto,
-    @UploadedFiles() files: Express.Multer.File[],
-  ) {
-    return this.roomService.create(createRoomDto, files);
+  create(@Body() createRoomDto: CreateRoomDto) {
+    return this.roomService.create(createRoomDto);
   }
 
   @Patch(':id')
   @RequirePermissions('room.update')
   @AuditLog(AuditResourceType.ROOM)
   @ApiCode('room.admin.update')
-  @UseInterceptors(FilesInterceptor('gallery', 10))
-  update(
-    @Param('id') id: string,
-    @Body() updateRoomDto: UpdateRoomDto,
-    @UploadedFiles() files: Express.Multer.File[],
-  ) {
-    return this.roomService.update(id, updateRoomDto, files);
+  update(@Param('id') id: string, @Body() updateRoomDto: UpdateRoomDto) {
+    return this.roomService.update(id, updateRoomDto);
   }
 
   @Delete(':id')

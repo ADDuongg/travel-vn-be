@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { NotFoundDomainException } from 'src/common/exceptions';
 import { FilterQuery, SortOrder, Types } from 'mongoose';
-import { CreateTourDto } from './dto/create-tour.dto';
+import {
+  CreateTourDto,
+  GalleryItemDto,
+  ThumbnailRefDto,
+} from './dto/create-tour.dto';
 import { UpdateTourDto } from './dto/update-tour.dto';
 import { TourQueryDto, TourSortBy } from './dto/tour-query.dto';
 import { Tour, TourDocument } from './schema/tour.schema';
@@ -26,6 +30,9 @@ import { TourIndexQueueService } from './tour-index.queue';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import type { Counter } from 'prom-client';
 import { ES_FALLBACK_TOTAL } from './tour-es.metrics';
+
+type StoredThumbnail = { url: string; publicId?: string; alt?: string };
+type StoredGalleryItem = StoredThumbnail & { order?: number };
 
 /* interface PaginatedResult<T> {
   items: T[];
@@ -72,10 +79,7 @@ export class TourService {
   /**
    * Create a new tour
    */
-  async create(
-    dto: CreateTourDto,
-    files?: Express.Multer.File[],
-  ): Promise<Tour> {
+  async create(dto: CreateTourDto): Promise<Tour> {
     // Check slug uniqueness
     const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
     if (existedSlug) {
@@ -104,7 +108,8 @@ export class TourService {
       throw new BadRequestException('Invalid destination province(s)');
     }
 
-    const { thumbnail, gallery } = await this.uploadGallery(files);
+    const gallery = this.normalizeGallery(dto.gallery);
+    const thumbnail = this.resolveThumbnail(dto.thumbnail, gallery);
 
     // Create tour
     const created = await this.tourRepository.create({
@@ -137,7 +142,9 @@ export class TourService {
       transportTypes: dto.transportTypes ?? [],
       bookingConfig: (dto.bookingConfig ?? {}) as Tour['bookingConfig'],
       difficulty: dto.difficulty ?? 'MODERATE',
-      thumbnail: thumbnail ?? undefined,
+      sale: dto.sale?.isActive ? dto.sale : undefined,
+      schedule: dto.schedule,
+      thumbnail,
       gallery,
     });
 
@@ -398,11 +405,7 @@ export class TourService {
   /**
    * Update tour
    */
-  async update(
-    id: string,
-    dto: UpdateTourDto,
-    files?: Express.Multer.File[],
-  ): Promise<Tour> {
+  async update(id: string, dto: UpdateTourDto): Promise<Tour> {
     const tour = await this.tourRepository.findById(id);
     if (!tour) {
       throw new NotFoundDomainException('Tour not found');
@@ -426,12 +429,67 @@ export class TourService {
       tour.code = dto.code;
     }
 
-    // Update gallery/thumbnail when new files are uploaded
-    if (files?.length) {
-      await this.deleteGallery(tour.gallery || []);
-      const uploaded = await this.uploadGallery(files);
-      tour.thumbnail = uploaded.thumbnail ?? undefined;
-      tour.gallery = uploaded.gallery;
+    if (dto.departureProvinceId !== undefined || dto.destinations !== undefined) {
+      const provinces = await this.provincesService.findAllForDropdown();
+      const provinceIds = provinces.map((p: any) => String(p._id));
+
+      if (
+        dto.departureProvinceId !== undefined &&
+        !provinceIds.includes(dto.departureProvinceId)
+      ) {
+        throw new BadRequestException('Invalid departure province');
+      }
+
+      if (
+        dto.destinations !== undefined &&
+        dto.destinations.some((d) => !provinceIds.includes(d.provinceId))
+      ) {
+        throw new BadRequestException('Invalid destination province(s)');
+      }
+    }
+
+    const prevGallery = (tour.gallery ?? []) as StoredGalleryItem[];
+    const prevThumbnail = tour.thumbnail as StoredThumbnail | undefined;
+
+    let nextGallery = prevGallery;
+    let nextThumbnail = prevThumbnail;
+    let galleryTouched = false;
+    let thumbnailTouched = false;
+
+    if (dto.gallery !== undefined) {
+      nextGallery = this.normalizeGallery(dto.gallery);
+      galleryTouched = true;
+    }
+
+    if (dto.thumbnail !== undefined) {
+      nextThumbnail = dto.thumbnail
+        ? this.pickThumbnail(dto.thumbnail)
+        : undefined;
+      thumbnailTouched = true;
+    }
+
+    if (galleryTouched && !thumbnailTouched) {
+      const stillValid =
+        prevThumbnail?.publicId &&
+        nextGallery.some((g) => g.publicId === prevThumbnail.publicId);
+      if (!stillValid) {
+        nextThumbnail = this.resolveThumbnail(undefined, nextGallery);
+      }
+    } else if (thumbnailTouched && !galleryTouched) {
+      nextThumbnail = this.resolveThumbnail(nextThumbnail, prevGallery);
+    } else if (galleryTouched && thumbnailTouched) {
+      nextThumbnail = this.resolveThumbnail(nextThumbnail, nextGallery);
+    }
+
+    if (galleryTouched || thumbnailTouched) {
+      await this.cleanupOrphanMedia({
+        prevGallery,
+        prevThumbnail,
+        nextGallery,
+        nextThumbnail,
+      });
+      tour.thumbnail = nextThumbnail;
+      tour.gallery = nextGallery;
     }
 
     // Update fields
@@ -449,7 +507,12 @@ export class TourService {
       tour.itinerary = dto.itinerary as any;
     }
     if (dto.capacity !== undefined) {
-      tour.capacity = dto.capacity as any;
+      tour.capacity = {
+        minGuests: dto.capacity.minGuests ?? tour.capacity.minGuests ?? 1,
+        maxGuests: dto.capacity.maxGuests,
+        privateAvailable:
+          dto.capacity.privateAvailable ?? tour.capacity.privateAvailable ?? false,
+      } as any;
     }
     if (dto.pricing !== undefined) {
       tour.pricing = dto.pricing as any;
@@ -480,6 +543,14 @@ export class TourService {
       tour.amenities = dto.amenities.map(
         (id: string) => new Types.ObjectId(id),
       );
+    }
+
+    if (dto.sale !== undefined) {
+      tour.sale = dto.sale?.isActive ? dto.sale : undefined;
+    }
+
+    if (dto.schedule !== undefined) {
+      tour.schedule = dto.schedule as any;
     }
 
     const saved = await tour.save();
@@ -577,47 +648,73 @@ export class TourService {
     }));
   }
 
-  private async uploadGallery(files?: Express.Multer.File[]) {
-    let thumbnail: { url: string; publicId?: string; alt?: string } | null =
-      null;
-    const gallery: Array<{
-      url: string;
-      publicId?: string;
-      alt?: string;
-      order?: number;
-    }> = [];
-
-    if (files?.length) {
-      for (let i = 0; i < files.length; i++) {
-        const uploaded = await this.cloudinaryService.uploadFile(files[i], {
-          folder: 'tours',
-        });
-
-        const image = {
-          url: uploaded.secure_url,
-          publicId: uploaded.public_id,
-          order: i,
-        };
-
-        if (i === 0) thumbnail = image;
-        gallery.push(image);
-      }
-    }
-
-    return { thumbnail, gallery };
+  private pickThumbnail(input: ThumbnailRefDto): StoredThumbnail {
+    return {
+      url: input.url,
+      ...(input.publicId ? { publicId: input.publicId } : {}),
+      ...(input.alt ? { alt: input.alt } : {}),
+    };
   }
 
-  private async deleteGallery(
-    gallery: Array<{ url?: string; publicId?: string }>,
-  ) {
-    if (!gallery?.length) return;
+  private normalizeGallery(input?: GalleryItemDto[]): StoredGalleryItem[] {
+    if (!input?.length) return [];
+    return input.map((item, idx) => ({
+      url: item.url,
+      ...(item.publicId ? { publicId: item.publicId } : {}),
+      ...(item.alt ? { alt: item.alt } : {}),
+      order: item.order ?? idx,
+    }));
+  }
 
-    await Promise.all(
-      gallery.map((img) =>
-        img.publicId
-          ? this.cloudinaryService.deleteFile(img.publicId)
-          : Promise.resolve(),
-      ),
+  private resolveThumbnail(
+    thumbnail: ThumbnailRefDto | StoredThumbnail | undefined,
+    gallery: StoredGalleryItem[],
+  ): StoredThumbnail | undefined {
+    if (thumbnail?.url) {
+      return this.pickThumbnail(thumbnail as ThumbnailRefDto);
+    }
+    const first = gallery[0];
+    if (!first?.url) return undefined;
+    return {
+      url: first.url,
+      ...(first.publicId ? { publicId: first.publicId } : {}),
+      ...(first.alt ? { alt: first.alt } : {}),
+    };
+  }
+
+  private async cleanupOrphanMedia(args: {
+    prevGallery: StoredGalleryItem[];
+    prevThumbnail?: StoredThumbnail;
+    nextGallery: StoredGalleryItem[];
+    nextThumbnail?: StoredThumbnail;
+  }) {
+    const collect = (
+      items: Array<StoredThumbnail | StoredGalleryItem | undefined>,
+    ) =>
+      new Set(
+        items
+          .filter((i): i is StoredThumbnail => Boolean(i?.publicId))
+          .map((i) => i.publicId as string),
+      );
+
+    const oldIds = collect([args.prevThumbnail, ...args.prevGallery]);
+    const newIds = collect([args.nextThumbnail, ...args.nextGallery]);
+
+    const orphans: string[] = [];
+    for (const id of oldIds) {
+      if (!newIds.has(id)) orphans.push(id);
+    }
+    if (!orphans.length) return;
+
+    const results = await Promise.allSettled(
+      orphans.map((id) => this.cloudinaryService.deleteFile(id)),
     );
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        this.logger.warn(
+          `Failed to delete orphan media: ${String(r.reason?.message ?? r.reason)}`,
+        );
+      }
+    }
   }
 }

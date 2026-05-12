@@ -2,11 +2,17 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { CreateHotelDto } from './dto/create-hotel.dto';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import {
+  CreateHotelDto,
+  GalleryItemDto,
+  ThumbnailRefDto,
+} from './dto/create-hotel.dto';
 import { UpdateHotelDto } from './dto/update-hotel.dto';
 import { HotelQueryDto } from './dto/hotel-query.dto';
 import { Hotel, HotelDocument } from './schema/hotel.schema';
@@ -14,11 +20,17 @@ import { ProvincesService } from 'src/provinces/provinces.service';
 import { FavoriteService } from 'src/favorite/favorite.service';
 import { FavoriteEntityType } from 'src/favorite/favorite.types';
 
+type StoredThumbnail = { url: string; publicId?: string; alt?: string };
+type StoredGalleryItem = StoredThumbnail & { order?: number };
+
 @Injectable()
 export class HotelService {
+  private readonly logger = new Logger(HotelService.name);
+
   constructor(
     @InjectModel(Hotel.name)
     private readonly hotelModel: Model<HotelDocument>,
+    private readonly cloudinaryService: CloudinaryService,
     private readonly provincesService: ProvincesService,
     private readonly favoriteService: FavoriteService,
   ) {}
@@ -41,6 +53,9 @@ export class HotelService {
       throw new BadRequestException('Province not found');
     }
 
+    const gallery = this.normalizeGallery(dto.gallery);
+    const thumbnail = this.resolveThumbnail(dto.thumbnail, gallery);
+
     return this.hotelModel.create({
       slug: dto.slug,
       isActive: dto.isActive ?? true,
@@ -51,6 +66,8 @@ export class HotelService {
       location: dto.location,
       amenities: dto.amenities?.map((id) => new Types.ObjectId(id)) ?? [],
       ratingSummary: { average: 0, total: 0 },
+      thumbnail,
+      gallery,
     });
   }
 
@@ -191,6 +208,140 @@ export class HotelService {
       hotel.amenities = dto.amenities.map((aid) => new Types.ObjectId(aid));
     }
 
+    const prevGallery = (hotel.gallery ?? []) as StoredGalleryItem[];
+    const prevThumbnail = hotel.thumbnail as StoredThumbnail | undefined;
+
+    let nextGallery = prevGallery;
+    let nextThumbnail = prevThumbnail;
+    let galleryTouched = false;
+    let thumbnailTouched = false;
+
+    if (dto.gallery !== undefined) {
+      nextGallery = this.normalizeGallery(dto.gallery);
+      galleryTouched = true;
+    }
+
+    if (dto.thumbnail !== undefined) {
+      nextThumbnail = dto.thumbnail
+        ? this.pickThumbnail(dto.thumbnail)
+        : undefined;
+      thumbnailTouched = true;
+    }
+
+    if (galleryTouched && !thumbnailTouched) {
+      const stillValid =
+        prevThumbnail?.publicId &&
+        nextGallery.some((g) => g.publicId === prevThumbnail.publicId);
+      if (!stillValid) {
+        nextThumbnail = this.resolveThumbnail(undefined, nextGallery);
+      }
+    } else if (thumbnailTouched && !galleryTouched) {
+      nextThumbnail = this.resolveThumbnail(nextThumbnail, prevGallery);
+    } else if (galleryTouched && thumbnailTouched) {
+      nextThumbnail = this.resolveThumbnail(nextThumbnail, nextGallery);
+    }
+
+    if (galleryTouched || thumbnailTouched) {
+      await this.cleanupOrphanMedia({
+        prevGallery,
+        prevThumbnail,
+        nextGallery,
+        nextThumbnail,
+      });
+    }
+
+    hotel.thumbnail = nextThumbnail;
+    hotel.gallery = nextGallery;
+
     return hotel.save();
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const hotel = await this.hotelModel.findById(id);
+    if (!hotel) {
+      throw new NotFoundException('Hotel not found');
+    }
+
+    await this.cleanupOrphanMedia({
+      prevGallery: (hotel.gallery ?? []) as StoredGalleryItem[],
+      prevThumbnail: hotel.thumbnail as StoredThumbnail | undefined,
+      nextGallery: [],
+      nextThumbnail: undefined,
+    });
+
+    await hotel.deleteOne();
+    return true;
+  }
+
+  /* ===== Media helpers (JSON-only pattern) ===== */
+
+  private pickThumbnail(input: ThumbnailRefDto): StoredThumbnail {
+    return {
+      url: input.url,
+      ...(input.publicId ? { publicId: input.publicId } : {}),
+      ...(input.alt ? { alt: input.alt } : {}),
+    };
+  }
+
+  private normalizeGallery(input?: GalleryItemDto[]): StoredGalleryItem[] {
+    if (!input?.length) return [];
+    return input.map((item, idx) => ({
+      url: item.url,
+      ...(item.publicId ? { publicId: item.publicId } : {}),
+      ...(item.alt ? { alt: item.alt } : {}),
+      order: item.order ?? idx,
+    }));
+  }
+
+  private resolveThumbnail(
+    thumbnail: ThumbnailRefDto | StoredThumbnail | undefined,
+    gallery: StoredGalleryItem[],
+  ): StoredThumbnail | undefined {
+    if (thumbnail?.url) {
+      return this.pickThumbnail(thumbnail as ThumbnailRefDto);
+    }
+    const first = gallery[0];
+    if (!first?.url) return undefined;
+    return {
+      url: first.url,
+      ...(first.publicId ? { publicId: first.publicId } : {}),
+      ...(first.alt ? { alt: first.alt } : {}),
+    };
+  }
+
+  private async cleanupOrphanMedia(args: {
+    prevGallery: StoredGalleryItem[];
+    prevThumbnail?: StoredThumbnail;
+    nextGallery: StoredGalleryItem[];
+    nextThumbnail?: StoredThumbnail;
+  }) {
+    const collect = (
+      items: Array<StoredThumbnail | StoredGalleryItem | undefined>,
+    ) =>
+      new Set(
+        items
+          .filter((i): i is StoredThumbnail => Boolean(i?.publicId))
+          .map((i) => i.publicId as string),
+      );
+
+    const oldIds = collect([args.prevThumbnail, ...args.prevGallery]);
+    const newIds = collect([args.nextThumbnail, ...args.nextGallery]);
+
+    const orphans: string[] = [];
+    for (const id of oldIds) {
+      if (!newIds.has(id)) orphans.push(id);
+    }
+    if (!orphans.length) return;
+
+    const results = await Promise.allSettled(
+      orphans.map((id) => this.cloudinaryService.deleteFile(id)),
+    );
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        this.logger.warn(
+          `Failed to delete orphan media: ${String(r.reason?.message ?? r.reason)}`,
+        );
+      }
+    }
   }
 }

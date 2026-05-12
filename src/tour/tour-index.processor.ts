@@ -76,8 +76,7 @@ export class TourIndexProcessor extends WorkerHost {
             operation,
             durationMs: Date.now() - startedMs,
             err,
-            message:
-              err instanceof Error ? err.message : String(err),
+            message: err instanceof Error ? err.message : String(err),
           },
           'Tour ES sync exhausted retries',
         );
@@ -89,8 +88,7 @@ export class TourIndexProcessor extends WorkerHost {
           tourId,
           operation,
           durationMs: Date.now() - startedMs,
-          message:
-            err instanceof Error ? err.message : String(err),
+          message: err instanceof Error ? err.message : String(err),
         });
       }
       throw err;

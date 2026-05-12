@@ -5,11 +5,9 @@ import {
   Param,
   Patch,
   Post,
-  Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
 import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
@@ -36,19 +34,8 @@ export class TourGuideAdminController {
   @RequirePermissions('tour_guide.create')
   @AuditLog(AuditResourceType.TOUR_GUIDE)
   @ApiCode('tour-guide.admin.create')
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'cv', maxCount: 1 },
-      { name: 'gallery', maxCount: 10 },
-    ]),
-  )
-  create(
-    @Body() dto: CreateTourGuideDto,
-    @Req() req: { files?: Record<string, Express.Multer.File[]> },
-  ) {
-    const cv = req.files?.cv?.[0];
-    const gallery = req.files?.gallery ?? [];
-    return this.tourGuideService.create(dto, cv, gallery);
+  create(@Body() dto: CreateTourGuideDto) {
+    return this.tourGuideService.create(dto);
   }
 
   @Patch(':id/verify')
@@ -69,20 +56,11 @@ export class TourGuideAdminController {
   @RequirePermissions('tour_guide.update')
   @AuditLog(AuditResourceType.TOUR_GUIDE)
   @ApiCode('tour-guide.admin.update')
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'cv', maxCount: 1 },
-      { name: 'gallery', maxCount: 10 },
-    ]),
-  )
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTourGuideDto,
-    @Req() req: { files?: Record<string, Express.Multer.File[]> },
   ) {
-    const cv = req.files?.cv?.[0];
-    const gallery = req.files?.gallery ?? [];
-    return this.tourGuideService.update(id, dto, cv, gallery);
+    return this.tourGuideService.update(id, dto);
   }
 
   @Delete(':id')

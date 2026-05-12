@@ -20,6 +20,7 @@ const hotelServiceMock = {
   findAllActiveOptions: jest.fn(),
   findById: jest.fn(),
   update: jest.fn(),
+  remove: jest.fn(),
 };
 
 describe('HotelPublicController', () => {

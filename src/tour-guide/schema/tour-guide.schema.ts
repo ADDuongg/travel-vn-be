@@ -43,18 +43,24 @@ export class TourGuide {
 
   // === Media ===
   @Prop({
-    type: [{ url: String, publicId: String, alt: String }],
+    type: [{ url: String, publicId: String, alt: String, order: Number }],
     default: [],
   })
-  gallery: Array<{ url: string; publicId?: string; alt?: string }>;
+  gallery: Array<{
+    url: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  }>;
 
   @Prop({
-    type: { url: String, publicId: String, filename: String },
+    type: { url: String, publicId: String, filename: String, format: String },
   })
   cv?: {
     url: string;
     publicId?: string;
     filename?: string;
+    format?: string;
   };
 
   // === Rating (auto-update từ Review) ===

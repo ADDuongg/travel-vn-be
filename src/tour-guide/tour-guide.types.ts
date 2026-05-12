@@ -29,8 +29,13 @@ export interface TourGuideListItem {
   certifications: string[];
   licenseNumber?: string;
   yearsOfExperience?: number;
-  gallery: Array<{ url: string; publicId?: string; alt?: string }>;
-  cv?: { url: string; publicId?: string; filename?: string };
+  gallery: Array<{
+    url: string;
+    publicId?: string;
+    alt?: string;
+    order?: number;
+  }>;
+  cv?: { url: string; publicId?: string; filename?: string; format?: string };
   ratingSummary: { average: number; total: number };
   isAvailable: boolean;
   isVerified: boolean;
