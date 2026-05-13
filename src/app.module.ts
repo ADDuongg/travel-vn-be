@@ -61,6 +61,8 @@ import { BlogModule } from './blog/blog.module';
 import { CorrelationModule } from './common/correlation/correlation.module';
 import { CorrelationContextService } from './common/correlation/correlation-context.service';
 import { AuthContextInterceptor } from './common/interceptors/auth-context.interceptor';
+import { HttpDurationObservabilityInterceptor } from './common/interceptors/http-duration-observability.interceptor';
+import { httpMetricsProviders } from './common/metrics/http.metrics';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
 import { DatabaseTransactionModule } from './common/database/database-transaction.module';
 
@@ -130,6 +132,8 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
 
         return {
           pinoHttp: {
+            // Completion + duration are logged by HttpDurationObservabilityInterceptor (route pattern + durationMs).
+            autoLogging: false,
             level: logLevel,
             base: {
               service: env.get('SERVICE_NAME'),
@@ -258,7 +262,13 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
   controllers: [AppController],
   providers: [
     AppService,
+    ...httpMetricsProviders,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    /** Outermost: wall-clock HTTP duration + Prometheus histogram on response finish. */
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: HttpDurationObservabilityInterceptor,
+    },
     /** Runs after JWT guard on protected routes — fills ALS fields for Pino mixin. */
     { provide: APP_INTERCEPTOR, useClass: AuthContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },

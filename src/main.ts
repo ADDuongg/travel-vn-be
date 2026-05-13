@@ -9,6 +9,7 @@ import * as bodyParser from 'body-parser';
 import { Logger } from 'nestjs-pino';
 
 import { AppModule } from './app.module';
+import { GLOBAL_HTTP_API_PREFIX } from './config/http-route.constants';
 import { EnvService } from './env/env.service';
 import { HttpExceptionFilter } from './interceptor/http-fail.interceptor.filter';
 import { bootstrapLogger } from './main-bootstrap-logger';
@@ -20,7 +21,7 @@ async function bootstrap() {
   });
   bootstrapLogger.info('NestFactory.create OK');
 
-  app.setGlobalPrefix('api/v1', {
+  app.setGlobalPrefix(GLOBAL_HTTP_API_PREFIX, {
     exclude: [
       { path: '', method: RequestMethod.GET },
       { path: 'health', method: RequestMethod.ALL },
@@ -107,7 +108,7 @@ async function bootstrap() {
     const fullDoc = (): OpenApiDoc =>
       SwaggerModule.createDocument(app, swaggerConfig);
 
-    const basePrefixes = ['/api/v1'];
+    const basePrefixes = [`/${GLOBAL_HTTP_API_PREFIX}`];
 
     SwaggerModule.setup('api/docs/all', app, () => fullDoc());
     SwaggerModule.setup('api/docs/public', app, () =>
