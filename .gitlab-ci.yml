@@ -124,7 +124,7 @@ default:
 # ---------------------------------------------------------------------------
 # Build Docker image cho STAGING environment.
 # Chi chay khi push/merge vao branch "staging".
-# Khong can --build-arg vi env vars truyen runtime qua docker-compose.
+# APP_VERSION = git short SHA (structured logs / Loki). Local build: omit arg → package.json version.
 build:staging:
   stage: build
   image: docker:27
@@ -137,6 +137,7 @@ build:staging:
   script:
     - >
       docker build
+      --build-arg APP_VERSION=$CI_COMMIT_SHORT_SHA
       -t $CI_REGISTRY_IMAGE:staging-latest
       -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
       .
@@ -174,6 +175,7 @@ build:production:
   script:
     - >
       docker build
+      --build-arg APP_VERSION=$CI_COMMIT_SHORT_SHA
       -t $CI_REGISTRY_IMAGE:production-latest
       -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
       .

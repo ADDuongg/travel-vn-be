@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 import pino from 'pino';
 import { validateEnv } from './config/env.validation';
+import { resolveAppVersion } from './config/app-version';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -133,7 +134,7 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
             base: {
               service: env.get('SERVICE_NAME'),
               environment: env.get('NODE_ENV'),
-              version: env.get('APP_VERSION') ?? 'unknown',
+              version: resolveAppVersion(env.get('APP_VERSION')),
             },
             mixin,
             transport: usePinoPretty
@@ -191,7 +192,7 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
             base: {
               service: env.get('SERVICE_NAME'),
               environment: env.get('NODE_ENV'),
-              version: env.get('APP_VERSION') ?? 'unknown',
+              version: resolveAppVersion(env.get('APP_VERSION')),
               phase: 'bootstrap',
               module: 'mongodb',
             },

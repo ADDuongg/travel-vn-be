@@ -45,6 +45,10 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# GitLab CI: docker build --build-arg APP_VERSION=$CI_COMMIT_SHORT_SHA (logs / Loki)
+ARG APP_VERSION=
+ENV APP_VERSION=${APP_VERSION}
+
 ENV NODE_ENV=production
 
 # wget: dung cho HEALTHCHECK va docker-compose healthcheck (image alpine mac dinh khong co)

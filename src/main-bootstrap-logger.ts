@@ -1,4 +1,5 @@
 import pino from 'pino';
+import { resolveAppVersion } from './config/app-version';
 
 const LOG_LEVELS = [
   'trace',
@@ -28,6 +29,6 @@ export const bootstrapLogger = pino({
     phase: 'bootstrap',
     service: process.env.SERVICE_NAME?.trim() || 'tours-api',
     environment: process.env.NODE_ENV ?? 'development',
-    version: process.env.APP_VERSION?.trim() || 'unknown',
+    version: resolveAppVersion(),
   },
 });
