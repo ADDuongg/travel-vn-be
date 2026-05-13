@@ -1,5 +1,6 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { ForbiddenDomainException } from 'src/common/exceptions';
 import { RBAC_PERMISSIONS_METADATA_KEY } from 'src/rbac/constants';
 import { PermissionGuard } from './permission.guard';
 
@@ -45,7 +46,7 @@ describe('PermissionGuard', () => {
       guard.canActivate(
         ctx({ path: '/api/v1/admin/hotels', permissions: [], user: {} }),
       ),
-    ).toThrow(ForbiddenException);
+    ).toThrow(ForbiddenDomainException);
   });
 
   it('allows super admin bypass', () => {
@@ -84,6 +85,6 @@ describe('PermissionGuard', () => {
           user: { rbacPermissions: ['hotel.view'], isSuperAdmin: false },
         }),
       ),
-    ).toThrow(ForbiddenException);
+    ).toThrow(ForbiddenDomainException);
   });
 });

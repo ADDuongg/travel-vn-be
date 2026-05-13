@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateRouterRoleDto } from './dto/create-router-role.dto';
@@ -17,7 +18,7 @@ export class RouterRoleService {
       const rr = new this.routerRoleModel(dto);
       return await rr.save();
     } catch {
-      throw new BadRequestException('Router already assigned to role');
+      throw new DomainException('Router already assigned to role', 400, 'BAD_REQUEST', 'router.role.bad_request');
     }
   }
 

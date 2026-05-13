@@ -1,8 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { parseDateOnly } from 'src/utils/date.util';
@@ -60,7 +61,7 @@ export class TourInventoryService {
     }>
   > {
     if (!Types.ObjectId.isValid(tourId)) {
-      throw new BadRequestException('Invalid tour ID');
+      throw new DomainException('Invalid tour ID', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     const [year, monthNum] = month.split('-').map(Number);
@@ -68,7 +69,12 @@ export class TourInventoryService {
     console.log('month', month);
 
     if (!year || !monthNum || monthNum < 1 || monthNum > 12) {
-      throw new BadRequestException('Invalid month format (use YYYY-MM)');
+      throw new DomainException(
+        'Invalid month format (use YYYY-MM)',
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     const start = new Date(Date.UTC(year, monthNum - 1, 1));
@@ -111,19 +117,15 @@ export class TourInventoryService {
       .session(session ?? null);
 
     if (!inv) {
-      throw new NotFoundException(
-        'Tour inventory not found for this tour and departure date',
-      );
+      throw new NotFoundDomainException('Tour inventory not found for this tour and departure date', 'NOT_FOUND', 'tour.inventory.not_found');
     }
 
     if (inv.status === TourInventoryStatus.CANCELLED) {
-      throw new BadRequestException('This departure is cancelled');
+      throw new DomainException('This departure is cancelled', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     if (inv.availableSlots < dto.slots) {
-      throw new BadRequestException(
-        `Not enough slots. Available: ${inv.availableSlots}, requested: ${dto.slots}`,
-      );
+      throw new DomainException(`Not enough slots. Available: ${inv.availableSlots}, requested: ${dto.slots}`, 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     const prevStatus = inv.status;
@@ -182,9 +184,7 @@ export class TourInventoryService {
       .session(session ?? null);
 
     if (!inv) {
-      throw new NotFoundException(
-        'Tour inventory not found for this tour and departure date',
-      );
+      throw new NotFoundDomainException('Tour inventory not found for this tour and departure date', 'NOT_FOUND', 'tour.inventory.not_found');
     }
 
     const prevStatus = inv.status;
@@ -241,24 +241,22 @@ export class TourInventoryService {
     specialPrice?: number,
   ): Promise<TourInventoryDocument> {
     if (!Types.ObjectId.isValid(tourId)) {
-      throw new BadRequestException('Invalid tour ID');
+      throw new DomainException('Invalid tour ID', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     const tour = await this.tourModel.findById(tourId);
     if (!tour) {
-      throw new NotFoundException('Tour not found');
+      throw new NotFoundDomainException('Tour not found', 'NOT_FOUND', 'tour.inventory.not_found');
     }
 
     const date = parseDateOnly(departureDate);
     if (date.getTime() < Date.now()) {
-      throw new BadRequestException('Departure date must be in the future');
+      throw new DomainException('Departure date must be in the future', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     const maxGuests = tour.capacity?.maxGuests ?? 100;
     if (totalSlots < 1 || totalSlots > maxGuests) {
-      throw new BadRequestException(
-        `totalSlots must be between 1 and ${maxGuests}`,
-      );
+      throw new DomainException(`totalSlots must be between 1 and ${maxGuests}`, 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
     }
 
     let inv = await this.inventoryModel.findOne({
@@ -269,8 +267,7 @@ export class TourInventoryService {
     if (inv) {
       const booked = inv.totalSlots - inv.availableSlots;
       if (totalSlots < booked) {
-        throw new BadRequestException(
-          `Cannot set totalSlots below already booked (${booked})`,
+        throw new DomainException(`Cannot set totalSlots below already booked (${booked}, 400, 'BAD_REQUEST', 'tour.inventory.bad_request')`,
         );
       }
       inv.totalSlots = totalSlots;

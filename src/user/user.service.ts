@@ -1,5 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { ForbiddenDomainException } from 'src/common/exceptions';
+import { Injectable } from '@nestjs/common';
+import { DomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { UserI18nKeys } from './user.i18n-keys';
 import * as bcrypt from 'bcryptjs';
 import { Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -28,16 +30,28 @@ export class UserService {
     const u = await this.userRepository.findByIdForAdminAccess(userId);
 
     if (!u) {
-      throw new ForbiddenDomainException('Admin access required');
+      throw new ForbiddenDomainException(
+        'Admin access required',
+        'ADMIN_PORTAL_REQUIRED',
+        UserI18nKeys.adminPortalRequired,
+      );
     }
     if (u.deletedAt || !u.isActive) {
-      throw new ForbiddenDomainException('Account inactive');
+      throw new ForbiddenDomainException(
+        'Account inactive',
+        'ACCOUNT_INACTIVE',
+        UserI18nKeys.accountInactive,
+      );
     }
     if (u.isSuperAdmin) {
       return;
     }
     if (!hasPortalStaffRole(u.roles ?? [])) {
-      throw new ForbiddenDomainException('Admin access required');
+      throw new ForbiddenDomainException(
+        'Admin access required',
+        'ADMIN_PORTAL_REQUIRED',
+        UserI18nKeys.adminPortalRequired,
+      );
     }
   }
 
@@ -47,7 +61,12 @@ export class UserService {
       userDto.email,
     );
     if (existedUser) {
-      throw new BadRequestException('Username hoặc email đã tồn tại');
+      throw new DomainException(
+        'Username hoặc email đã tồn tại',
+        400,
+        'DUPLICATE_USERNAME_EMAIL',
+        UserI18nKeys.duplicateUsernameEmail,
+      );
     }
 
     const hashedPassword = await bcrypt.hash(userDto.password, 10);
@@ -131,7 +150,12 @@ export class UserService {
         orConditions,
       );
       if (existed) {
-        throw new BadRequestException('Username hoặc email đã tồn tại');
+        throw new DomainException(
+          'Username hoặc email đã tồn tại',
+          400,
+          'DUPLICATE_USERNAME_EMAIL',
+          UserI18nKeys.duplicateUsernameEmail,
+        );
       }
     }
 
@@ -157,7 +181,12 @@ export class UserService {
       $set.password = await bcrypt.hash(dto.password, 10);
     }
 
-    return this.userRepository.updateProfileById(userId, $set);
+    const updated = await this.userRepository.updateProfileById(userId, $set);
+    return withI18nSuccess(
+      updated,
+      'Profile updated successfully',
+      UserI18nKeys.profileUpdated,
+    );
   }
 
   remove(id: string) {

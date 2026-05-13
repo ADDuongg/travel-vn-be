@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/no-base-to-string */
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
-import { NotFoundDomainException } from 'src/common/exceptions';
+import { Injectable, Logger } from '@nestjs/common';
+import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { TourI18nKeys } from './tour.i18n-keys';
 import { FilterQuery, SortOrder, Types } from 'mongoose';
 import {
   CreateTourDto,
@@ -79,17 +76,27 @@ export class TourService {
   /**
    * Create a new tour
    */
-  async create(dto: CreateTourDto): Promise<Tour> {
+  async create(dto: CreateTourDto) {
     // Check slug uniqueness
     const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
     if (existedSlug) {
-      throw new ConflictException('Tour slug already exists');
+      throw new DomainException(
+        'Tour slug already exists',
+        409,
+        'TOUR_SLUG_EXISTS',
+        TourI18nKeys.slugExists,
+      );
     }
 
     // Check code uniqueness
     const existedCode = await this.tourRepository.findOneByCode(dto.code);
     if (existedCode) {
-      throw new ConflictException('Tour code already exists');
+      throw new DomainException(
+        'Tour code already exists',
+        409,
+        'TOUR_CODE_EXISTS',
+        TourI18nKeys.codeExists,
+      );
     }
 
     // Validate provinces
@@ -98,14 +105,24 @@ export class TourService {
 
     const invalidDeparture = !provinceIds.includes(dto.departureProvinceId);
     if (invalidDeparture) {
-      throw new BadRequestException('Invalid departure province');
+      throw new DomainException(
+        'Invalid departure province',
+        400,
+        'INVALID_DEPARTURE_PROVINCE',
+        TourI18nKeys.invalidDepartureProvince,
+      );
     }
 
     const invalidDestinations = dto.destinations.some(
       (d) => !provinceIds.includes(d.provinceId),
     );
     if (invalidDestinations) {
-      throw new BadRequestException('Invalid destination province(s)');
+      throw new DomainException(
+        'Invalid destination province(s)',
+        400,
+        'INVALID_DESTINATION_PROVINCES',
+        TourI18nKeys.invalidDestinationProvinces,
+      );
     }
 
     const gallery = this.normalizeGallery(dto.gallery);
@@ -163,12 +180,12 @@ export class TourService {
       });
     }
 
-    return created;
+    return withI18nSuccess(
+      created,
+      'Tour created successfully',
+      TourI18nKeys.created,
+    );
   }
-
-  /**
-   * Find all tours with filters and pagination
-   */
   async findAll(query: TourQueryDto, userId?: string) {
     if (this.tourSearch.canServeSearch()) {
       this.logger.log('🚀 USING ELASTICSEARCH');
@@ -363,13 +380,22 @@ export class TourService {
    */
   async findById(id: string, userId?: string): Promise<any> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException('Invalid tour ID');
+      throw new DomainException(
+        'Invalid tour ID',
+        400,
+        'INVALID_TOUR_ID',
+        TourI18nKeys.invalidTourId,
+      );
     }
 
     const tour = await this.tourRepository.findByIdPopulated(id);
 
     if (!tour) {
-      throw new NotFoundDomainException('Tour not found');
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'TOUR_NOT_FOUND',
+        TourI18nKeys.notFound,
+      );
     }
 
     const obj = tour.toObject();
@@ -389,7 +415,11 @@ export class TourService {
     const tour = await this.tourRepository.findOneActiveBySlug(slug);
 
     if (!tour) {
-      throw new NotFoundDomainException('Tour not found');
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'TOUR_NOT_FOUND',
+        TourI18nKeys.notFound,
+      );
     }
 
     const obj = tour.toObject();
@@ -405,17 +435,26 @@ export class TourService {
   /**
    * Update tour
    */
-  async update(id: string, dto: UpdateTourDto): Promise<Tour> {
+  async update(id: string, dto: UpdateTourDto) {
     const tour = await this.tourRepository.findById(id);
     if (!tour) {
-      throw new NotFoundDomainException('Tour not found');
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'TOUR_NOT_FOUND',
+        TourI18nKeys.notFound,
+      );
     }
 
     // Check slug uniqueness
     if (dto.slug !== undefined && dto.slug !== tour.slug) {
       const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
       if (existedSlug) {
-        throw new ConflictException('Tour slug already exists');
+        throw new DomainException(
+          'Tour slug already exists',
+          409,
+          'TOUR_SLUG_EXISTS',
+          TourI18nKeys.slugExists,
+        );
       }
       tour.slug = dto.slug;
     }
@@ -424,7 +463,12 @@ export class TourService {
     if (dto.code !== undefined && dto.code !== tour.code) {
       const existedCode = await this.tourRepository.findOneByCode(dto.code);
       if (existedCode) {
-        throw new ConflictException('Tour code already exists');
+        throw new DomainException(
+          'Tour code already exists',
+          409,
+          'TOUR_CODE_EXISTS',
+          TourI18nKeys.codeExists,
+        );
       }
       tour.code = dto.code;
     }
@@ -437,14 +481,24 @@ export class TourService {
         dto.departureProvinceId !== undefined &&
         !provinceIds.includes(dto.departureProvinceId)
       ) {
-        throw new BadRequestException('Invalid departure province');
+        throw new DomainException(
+          'Invalid departure province',
+          400,
+          'INVALID_DEPARTURE_PROVINCE',
+          TourI18nKeys.invalidDepartureProvince,
+        );
       }
 
       if (
         dto.destinations !== undefined &&
         dto.destinations.some((d) => !provinceIds.includes(d.provinceId))
       ) {
-        throw new BadRequestException('Invalid destination province(s)');
+        throw new DomainException(
+          'Invalid destination province(s)',
+          400,
+          'INVALID_DESTINATION_PROVINCES',
+          TourI18nKeys.invalidDestinationProvinces,
+        );
       }
     }
 
@@ -585,16 +639,20 @@ export class TourService {
       });
     }
 
-    return saved;
+    return withI18nSuccess(
+      saved,
+      'Tour updated successfully',
+      TourI18nKeys.updated,
+    );
   }
-
-  /**
-   * Delete tour (soft delete)
-   */
   async delete(id: string): Promise<void> {
     const tour = await this.tourRepository.findById(id);
     if (!tour) {
-      throw new NotFoundDomainException('Tour not found');
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'TOUR_NOT_FOUND',
+        TourI18nKeys.notFound,
+      );
     }
 
     tour.isActive = false;

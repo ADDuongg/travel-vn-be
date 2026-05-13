@@ -1,10 +1,6 @@
 // zod-validation.pipe.ts
-import {
-  ArgumentMetadata,
-  BadRequestException,
-  Injectable,
-  PipeTransform,
-} from '@nestjs/common';
+import { ArgumentMetadata, Injectable, PipeTransform } from '@nestjs/common';
+import { DomainException } from 'src/common/exceptions';
 import { ZodSchema } from 'zod';
 
 @Injectable()
@@ -17,7 +13,12 @@ export class ZodValidationPipe implements PipeTransform {
       const errors = result.error.issues.map(
         (issue) => `${issue.path.join('.')}: ${issue.message}`,
       );
-      throw new BadRequestException(errors);
+      throw new DomainException(
+        errors.join(', '),
+        400,
+        'BAD_REQUEST',
+        'pipe.bad_request',
+      );
     }
     return result.data;
   }

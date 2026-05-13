@@ -1,16 +1,5 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
@@ -98,7 +87,7 @@ export class ReviewClientController {
   remove(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
     const userId = req.user?.userId;
     if (!userId) {
-      throw new BadRequestException('Unauthorized');
+      throw new DomainException('Unauthorized', 400, 'BAD_REQUEST', 'review.bad_request');
     }
     return this.reviewService.softDeleteOwnReview(id, userId);
   }

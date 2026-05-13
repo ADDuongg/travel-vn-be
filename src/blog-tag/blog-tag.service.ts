@@ -1,9 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { toSlug, withUniqueSuffix } from 'src/utils/slug.util';
@@ -31,7 +27,7 @@ export class BlogTagService {
 
   async create(dto: CreateBlogTagDto) {
     if (!dto.name || !Object.keys(dto.name).length) {
-      throw new BadRequestException('name must include at least one language');
+      throw new DomainException('name must include at least one language', 400, 'BAD_REQUEST', 'blog.tag.bad_request');
     }
     const baseSlug = dto.slug?.trim()
       ? toSlug(dto.slug)
@@ -104,14 +100,14 @@ export class BlogTagService {
     const doc = await this.blogTagModel
       .findOne({ slug, isDeleted: { $ne: true } })
       .lean();
-    if (!doc) throw new NotFoundException('Blog tag not found');
+    if (!doc) throw new NotFoundDomainException('Blog tag not found', 'NOT_FOUND', 'blog.tag.not_found');
     return doc;
   }
 
   async findById(id: string) {
     const doc = await this.blogTagModel.findById(id).lean();
     if (!doc || doc.isDeleted) {
-      throw new NotFoundException('Blog tag not found');
+      throw new NotFoundDomainException('Blog tag not found', 'NOT_FOUND', 'blog.tag.not_found');
     }
     return doc;
   }
@@ -129,7 +125,7 @@ export class BlogTagService {
   async update(id: string, dto: UpdateBlogTagDto) {
     const doc = await this.blogTagModel.findById(id);
     if (!doc || doc.isDeleted) {
-      throw new NotFoundException('Blog tag not found');
+      throw new NotFoundDomainException('Blog tag not found', 'NOT_FOUND', 'blog.tag.not_found');
     }
     if (dto.name !== undefined) doc.name = dto.name;
     if (typeof dto.isActive === 'boolean') doc.isActive = dto.isActive;
@@ -142,7 +138,7 @@ export class BlogTagService {
           isDeleted: { $ne: true },
           _id: { $ne: doc._id },
         });
-        if (exists) throw new ConflictException('Tag slug already exists');
+        if (exists) throw new DomainException('Tag slug already exists', 409, 'CONFLICT', 'blog.tag.conflict');
         doc.slug = newSlug;
       }
     }
@@ -168,7 +164,7 @@ export class BlogTagService {
   async softDelete(id: string) {
     const doc = await this.blogTagModel.findById(id);
     if (!doc || doc.isDeleted) {
-      throw new NotFoundException('Blog tag not found');
+      throw new NotFoundDomainException('Blog tag not found', 'NOT_FOUND', 'blog.tag.not_found');
     }
     doc.isDeleted = true;
     doc.deletedAt = new Date();

@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { startOfDay, subDays } from 'date-fns';
 import { Model } from 'mongoose';
@@ -85,9 +86,7 @@ export class AnalyticsService {
 
     if (range === DashboardRange.CUSTOM) {
       if (!query.from || !query.to) {
-        throw new BadRequestException(
-          'from and to are required for custom range',
-        );
+        throw new DomainException('from and to are required for custom range', 400, 'BAD_REQUEST', 'analytics.bad_request');
       }
       const start = new Date(query.from);
       const to = new Date(query.to);

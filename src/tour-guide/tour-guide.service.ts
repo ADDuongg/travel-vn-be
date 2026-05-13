@@ -1,9 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -169,8 +165,8 @@ export class TourGuideService {
       .populate(USER_POPULATE)
       .populate(PROVINCE_POPULATE)
       .lean();
-    if (!guide) throw new NotFoundException('Tour guide not found');
-    if (!guide.isActive) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide.isActive) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
     if (!userId) return guide;
     const isFavorited = await this.favoriteService.isFavorited({
       userId,
@@ -184,13 +180,13 @@ export class TourGuideService {
   async create(dto: CreateTourGuideDto) {
     const userId = dto.userId;
     if (!userId || !Types.ObjectId.isValid(userId)) {
-      throw new BadRequestException('userId is required');
+      throw new DomainException('userId is required', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
     }
     const existing = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .exec();
     if (existing) {
-      throw new BadRequestException('User already has a tour guide profile');
+      throw new DomainException('User already has a tour guide profile', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
     }
     const gallery = this.normalizeGallery(dto.gallery);
     const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
@@ -206,9 +202,7 @@ export class TourGuideService {
       .findOne({ userId: new Types.ObjectId(userId) })
       .exec();
     if (existing) {
-      throw new BadRequestException(
-        'You already have a tour guide profile. Wait for admin verification.',
-      );
+      throw new DomainException('You already have a tour guide profile. Wait for admin verification.', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
     }
     const gallery = this.normalizeGallery(dto.gallery);
     const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
@@ -240,7 +234,7 @@ export class TourGuideService {
     const guide = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId), isActive: true })
       .exec();
-    if (!guide) throw new NotFoundException('Tour guide profile not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide profile not found', 'NOT_FOUND', 'tour.guide.not_found');
     await this.applyUpdate(guide, dto);
     const orphanPublicIds = this.applyMediaUpdate(guide, dto);
     const saved = await guide.save();
@@ -251,7 +245,7 @@ export class TourGuideService {
   /** Admin: cập nhật bất kỳ guide nào bằng JSON refs. */
   async update(id: string, dto: UpdateTourGuideDto) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
     await this.applyUpdate(guide, dto);
     const orphanPublicIds = this.applyMediaUpdate(guide, dto);
     const saved = await guide.save();
@@ -262,7 +256,7 @@ export class TourGuideService {
   /** Admin: verify / unverify guide. */
   async verify(id: string, isVerified: boolean) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
     guide.isVerified = isVerified;
     guide.verifiedAt = isVerified ? new Date() : undefined;
     const saved = await guide.save();
@@ -290,7 +284,7 @@ export class TourGuideService {
   /** Admin toggle availability cho bất kỳ guide nào. */
   async toggleAvailability(id: string) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
     guide.isAvailable = !guide.isAvailable;
     return guide.save().then((g) => g.toObject());
   }
@@ -388,7 +382,7 @@ export class TourGuideService {
   /** Admin: soft delete + bỏ role guide khỏi User. */
   async softDelete(id: string) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
     guide.isActive = false;
     await guide.save();
     await this.userService.removeRole(String(guide.userId), 'guide');
@@ -398,7 +392,7 @@ export class TourGuideService {
   /** GET /:id/reviews — lấy review public cho guide (entityType = GUIDE). */
   async getReviews(id: string, page = 1, limit = 10) {
     const guide = await this.tourGuideModel.findById(id).select('_id').lean();
-    if (!guide) throw new NotFoundException('Tour guide not found');
+    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
 
     const items = await this.reviewService.findPublicReviews({
       entityType: ReviewEntityType.GUIDE,

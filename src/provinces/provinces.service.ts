@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -140,7 +137,7 @@ export class ProvincesService {
 
   async findBySlug(slug: string) {
     const province = await this.provinceModel.findOne({ slug }).lean();
-    if (!province) throw new NotFoundException('Province not found');
+    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
     const [provinceWithCounts] = await this.attachCountsToProvinces([province]);
     return provinceWithCounts;
   }
@@ -172,7 +169,7 @@ export class ProvincesService {
   async update(id: string, dto: UpdateProvinceDto) {
     const requiredLangs = await this.getActiveLangCodes();
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundException('Province not found');
+    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
 
     if (dto.translations !== undefined)
       province.translations = dto.translations;
@@ -236,7 +233,7 @@ export class ProvincesService {
 
   async softDelete(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundException('Province not found');
+    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
     province.isActive = false;
     await province.save();
     return { message: 'Province deactivated successfully' };
@@ -244,7 +241,7 @@ export class ProvincesService {
 
   async restore(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundException('Province not found');
+    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
     province.isActive = true;
     await province.save();
     return { message: 'Province restored successfully' };
@@ -252,7 +249,7 @@ export class ProvincesService {
 
   async togglePopular(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundException('Province not found');
+    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
     province.isPopular = !province.isPopular;
     return province.save().then((p) => p.toObject());
   }
@@ -462,7 +459,7 @@ export class ProvincesService {
     const parsed = this.parseJsonIfString(raw);
     if (!Array.isArray(parsed)) {
       if (parsed && typeof parsed === 'object') {
-        throw new BadRequestException('highlights must be a JSON array');
+        throw new DomainException('highlights must be a JSON array', 400, 'BAD_REQUEST', 'provinces.bad_request');
       }
       return [];
     }
@@ -477,8 +474,11 @@ export class ProvincesService {
     }
 
     if (parsed.length > 0 && mapped.length === 0) {
-      throw new BadRequestException(
+      throw new DomainException(
         `No valid highlight items: each item needs translations with non-empty name for: ${requiredLangCodes.join(', ')} (or legacy name/description per language).`,
+        400,
+        'BAD_REQUEST',
+        'provinces.bad_request',
       );
     }
 

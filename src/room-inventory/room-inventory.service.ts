@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import {
@@ -49,7 +50,7 @@ export class RoomInventoryService {
     const existingDates = new Set(existing.map((i) => i.date.getTime()));
 
     const room = await this.roomModel.findById(roomId).session(session ?? null);
-    if (!room) throw new BadRequestException('Room not found');
+    if (!room) throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
 
     const toCreate = nights
       .filter((d) => !existingDates.has(d.getTime()))
@@ -159,19 +160,19 @@ export class RoomInventoryService {
     newTotal: number,
   ): Promise<RoomInventoryDocument> {
     const inventory = await this.RoomInventoryModel.findById(inventoryId);
-    if (!inventory) throw new BadRequestException('Inventory not found');
+    if (!inventory) throw new DomainException('Inventory not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
 
     const room = await this.roomModel.findById(inventory.roomId);
-    if (!room) throw new BadRequestException('Room not found');
+    if (!room) throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
 
     if (newTotal > room.inventory.totalRooms) {
-      throw new BadRequestException('Total exceeds Room.totalRooms');
+      throw new DomainException('Total exceeds Room.totalRooms', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
     }
 
     const booked = inventory.total - inventory.available;
 
     if (newTotal < booked) {
-      throw new BadRequestException('New total less than booked rooms');
+      throw new DomainException('New total less than booked rooms', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
     }
 
     inventory.total = newTotal;
@@ -186,7 +187,7 @@ export class RoomInventoryService {
 
     const booked = inventory.total - inventory.available;
     if (booked > 0) {
-      throw new BadRequestException('Cannot delete inventory with bookings');
+      throw new DomainException('Cannot delete inventory with bookings', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
     }
 
     await inventory.deleteOne();
@@ -214,7 +215,7 @@ export class RoomInventoryService {
     if (inventories.length === 0) {
       const room = await this.roomModel.findById(roomId);
       if (!room) {
-        throw new BadRequestException('Room not found');
+        throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
       }
 
       return room.inventory.totalRooms;
@@ -249,7 +250,7 @@ export class RoomInventoryService {
       );
 
       if (res.modifiedCount === 0) {
-        throw new BadRequestException('Not enough availability');
+        throw new DomainException('Not enough availability', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
       }
     }
   }

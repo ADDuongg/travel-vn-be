@@ -1,9 +1,5 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 
 import { UserService } from 'src/user/user.service';
 
@@ -31,7 +27,7 @@ export class AdminGuard implements CanActivate {
 
     const userId = req.user?.userId ?? req.user?.sub;
     if (!userId) {
-      throw new UnauthorizedException('Invalid authentication');
+      throw new DomainException('Invalid authentication', 401, 'UNAUTHORIZED', 'guards.unauthorized');
     }
 
     await this.users.assertAdminPortalAccess(String(userId));

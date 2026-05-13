@@ -37,6 +37,7 @@ describe('HttpExceptionFilter (error contract)', () => {
         status: false,
         path: url,
         message: 'Tour not found',
+        messageKey: 'common.not_found',
         errorCode: 'TOUR_NOT_FOUND',
         requestId: 'req-abc',
         data: null,
@@ -54,6 +55,7 @@ describe('HttpExceptionFilter (error contract)', () => {
       expect.objectContaining({
         statusCode: 400,
         message: 'a, b',
+        messageKey: 'common.validation_failed',
         data: null,
       }),
     );
@@ -69,6 +71,7 @@ describe('HttpExceptionFilter (error contract)', () => {
       expect.objectContaining({
         statusCode: 500,
         message: 'Internal server error',
+        messageKey: 'common.internal_error',
         data: null,
       }),
     );
@@ -90,6 +93,7 @@ describe('HttpExceptionFilter (error contract)', () => {
       expect.objectContaining({
         statusCode: 500,
         message: 'Internal server error',
+        messageKey: 'common.internal_error',
         errorCode: 'INFRASTRUCTURE_ERROR',
       }),
     );

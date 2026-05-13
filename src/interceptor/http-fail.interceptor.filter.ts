@@ -3,11 +3,35 @@ import {
   Catch,
   ArgumentsHost,
   HttpException,
+  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { REQUEST_ID_HEADER } from 'src/common/middleware/correlation-id.middleware';
 import { AppException } from 'src/common/exceptions';
+import { COMMON_I18N_KEYS } from 'src/common/i18n/keys';
+
+function defaultMessageKeyForHttpStatus(status: number): string {
+  switch (status) {
+    case HttpStatus.BAD_REQUEST:
+      return COMMON_I18N_KEYS.BAD_REQUEST;
+    case HttpStatus.UNAUTHORIZED:
+      return COMMON_I18N_KEYS.UNAUTHORIZED;
+    case HttpStatus.FORBIDDEN:
+      return COMMON_I18N_KEYS.FORBIDDEN;
+    case HttpStatus.NOT_FOUND:
+      return COMMON_I18N_KEYS.NOT_FOUND;
+    case HttpStatus.CONFLICT:
+      return COMMON_I18N_KEYS.CONFLICT;
+    case HttpStatus.UNPROCESSABLE_ENTITY:
+      return COMMON_I18N_KEYS.VALIDATION_FAILED;
+    case HttpStatus.TOO_MANY_REQUESTS:
+      return COMMON_I18N_KEYS.RATE_LIMITED;
+    default:
+      if (status >= 500) return COMMON_I18N_KEYS.INTERNAL_ERROR;
+      return COMMON_I18N_KEYS.BAD_REQUEST;
+  }
+}
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -23,11 +47,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = 500;
     let message = 'Internal server error';
     let errorCode: string | undefined;
+    let messageKey: string | undefined;
 
     if (exception instanceof AppException) {
       status = exception.statusCode;
       message = exception.message;
       errorCode = exception.errorCode;
+      messageKey = exception.messageKey;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
@@ -37,6 +63,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           message = ((res as Record<string, unknown>).message as string[]).join(
             ', ',
           );
+          messageKey = COMMON_I18N_KEYS.VALIDATION_FAILED;
         } else {
           message =
             ((res as Record<string, unknown>).message as string) ??
@@ -80,7 +107,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
         status,
         message,
         errorCode,
+        messageKey,
       });
+    }
+
+    if (!messageKey) {
+      if (exception instanceof HttpException) {
+        messageKey = defaultMessageKeyForHttpStatus(status);
+      } else if (exception instanceof AppException) {
+        messageKey =
+          status >= 500
+            ? COMMON_I18N_KEYS.INTERNAL_ERROR
+            : COMMON_I18N_KEYS.DOMAIN_ERROR;
+      } else if (status >= 500) {
+        messageKey = COMMON_I18N_KEYS.INTERNAL_ERROR;
+      } else {
+        messageKey = COMMON_I18N_KEYS.DOMAIN_ERROR;
+      }
     }
 
     const body: Record<string, unknown> = {
@@ -89,6 +132,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message: safeClientMessage,
+      messageKey,
       data: null,
     };
 

@@ -1,12 +1,5 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Res,
-  UseGuards,
-  NotFoundException,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
@@ -53,7 +46,7 @@ export class AuditLogAdminController {
   @RequirePermissions('audit_log.view')
   async findOne(@Param('id') id: string) {
     const log = await this.auditLogService.findById(id);
-    if (!log) throw new NotFoundException('Audit log not found');
+    if (!log) throw new NotFoundDomainException('Audit log not found', 'NOT_FOUND', 'audit.log.not_found');
     return log;
   }
 }

@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateRouterDto } from './dto/create-router.dto';
@@ -23,7 +20,7 @@ export class RouterService {
     });
 
     if (existed) {
-      throw new BadRequestException('Router code already exists');
+      throw new DomainException('Router code already exists', 400, 'BAD_REQUEST', 'routers.bad_request');
     }
 
     const router = new this.routerModel(dto);
@@ -40,7 +37,7 @@ export class RouterService {
     const router = await this.routerModel.findById(id).lean();
 
     if (!router) {
-      throw new NotFoundException('Router not found');
+      throw new NotFoundDomainException('Router not found', 'NOT_FOUND', 'routers.not_found');
     }
 
     return router;
@@ -53,7 +50,7 @@ export class RouterService {
     });
 
     if (!router) {
-      throw new NotFoundException('Router not found');
+      throw new NotFoundDomainException('Router not found', 'NOT_FOUND', 'routers.not_found');
     }
 
     return router;
@@ -64,7 +61,7 @@ export class RouterService {
     const router = await this.routerModel.findByIdAndDelete(id);
 
     if (!router) {
-      throw new NotFoundException('Router not found');
+      throw new NotFoundDomainException('Router not found', 'NOT_FOUND', 'routers.not_found');
     }
 
     return { deleted: true };

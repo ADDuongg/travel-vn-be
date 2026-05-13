@@ -1,4 +1,5 @@
-import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CorrelationContextService } from 'src/common/correlation/correlation-context.service';
 import { createDomainEventEnvelope } from 'src/common/events/domain-event';
@@ -39,7 +40,7 @@ export class OtpService {
     options: IssueOtpOptions = {},
   ): Promise<OtpRecord> {
     if (!target?.trim()) {
-      throw new BadRequestException('Target is required for OTP');
+      throw new DomainException('Target is required for OTP', 400, 'BAD_REQUEST', 'otp.bad_request');
     }
 
     const existing = await this.repo.find(purpose, target);
@@ -49,9 +50,11 @@ export class OtpService {
       const issuedAt = new Date(existing.issuedAt);
       const diffSec = (now.getTime() - issuedAt.getTime()) / 1000;
       if (diffSec < this.resendWindowSec) {
-        throw new HttpException(
+        throw new DomainException(
           'OTP recently sent, please wait before requesting again',
           429,
+          'RATE_LIMIT',
+          'otp.rate_limited',
         );
       }
     }
@@ -102,18 +105,18 @@ export class OtpService {
     const record = await this.repo.find(purpose, target);
 
     if (!record) {
-      throw new BadRequestException('OTP not found or expired');
+      throw new DomainException('OTP not found or expired', 400, 'BAD_REQUEST', 'otp.bad_request');
     }
 
     const now = new Date();
     if (new Date(record.expiresAt) < now) {
       await this.repo.delete(purpose, target);
-      throw new BadRequestException('OTP has expired');
+      throw new DomainException('OTP has expired', 400, 'BAD_REQUEST', 'otp.bad_request');
     }
 
     if (record.attempts >= record.maxAttempts) {
       await this.repo.delete(purpose, target);
-      throw new HttpException('OTP attempts exceeded', 429);
+      throw new DomainException('OTP attempts exceeded', 429, 'RATE_LIMIT', 'otp.rate_limited');
     }
 
     if (record.code !== code) {
@@ -121,7 +124,7 @@ export class OtpService {
       if (updated && updated.attempts >= updated.maxAttempts) {
         await this.repo.delete(purpose, target);
       }
-      throw new BadRequestException('Invalid OTP code');
+      throw new DomainException('Invalid OTP code', 400, 'BAD_REQUEST', 'otp.bad_request');
     }
 
     await this.repo.delete(purpose, target);

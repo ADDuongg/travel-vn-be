@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateApiPermissionDto } from './dto/create-api-permission.dto';
@@ -23,7 +20,7 @@ export class ApiPermissionService {
     });
 
     if (existed) {
-      throw new BadRequestException('API permission code already exists');
+      throw new DomainException('API permission code already exists', 400, 'BAD_REQUEST', 'api.permission.bad_request');
     }
 
     const api = new this.apiModel(dto);
@@ -40,7 +37,7 @@ export class ApiPermissionService {
     const api = await this.apiModel.findById(id).lean();
 
     if (!api) {
-      throw new NotFoundException('API permission not found');
+      throw new NotFoundDomainException('API permission not found', 'NOT_FOUND', 'api.permission.not_found');
     }
 
     return api;
@@ -51,7 +48,7 @@ export class ApiPermissionService {
     const api = await this.apiModel.findByIdAndUpdate(id, dto, { new: true });
 
     if (!api) {
-      throw new NotFoundException('API permission not found');
+      throw new NotFoundDomainException('API permission not found', 'NOT_FOUND', 'api.permission.not_found');
     }
 
     return api;
@@ -62,7 +59,7 @@ export class ApiPermissionService {
     const api = await this.apiModel.findByIdAndDelete(id);
 
     if (!api) {
-      throw new NotFoundException('API permission not found');
+      throw new NotFoundDomainException('API permission not found', 'NOT_FOUND', 'api.permission.not_found');
     }
 
     return { deleted: true };

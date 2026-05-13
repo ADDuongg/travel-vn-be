@@ -1,16 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
 import { Types } from 'mongoose';
-
+import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import { AuditLogService } from 'src/audit-log/audit-log.service';
+import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 import { PaymentService } from './payment.service';
 import { PaymentStatus } from './schema/payment.schema';
 import { BookingService } from '../booking/booking.service';
 import { TourBookingService } from '../tour-booking/tour-booking.service';
 import { BookingPaymentStatus } from 'src/booking/schema/booking.schema';
 import { PaymentRepository } from './payment.repository';
-import { NotFoundDomainException } from 'src/common/exceptions';
-import { AuditLogService } from 'src/audit-log/audit-log.service';
-import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 
 jest.mock('../stripe.service', () => ({
   stripe: {
@@ -100,9 +98,9 @@ describe('PaymentService', () => {
   });
 
   describe('createPaymentIntent', () => {
-    it('throws BadRequestException for invalid bookingId format', async () => {
+    it('throws DomainException for invalid bookingId format', async () => {
       await expect(service.createPaymentIntent('not-valid-id')).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
 
@@ -114,24 +112,24 @@ describe('PaymentService', () => {
       ).rejects.toThrow(NotFoundDomainException);
     });
 
-    it('throws BadRequestException when booking is EXPIRED', async () => {
+    it('throws DomainException when booking is EXPIRED', async () => {
       mockBookingService.findOne.mockResolvedValue({
         paymentStatus: BookingPaymentStatus.EXPIRED,
       });
 
       await expect(
         service.createPaymentIntent(bookingId.toString()),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
-    it('throws BadRequestException when booking is already PAID', async () => {
+    it('throws DomainException when booking is already PAID', async () => {
       mockBookingService.findOne.mockResolvedValue({
         paymentStatus: BookingPaymentStatus.PAID,
       });
 
       await expect(
         service.createPaymentIntent(bookingId.toString()),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
     it('creates stripe intent and saves payment record on success', async () => {
@@ -253,32 +251,32 @@ describe('PaymentService', () => {
   });
 
   describe('refund', () => {
-    it('throws BadRequestException when no refundable payment found', async () => {
+    it('throws DomainException when no refundable payment found', async () => {
       mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(null);
 
       await expect(service.refund(bookingId.toString())).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
 
-    it('throws BadRequestException when payment is already fully refunded', async () => {
+    it('throws DomainException when payment is already fully refunded', async () => {
       mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
         makePayment({ amount: 500_000, refundedAmount: 500_000 }),
       );
 
       await expect(service.refund(bookingId.toString())).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
 
-    it('throws BadRequestException when requested refund exceeds remaining', async () => {
+    it('throws DomainException when requested refund exceeds remaining', async () => {
       mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
         makePayment({ amount: 500_000, refundedAmount: 400_000 }),
       );
 
       await expect(
         service.refund(bookingId.toString(), 200_000),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
     it('creates stripe refund and marks payment FULLY_REFUNDED', async () => {

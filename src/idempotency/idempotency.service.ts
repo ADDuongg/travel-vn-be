@@ -1,4 +1,5 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -45,14 +46,14 @@ export class IdempotencyService {
         });
 
         if (!existing) {
-          throw new ConflictException('Idempotency record not found');
+          throw new DomainException('Idempotency record not found', 409, 'CONFLICT', 'idempotency.conflict');
         }
 
         if (existing.status === IdempotencyStatus.COMPLETED) {
           return existing.response;
         }
 
-        throw new ConflictException('Request is being processed');
+        throw new DomainException('Request is being processed', 409, 'CONFLICT', 'idempotency.conflict');
       }
 
       throw error;

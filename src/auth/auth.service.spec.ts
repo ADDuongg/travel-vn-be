@@ -1,10 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import {
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { DomainException } from 'src/common/exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
@@ -189,16 +185,16 @@ describe('AuthService', () => {
       phone: '0900000000',
     };
 
-    it('throws BadRequestException when passwords do not match', async () => {
+    it('throws DomainException when passwords do not match', async () => {
       await expect(
         service.register({ ...dto, confirmPassword: 'different' }),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
-    it('throws ConflictException when username already exists', async () => {
+    it('throws DomainException when username already exists', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
 
-      await expect(service.register(dto)).rejects.toThrow(ConflictException);
+      await expect(service.register(dto)).rejects.toThrow(DomainException);
     });
 
     it('creates user and returns access + refresh tokens on success', async () => {
@@ -216,9 +212,9 @@ describe('AuthService', () => {
 
       const result = await service.register(dto);
 
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
-      expect(result).toHaveProperty('account');
+      expect(result.data).toHaveProperty('access_token');
+      expect(result.data).toHaveProperty('refresh_token');
+      expect(result.data).toHaveProperty('account');
     });
   });
 
@@ -260,7 +256,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh('bad_token')).rejects.toThrow(
-        UnauthorizedException,
+        DomainException,
       );
     });
 
@@ -273,7 +269,7 @@ describe('AuthService', () => {
       mockRefreshTokenModel.findOne.mockResolvedValue(null);
 
       await expect(service.refresh('valid_jwt')).rejects.toThrow(
-        UnauthorizedException,
+        DomainException,
       );
     });
 
@@ -289,7 +285,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.refresh('valid_jwt')).rejects.toThrow(
-        UnauthorizedException,
+        DomainException,
       );
     });
 
@@ -342,7 +338,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.logout('bad_token')).rejects.toThrow(
-        UnauthorizedException,
+        DomainException,
       );
     });
 
@@ -358,7 +354,7 @@ describe('AuthService', () => {
       });
 
       await expect(service.logout('token')).rejects.toThrow(
-        UnauthorizedException,
+        DomainException,
       );
     });
 
@@ -378,7 +374,9 @@ describe('AuthService', () => {
 
       const result = await service.logout('token');
 
-      expect(result.message).toBe('Logged out successfully');
+      expect((result as { data: { message: string } }).data.message).toBe(
+        'Logged out successfully',
+      );
     });
   });
 
@@ -391,7 +389,7 @@ describe('AuthService', () => {
 
       const result = await service.logoutAll('000000000000000000000001');
 
-      expect(result.modified).toBe(3);
+      expect(result.data.modified).toBe(3);
       expect(mockRefreshTokenModel.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({ isRevoked: false }),
         expect.objectContaining({

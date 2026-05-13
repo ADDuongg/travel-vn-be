@@ -1,10 +1,13 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
+import {
+  DomainException,
+  ForbiddenDomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import Redis from 'ioredis';
 import { Model, Types } from 'mongoose';
@@ -65,7 +68,11 @@ export class RbacService {
     const oid = this.parseRoleOid(roleId);
     const role = await this.roleModel.findById(oid).lean().exec();
     if (!role) {
-      throw new NotFoundException(`Role ${roleId} not found`);
+      throw new NotFoundDomainException(
+        `Role ${roleId} not found`,
+        'ROLE_NOT_FOUND',
+        'rbac.role_not_found',
+      );
     }
     const code = String(role.code).toLowerCase();
     if (code === 'super_admin') {
@@ -84,12 +91,18 @@ export class RbacService {
     const oid = this.parseRoleOid(roleId);
     const role = await this.roleModel.findById(oid).lean().exec();
     if (!role) {
-      throw new NotFoundException(`Role ${roleId} not found`);
+      throw new NotFoundDomainException(
+        `Role ${roleId} not found`,
+        'ROLE_NOT_FOUND',
+        'rbac.role_not_found',
+      );
     }
     const roleCode = String(role.code).toLowerCase();
     if (roleCode === 'super_admin') {
-      throw new ForbiddenException(
+      throw new ForbiddenDomainException(
         'Role super_admin does not use role_permissions; use User.isSuperAdmin',
+        'SUPER_ADMIN_IMMUTABLE',
+        'rbac.super_admin_immutable',
       );
     }
 
@@ -157,7 +170,12 @@ export class RbacService {
   private parseRoleOid(roleId: string): Types.ObjectId {
     const id = String(roleId).trim();
     if (!Types.ObjectId.isValid(id)) {
-      throw new BadRequestException(`Invalid role id: ${roleId}`);
+      throw new DomainException(
+        `Invalid role id: ${roleId}`,
+        400,
+        'INVALID_ROLE_ID',
+        'rbac.bad_request',
+      );
     }
     return new Types.ObjectId(id);
   }

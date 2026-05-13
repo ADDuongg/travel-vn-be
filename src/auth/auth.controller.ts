@@ -5,7 +5,6 @@ import {
   Post,
   Req,
   Res,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { Response, Request, CookieOptions } from 'express';
@@ -22,6 +21,9 @@ import {
 } from 'src/audit-log/enums/audit-log.enum';
 
 import { AuthService } from './auth.service';
+import { AuthI18nKeys } from './auth.i18n-keys';
+import { DomainException } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
 import {
   ForgotPasswordConfirmDto,
   ForgotPasswordRequestDto,
@@ -104,7 +106,12 @@ export class AuthController {
         userAgent: req.headers['user-agent']?.toString(),
         metadata: { username: dto.username },
       });
-      throw new UnauthorizedException();
+      throw new DomainException(
+        'Invalid credentials',
+        401,
+        'INVALID_CREDENTIALS',
+        AuthI18nKeys.unauthorized,
+      );
     }
     const userAgentHeader = req.headers['user-agent'];
     const userAgent =
@@ -116,10 +123,14 @@ export class AuthController {
 
     this.resetRefreshTokenCookie(res, result.refresh_token, true);
 
-    return {
-      access_token: result.access_token,
-      account: result.account,
-    };
+    return withI18nSuccess(
+      {
+        access_token: result.access_token,
+        account: result.account,
+      },
+      'Logged in successfully',
+      AuthI18nKeys.loginSuccess,
+    );
   }
 
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
@@ -142,7 +153,12 @@ export class AuthController {
   ) {
     const refreshToken = req.cookies?.refresh_token as string | undefined;
     if (!refreshToken || typeof refreshToken !== 'string') {
-      throw new UnauthorizedException();
+      throw new DomainException(
+        'Unauthorized',
+        401,
+        'UNAUTHORIZED',
+        AuthI18nKeys.unauthorized,
+      );
     }
 
     const userAgentHeader = req.headers['user-agent'];
@@ -157,7 +173,11 @@ export class AuthController {
       this.resetRefreshTokenCookie(res, result.refresh_token, true);
     }
 
-    return result;
+    return withI18nSuccess(
+      result,
+      'Session refreshed successfully',
+      AuthI18nKeys.refreshSuccess,
+    );
   }
 
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
@@ -189,21 +209,30 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.refresh_token as string | undefined;
     if (!refreshToken || typeof refreshToken !== 'string') {
-      return { message: 'Already logged out' };
+      return withI18nSuccess(
+        { message: 'Already logged out' },
+        'Already logged out',
+        AuthI18nKeys.logoutAlready,
+      );
     }
 
-    await this.authService.logout(refreshToken);
+    const out = await this.authService.logout(refreshToken);
 
     this.resetRefreshTokenCookie(res);
 
-    return { message: 'Logged out successfully' };
+    return out;
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Req() req: Request & { user?: { userId: string } }) {
     if (!req.user?.userId) {
-      throw new UnauthorizedException();
+      throw new DomainException(
+        'Unauthorized',
+        401,
+        'UNAUTHORIZED',
+        AuthI18nKeys.unauthorized,
+      );
     }
 
     return this.authService.me(req.user.userId);
@@ -214,7 +243,12 @@ export class AuthController {
   @Post('logout-all')
   async logoutAll(@Req() req: Request & { user?: { userId: string } }) {
     if (!req.user?.userId) {
-      throw new UnauthorizedException();
+      throw new DomainException(
+        'Unauthorized',
+        401,
+        'UNAUTHORIZED',
+        AuthI18nKeys.unauthorized,
+      );
     }
 
     const userId = req.user.userId;

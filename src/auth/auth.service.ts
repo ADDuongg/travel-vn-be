@@ -1,10 +1,5 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
@@ -37,6 +32,9 @@ import {
   AuditResourceType,
   AuthAuditAction,
 } from 'src/audit-log/enums/audit-log.enum';
+import { DomainException } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { AuthI18nKeys } from './auth.i18n-keys';
 
 @Injectable()
 export class AuthService {
@@ -218,12 +216,22 @@ export class AuthService {
       `RESET_PASSWORD identifier=${identifier} userEmail=${user?.email}`,
     );
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new DomainException(
+        'User not found',
+        400,
+        'USER_NOT_FOUND',
+        AuthI18nKeys.userNotFound,
+      );
     }
 
     const target = user.email;
     if (!target) {
-      throw new BadRequestException('User does not have an email');
+      throw new DomainException(
+        'User does not have an email',
+        400,
+        'USER_NO_EMAIL',
+        AuthI18nKeys.userNoEmail,
+      );
     }
 
     const payload: ResetPasswordPayload = {
@@ -263,12 +271,21 @@ export class AuthService {
       metadata: { identifier },
     });
 
-    return { message: 'Password reset email sent' };
+    return withI18nSuccess(
+      { message: 'Password reset email sent' },
+      'Password reset email sent',
+      AuthI18nKeys.passwordResetEmailSent,
+    );
   }
 
   async resetPasswordWithToken(token: string, newPassword: string) {
     if (!newPassword || newPassword.length < 6) {
-      throw new BadRequestException('New password is too short');
+      throw new DomainException(
+        'New password is too short',
+        400,
+        'PASSWORD_TOO_SHORT',
+        AuthI18nKeys.passwordTooShort,
+      );
     }
 
     let payload: ResetPasswordPayload | null = null;
@@ -279,7 +296,12 @@ export class AuthService {
         audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
       });
     } catch {
-      throw new UnauthorizedException('Invalid or expired reset token');
+      throw new DomainException(
+        'Invalid or expired reset token',
+        401,
+        'INVALID_RESET_TOKEN',
+        AuthI18nKeys.invalidExpiredResetToken,
+      );
     }
 
     if (
@@ -287,7 +309,12 @@ export class AuthService {
       payload.typ !== 'reset-password' ||
       typeof payload.tokenVersion !== 'number'
     ) {
-      throw new UnauthorizedException('Invalid reset token');
+      throw new DomainException(
+        'Invalid reset token',
+        401,
+        'INVALID_RESET_TOKEN',
+        AuthI18nKeys.invalidResetToken,
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -302,7 +329,12 @@ export class AuthService {
       .lean<AuthUser | null>();
 
     if (!updated) {
-      throw new UnauthorizedException('Invalid or already used reset token');
+      throw new DomainException(
+        'Invalid or already used reset token',
+        401,
+        'INVALID_OR_USED_RESET_TOKEN',
+        AuthI18nKeys.invalidOrUsedResetToken,
+      );
     }
 
     await this.logoutAll(payload.sub);
@@ -315,7 +347,11 @@ export class AuthService {
       username: updated.username,
     });
 
-    return { message: 'Password has been reset successfully' };
+    return withI18nSuccess(
+      { message: 'Password has been reset successfully' },
+      'Password has been reset successfully',
+      AuthI18nKeys.passwordResetSuccess,
+    );
   }
 
   // =========================
@@ -326,12 +362,22 @@ export class AuthService {
     meta: { ip?: string; userAgent?: string } = {},
   ) {
     if (dto.password !== dto.confirmPassword) {
-      throw new BadRequestException('Password confirmation does not match');
+      throw new DomainException(
+        'Password confirmation does not match',
+        400,
+        'PASSWORD_CONFIRM_MISMATCH',
+        AuthI18nKeys.passwordConfirmMismatch,
+      );
     }
 
     const existing = await this.usersService.findOne(dto.username);
     if (existing) {
-      throw new ConflictException('Username already exists');
+      throw new DomainException(
+        'Username already exists',
+        409,
+        'USERNAME_EXISTS',
+        AuthI18nKeys.usernameExists,
+      );
     }
 
     const addressInput = (dto as any).address;
@@ -387,11 +433,15 @@ export class AuthService {
       userAgent: meta.userAgent,
     });
 
-    return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
-      account: user,
-    };
+    return withI18nSuccess(
+      {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        account: user,
+      },
+      'Registered successfully',
+      AuthI18nKeys.registerSuccess,
+    );
   }
 
   // =========================
@@ -412,7 +462,12 @@ export class AuthService {
       );
 
       if (payload.typ !== 'refresh') {
-        throw new UnauthorizedException('Invalid token type');
+        throw new DomainException(
+          'Invalid token type',
+          401,
+          'INVALID_TOKEN_TYPE',
+          AuthI18nKeys.invalidTokenType,
+        );
       }
 
       const existing = await this.refreshTokenModel.findOne({
@@ -421,7 +476,12 @@ export class AuthService {
       });
 
       if (!existing) {
-        throw new UnauthorizedException('Refresh token not found');
+        throw new DomainException(
+          'Refresh token not found',
+          401,
+          'REFRESH_TOKEN_NOT_FOUND',
+          AuthI18nKeys.refreshTokenNotFound,
+        );
       }
 
       if (existing.isRevoked) {
@@ -440,7 +500,12 @@ export class AuthService {
           ip: meta.ip,
           userAgent: meta.userAgent,
         });
-        throw new UnauthorizedException('Token reuse detected');
+        throw new DomainException(
+          'Token reuse detected',
+          401,
+          'TOKEN_REUSE_DETECTED',
+          AuthI18nKeys.tokenReuseDetected,
+        );
       }
 
       const currentHash = this.hashToken(oldRefreshToken);
@@ -460,7 +525,12 @@ export class AuthService {
           ip: meta.ip,
           userAgent: meta.userAgent,
         });
-        throw new UnauthorizedException('Token reuse detected');
+        throw new DomainException(
+          'Token reuse detected',
+          401,
+          'TOKEN_REUSE_DETECTED',
+          AuthI18nKeys.tokenReuseDetected,
+        );
       }
       if (!existing.tokenHash) {
         (existing as any).tokenHash = currentHash;
@@ -471,7 +541,12 @@ export class AuthService {
       await (existing as any).save();
 
       if (existing.expiresAt < new Date()) {
-        throw new UnauthorizedException('Refresh token expired');
+        throw new DomainException(
+          'Refresh token expired',
+          401,
+          'REFRESH_TOKEN_EXPIRED',
+          AuthI18nKeys.refreshTokenExpired,
+        );
       }
 
       // revoke old token
@@ -484,11 +559,22 @@ export class AuthService {
         .select('isActive deletedAt')
         .lean<{ isActive?: boolean; deletedAt?: Date | null } | null>();
       if (!alive || alive.deletedAt || !alive.isActive) {
-        throw new UnauthorizedException();
+        throw new DomainException(
+          'Unauthorized',
+          401,
+          'UNAUTHORIZED',
+          AuthI18nKeys.unauthorized,
+        );
       }
 
       const user = await this.usersService.findOneById(payload.sub);
-      if (!user) throw new UnauthorizedException();
+      if (!user)
+        throw new DomainException(
+          'Unauthorized',
+          401,
+          'UNAUTHORIZED',
+          AuthI18nKeys.unauthorized,
+        );
 
       const rbacPermissions = await this.rbacService.resolveFlatPermissions(
         user.roles || [],
@@ -527,10 +613,15 @@ export class AuthService {
         },
       };
     } catch (err) {
-      if (err instanceof UnauthorizedException) {
+      if (err instanceof DomainException && err.statusCode === 401) {
         throw err;
       }
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new DomainException(
+        'Invalid refresh token',
+        401,
+        'INVALID_REFRESH_TOKEN',
+        AuthI18nKeys.invalidRefreshToken,
+      );
     }
   }
 
@@ -541,7 +632,12 @@ export class AuthService {
       .lean();
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new DomainException(
+        'Unauthorized',
+        401,
+        'UNAUTHORIZED',
+        AuthI18nKeys.meUserNotFound,
+      );
     }
     const permissions = await this.permissionService.resolvePermissions(
       user.roles || [],
@@ -550,13 +646,17 @@ export class AuthService {
       user.roles || [],
       !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
     );
-    return {
-      ...user,
-      id: String(user._id),
-      permissions,
-      rbacPermissions,
-      isSuperAdmin: !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
-    };
+    return withI18nSuccess(
+      {
+        ...user,
+        id: String(user._id),
+        permissions,
+        rbacPermissions,
+        isSuperAdmin: !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
+      },
+      'Profile loaded',
+      AuthI18nKeys.meSuccess,
+    );
   }
 
   async logout(refreshToken: string) {
@@ -567,7 +667,12 @@ export class AuthService {
     });
 
     if (payload.typ !== 'refresh') {
-      throw new UnauthorizedException('Invalid token type');
+      throw new DomainException(
+        'Invalid token type',
+        401,
+        'INVALID_TOKEN_TYPE',
+        AuthI18nKeys.invalidTokenType,
+      );
     }
 
     const existing = await this.refreshTokenModel.findOne({
@@ -575,7 +680,12 @@ export class AuthService {
       userId: new Types.ObjectId(payload.sub),
     });
     if (!existing || existing.isRevoked) {
-      throw new UnauthorizedException('Session already logged out');
+      throw new DomainException(
+        'Session already logged out',
+        401,
+        'SESSION_LOGGED_OUT',
+        AuthI18nKeys.sessionLoggedOut,
+      );
     }
 
     const currentHash = this.hashToken(refreshToken);
@@ -587,7 +697,12 @@ export class AuthService {
       }
       await this.revokeRefreshTokenFamily(familyId);
       await this.logoutAll(payload.sub);
-      throw new UnauthorizedException('Token reuse detected');
+      throw new DomainException(
+        'Token reuse detected',
+        401,
+        'TOKEN_REUSE_DETECTED',
+        AuthI18nKeys.tokenReuseDetected,
+      );
     }
 
     if (!existing.tokenHash) {
@@ -608,7 +723,11 @@ export class AuthService {
       userId: payload.sub,
     });
 
-    return { message: 'Logged out successfully' };
+    return withI18nSuccess(
+      { message: 'Logged out successfully' },
+      'Logged out successfully',
+      AuthI18nKeys.logoutSuccess,
+    );
   }
 
   // =========================
@@ -637,10 +756,14 @@ export class AuthService {
       metadata: { sessionsRevoked: result.modifiedCount },
     });
 
-    return {
-      message: 'All sessions logged out successfully',
-      modified: result.modifiedCount,
-    };
+    return withI18nSuccess(
+      {
+        message: 'All sessions logged out successfully',
+        modified: result.modifiedCount,
+      },
+      'All sessions logged out successfully',
+      AuthI18nKeys.logoutAllSuccess,
+    );
   }
 
   // =========================
@@ -664,7 +787,12 @@ export class AuthService {
     const decoded: unknown = this.jwtService.decode(token);
 
     if (!isJwtDecoded(decoded)) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new DomainException(
+        'Invalid refresh token',
+        401,
+        'INVALID_REFRESH_TOKEN',
+        AuthI18nKeys.invalidRefreshToken,
+      );
     }
 
     const expiresAt = new Date(decoded.exp * 1000);

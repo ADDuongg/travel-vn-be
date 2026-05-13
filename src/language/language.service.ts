@@ -1,14 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateLanguageDto } from './dto/create-language.dto';
 import { UpdateLanguageDto } from './dto/update-language.dto';
 import { Language, LanguageDocument } from './schema/language.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { LanguageI18nKeys } from './language.i18n-keys';
 
 @Injectable()
 export class LanguageService {
@@ -23,7 +22,12 @@ export class LanguageService {
 
     const existed = await this.languageModel.findOne({ code });
     if (existed) {
-      throw new ConflictException('Language code already exists');
+      throw new DomainException(
+        'Language code already exists',
+        409,
+        'LANGUAGE_CODE_EXISTS',
+        LanguageI18nKeys.codeExists,
+      );
     }
 
     let flag;
@@ -37,11 +41,16 @@ export class LanguageService {
       };
     }
 
-    return this.languageModel.create({
+    const created = await this.languageModel.create({
       ...dto,
       code,
       ...flag,
     });
+    return withI18nSuccess(
+      created,
+      'Language created successfully',
+      LanguageI18nKeys.created,
+    );
   }
 
   findAll() {
@@ -60,7 +69,11 @@ export class LanguageService {
     });
 
     if (!lang) {
-      throw new NotFoundException('Language not found');
+      throw new NotFoundDomainException(
+        'Language not found',
+        'LANGUAGE_NOT_FOUND',
+        LanguageI18nKeys.notFound,
+      );
     }
 
     if (file) {
@@ -75,7 +88,12 @@ export class LanguageService {
     }
 
     Object.assign(lang, dto);
-    return lang.save();
+    const saved = await lang.save();
+    return withI18nSuccess(
+      saved,
+      'Language updated successfully',
+      LanguageI18nKeys.updated,
+    );
   }
 
   async remove(code: string) {
@@ -84,7 +102,11 @@ export class LanguageService {
     });
 
     if (!lang) {
-      throw new NotFoundException('Language not found');
+      throw new NotFoundDomainException(
+        'Language not found',
+        'LANGUAGE_NOT_FOUND',
+        LanguageI18nKeys.notFound,
+      );
     }
 
     if (lang.flagPublicId) {
@@ -92,6 +114,10 @@ export class LanguageService {
     }
 
     await lang.deleteOne();
-    return true;
+    return withI18nSuccess(
+      true,
+      'Language deleted successfully',
+      LanguageI18nKeys.deleted,
+    );
   }
 }

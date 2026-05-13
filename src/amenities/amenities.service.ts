@@ -1,9 +1,6 @@
 // amenities/amenities.service.ts
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common'
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateAmenityDto } from './dto/create-amenity.dto';
@@ -32,7 +29,7 @@ export class AmenitiesService {
     }
 
     if (!dto.translations || Object.keys(dto.translations).length === 0) {
-      throw new BadRequestException('At least one language is required');
+      throw new DomainException('At least one language is required', 400, 'BAD_REQUEST', 'amenities.bad_request');
     }
 
     return this.amenityModel.create({
@@ -66,7 +63,7 @@ export class AmenitiesService {
 
   async update(id: string, dto: UpdateAmenityDto, file?: Express.Multer.File) {
     const amenity = await this.amenityModel.findById(id);
-    if (!amenity) throw new NotFoundException();
+    if (!amenity) throw new NotFoundDomainException('Amenity not found', 'NOT_FOUND', 'amenities.not_found');
 
     if (file) {
       if (amenity.icon?.publicId) {
@@ -97,7 +94,7 @@ export class AmenitiesService {
 
   async remove(id: string) {
     const amenity = await this.amenityModel.findById(id);
-    if (!amenity) throw new NotFoundException('Amenity not found');
+    if (!amenity) throw new NotFoundDomainException('Amenity not found', 'NOT_FOUND', 'amenities.not_found');
 
     if (amenity.icon?.publicId) {
       await this.cloudinaryService.deleteFile(amenity.icon.publicId);

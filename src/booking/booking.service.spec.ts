@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { DomainException } from 'src/common/exceptions';
 import { Types } from 'mongoose';
 
 import { BookingService } from './booking.service';
@@ -123,7 +123,7 @@ describe('BookingService', () => {
       );
     });
 
-    it('throws BadRequestException when checkIn === checkOut (0 nights)', async () => {
+    it('throws DomainException when checkIn === checkOut (0 nights)', async () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
 
       await expect(
@@ -131,10 +131,10 @@ describe('BookingService', () => {
           { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-10' },
           'uid',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
-    it('throws BadRequestException when nights < minNights', async () => {
+    it('throws DomainException when nights < minNights', async () => {
       mockRoomService.findOne.mockResolvedValue({
         ...mockRoom,
         bookingConfig: { minNights: 3, maxNights: 14 },
@@ -145,10 +145,10 @@ describe('BookingService', () => {
           { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
           'uid',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
-    it('throws BadRequestException when nights > maxNights', async () => {
+    it('throws DomainException when nights > maxNights', async () => {
       mockRoomService.findOne.mockResolvedValue({
         ...mockRoom,
         bookingConfig: { minNights: 1, maxNights: 1 },
@@ -159,15 +159,15 @@ describe('BookingService', () => {
           { ...baseDto, checkIn: '2030-06-10', checkOut: '2030-06-12' },
           'uid',
         ),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
-    it('throws BadRequestException when room is not available', async () => {
+    it('throws DomainException when room is not available', async () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
       mockRoomInventoryService.checkAvailability.mockResolvedValue(false);
 
       await expect(service.createRoomBooking(baseDto, 'uid')).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
 
@@ -199,13 +199,13 @@ describe('BookingService', () => {
       );
     });
 
-    it('throws BadRequestException when guests exceed max capacity', async () => {
+    it('throws DomainException when guests exceed max capacity', async () => {
       mockRoomService.findOne.mockResolvedValue(mockRoom);
 
       const dto = { ...baseDto, rooms: [{ adults: 4, children: 0 }] };
 
       await expect(service.createRoomBooking(dto, 'uid')).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
   });
@@ -285,13 +285,13 @@ describe('BookingService', () => {
       ).rejects.toThrow(ForbiddenDomainException);
     });
 
-    it('throws BadRequestException when booking is already paid', async () => {
+    it('throws DomainException when booking is already paid', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
       mockBookingRepository.findById.mockResolvedValue(booking);
 
       await expect(
         service.cancel(booking._id.toString(), ownerId),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
     it('cancels booking and rolls back future inventory', async () => {
@@ -458,12 +458,12 @@ describe('BookingService', () => {
       );
     });
 
-    it('throws BadRequestException when booking is already PAID', async () => {
+    it('throws DomainException when booking is already PAID', async () => {
       const booking = makeBooking({ paymentStatus: BookingPaymentStatus.PAID });
       mockBookingRepository.findById.mockResolvedValue(booking);
 
       await expect(service.update(booking._id.toString(), {})).rejects.toThrow(
-        BadRequestException,
+        DomainException,
       );
     });
   });

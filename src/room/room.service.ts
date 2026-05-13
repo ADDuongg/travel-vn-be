@@ -3,8 +3,8 @@ import {
   ConflictException,
   Injectable,
   Logger,
-  NotFoundException,
 } from '@nestjs/common';
+import { NotFoundDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AmenitiesService } from 'src/amenities/amenities.service';
@@ -259,7 +259,7 @@ export class RoomService {
         populate: { path: 'provinceId', select: 'name code slug fullName' },
       })
       .populate('amenities');
-    if (!room) throw new NotFoundException('Room not found');
+    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
     const obj = room.toObject();
     if (!userId) return obj;
     const isFavorited = await this.favoriteService.isFavorited({
@@ -272,7 +272,7 @@ export class RoomService {
 
   async update(id: string, dto: UpdateRoomDto) {
     const room = await this.roomModel.findById(id);
-    if (!room) throw new NotFoundException('Room not found');
+    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
     const inventoryCount =
       await this.roomInventoryService.countFutureInventories(id);
 
@@ -350,7 +350,7 @@ export class RoomService {
 
   async remove(id: string) {
     const room = await this.roomModel.findById(id);
-    if (!room) throw new NotFoundException('Room not found');
+    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
 
     await this.cleanupOrphanMedia({
       prevGallery: (room.gallery ?? []) as StoredGalleryItem[],

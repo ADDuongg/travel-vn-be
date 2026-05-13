@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Hotel, HotelDocument } from 'src/hotel/schema/hotel.schema';
@@ -35,10 +36,10 @@ export class FavoriteService {
     entityId: string;
   }) {
     if (!params.userId) {
-      throw new BadRequestException('Unauthorized');
+      throw new DomainException('Unauthorized', 400, 'BAD_REQUEST', 'favorite.bad_request');
     }
     if (!Types.ObjectId.isValid(params.entityId)) {
-      throw new BadRequestException('Invalid entityId');
+      throw new DomainException('Invalid entityId', 400, 'BAD_REQUEST', 'favorite.bad_request');
     }
     const userId = new Types.ObjectId(params.userId);
     const entityId = new Types.ObjectId(params.entityId);
@@ -55,10 +56,10 @@ export class FavoriteService {
     entityId: string;
   }): Promise<{ isFavorited: boolean }> {
     if (!params.userId) {
-      throw new BadRequestException('Unauthorized');
+      throw new DomainException('Unauthorized', 400, 'BAD_REQUEST', 'favorite.bad_request');
     }
     if (!Types.ObjectId.isValid(params.entityId)) {
-      throw new BadRequestException('Invalid entityId');
+      throw new DomainException('Invalid entityId', 400, 'BAD_REQUEST', 'favorite.bad_request');
     }
     const userId = new Types.ObjectId(params.userId);
     const entityId = new Types.ObjectId(params.entityId);

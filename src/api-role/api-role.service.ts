@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { ApiRole } from './schema/api-role.schema';
@@ -18,7 +19,7 @@ export class ApiRoleService {
         apiCode,
       });
     } catch {
-      throw new BadRequestException('API already assigned to role');
+      throw new DomainException('API already assigned to role', 400, 'BAD_REQUEST', 'api.role.bad_request');
     }
   }
 

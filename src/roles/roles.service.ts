@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import Redis from 'ioredis';
 import { Model, Types } from 'mongoose';
@@ -39,7 +34,7 @@ export class RolesService {
     });
 
     if (existed) {
-      throw new BadRequestException('Role code already exists');
+      throw new DomainException('Role code already exists', 400, 'BAD_REQUEST', 'roles.bad_request');
     }
 
     const role = new this.roleModel(createRoleDto);
@@ -56,7 +51,7 @@ export class RolesService {
     const role = await this.roleModel.findById(id).lean();
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundDomainException('Role not found', 'NOT_FOUND', 'roles.not_found');
     }
 
     return role;
@@ -69,7 +64,7 @@ export class RolesService {
     });
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundDomainException('Role not found', 'NOT_FOUND', 'roles.not_found');
     }
 
     return role;
@@ -80,15 +75,14 @@ export class RolesService {
     const role = await this.roleModel.findById(id).exec();
 
     if (!role) {
-      throw new NotFoundException('Role not found');
+      throw new NotFoundDomainException('Role not found', 'NOT_FOUND', 'roles.not_found');
     }
 
     const assigned = await this.userModel.countDocuments({
       roles: role.code,
     });
     if (assigned > 0) {
-      throw new ConflictException(
-        `Cannot delete role "${role.code}": ${assigned} user(s) still reference this role.`,
+      throw new DomainException(`Cannot delete role "${role.code}": ${assigned} user(s, 409, 'CONFLICT', 'roles.conflict') still reference this role.`,
       );
     }
 

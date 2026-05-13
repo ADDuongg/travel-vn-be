@@ -1,8 +1,11 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
+  DomainException,
   ForbiddenDomainException,
   NotFoundDomainException,
 } from 'src/common/exceptions';
+import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { BookingI18nKeys } from './booking.i18n-keys';
 import { ClientSession, Types } from 'mongoose';
 
 import { RoomInventoryService } from 'src/room-inventory/room-inventory.service';
@@ -90,12 +93,14 @@ export class BookingService {
 
   /* ================= ROOM BOOKING ================= */
 
-  async createRoomBooking(
-    dto: CreateRoomBookingDto,
-    userId: string,
-  ): Promise<Booking> {
+  async createRoomBooking(dto: CreateRoomBookingDto, userId: string) {
     const room = await this.roomService.findOne(dto.roomId);
-    if (!room) throw new NotFoundDomainException('Room not found');
+    if (!room)
+      throw new NotFoundDomainException(
+        'Room not found',
+        'ROOM_NOT_FOUND',
+        BookingI18nKeys.roomNotFound,
+      );
 
     const checkIn = parseDateOnly(dto.checkIn);
     const checkOut = parseDateOnly(dto.checkOut);
@@ -105,25 +110,45 @@ export class BookingService {
     );
 
     if (nights <= 0) {
-      throw new BadRequestException('Invalid check-in / check-out');
+      throw new DomainException(
+        'Invalid check-in / check-out',
+        400,
+        'INVALID_DATES',
+        BookingI18nKeys.invalidCheckInOut,
+      );
     }
 
     const minNights = room.bookingConfig?.minNights ?? 1;
     const maxNights = room.bookingConfig?.maxNights;
 
     if (nights < minNights) {
-      throw new BadRequestException(`Minimum stay is ${minNights} nights`);
+      throw new DomainException(
+        `Minimum stay is ${minNights} nights`,
+        400,
+        'MIN_NIGHTS',
+        BookingI18nKeys.minNights,
+      );
     }
 
     if (maxNights && nights > maxNights) {
-      throw new BadRequestException(`Maximum stay is ${maxNights} nights`);
+      throw new DomainException(
+        `Maximum stay is ${maxNights} nights`,
+        400,
+        'MAX_NIGHTS',
+        BookingI18nKeys.maxNights,
+      );
     }
 
     const quantity = dto.rooms.length;
 
     const totalRooms = room.inventory?.totalRooms;
     if (typeof totalRooms !== 'number') {
-      throw new BadRequestException('Room inventory is not configured');
+      throw new DomainException(
+        'Room inventory is not configured',
+        400,
+        'INVENTORY_NOT_CONFIGURED',
+        BookingI18nKeys.inventoryNotConfigured,
+      );
     }
 
     const isAvailable = await this.roomInventoryService.checkAvailability(
@@ -133,11 +158,21 @@ export class BookingService {
     );
 
     if (!isAvailable) {
-      throw new BadRequestException('Room not available');
+      throw new DomainException(
+        'Room not available',
+        400,
+        'ROOM_NOT_AVAILABLE',
+        BookingI18nKeys.roomNotAvailable,
+      );
     }
 
     if (quantity > totalRooms) {
-      throw new BadRequestException(`Only ${totalRooms} rooms available`);
+      throw new DomainException(
+        `Only ${totalRooms} rooms available`,
+        400,
+        'ROOMS_LIMIT',
+        BookingI18nKeys.roomsAvailableLimit,
+      );
     }
 
     for (const r of dto.rooms) {
@@ -146,12 +181,20 @@ export class BookingService {
         (room.capacity?.maxAdults ?? 0) + (room.capacity?.maxChildren ?? 0);
 
       if (totalGuests > maxCapacity) {
-        throw new BadRequestException('Exceed max guests per room');
+        throw new DomainException(
+          'Exceed max guests per room',
+          400,
+          'EXCEED_GUESTS',
+          BookingI18nKeys.exceedMaxGuests,
+        );
       }
 
       if (room.capacity?.maxAdults && r.adults > room.capacity.maxAdults) {
-        throw new BadRequestException(
+        throw new DomainException(
           `Exceed max adults per room (${room.capacity.maxAdults})`,
+          400,
+          'EXCEED_ADULTS',
+          BookingI18nKeys.exceedMaxAdults,
         );
       }
 
@@ -159,8 +202,11 @@ export class BookingService {
         room.capacity?.maxChildren &&
         (r.children ?? 0) > room.capacity.maxChildren
       ) {
-        throw new BadRequestException(
+        throw new DomainException(
           `Exceed max children per room (${room.capacity.maxChildren})`,
+          400,
+          'EXCEED_CHILDREN',
+          BookingI18nKeys.exceedMaxChildren,
         );
       }
     }
@@ -199,22 +245,29 @@ export class BookingService {
 
       userId: new Types.ObjectId(userId),
     });
-    return this.transactionService.runInTransaction(async (session) => {
-      await this.roomInventoryService.ensureInventoryExists(
-        room._id as Types.ObjectId,
-        checkIn,
-        checkOut,
-        session,
-      );
-      await this.roomInventoryService.reserveInventoryRange(
-        room._id as Types.ObjectId,
-        checkIn,
-        checkOut,
-        quantity,
-        session,
-      );
-      return this.bookingRepository.save(booking, session);
-    });
+    const saved = await this.transactionService.runInTransaction(
+      async (session) => {
+        await this.roomInventoryService.ensureInventoryExists(
+          room._id as Types.ObjectId,
+          checkIn,
+          checkOut,
+          session,
+        );
+        await this.roomInventoryService.reserveInventoryRange(
+          room._id as Types.ObjectId,
+          checkIn,
+          checkOut,
+          quantity,
+          session,
+        );
+        return this.bookingRepository.save(booking, session);
+      },
+    );
+    return withI18nSuccess(
+      saved,
+      'Booking created successfully',
+      BookingI18nKeys.created,
+    );
   }
 
   /* ================= ADMIN LIST ================= */
@@ -367,7 +420,11 @@ export class BookingService {
     );
 
     if (!booking) {
-      throw new NotFoundDomainException('Booking not found');
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
     }
     const { userId: bookingUserId, ...rest } = booking;
     const formatted = {
@@ -388,7 +445,11 @@ export class BookingService {
     const booking = await this.bookingRepository.findByIdForAdmin(bookingId);
 
     if (!booking) {
-      throw new NotFoundDomainException('Booking not found');
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
     }
 
     const { userId: bookingUser, ...rest } = booking;
@@ -407,12 +468,22 @@ export class BookingService {
 
   /* ================= UPDATE ================= */
 
-  async update(id: string, dto: UpdateBookingDto): Promise<Booking> {
+  async update(id: string, dto: UpdateBookingDto) {
     const booking = await this.bookingRepository.findById(id);
-    if (!booking) throw new NotFoundDomainException('Booking not found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
 
     if (booking.paymentStatus === BookingPaymentStatus.PAID) {
-      throw new BadRequestException('Paid booking cannot be updated');
+      throw new DomainException(
+        'Paid booking cannot be updated',
+        400,
+        'PAID_CANNOT_UPDATE',
+        BookingI18nKeys.paidCannotUpdate,
+      );
     }
 
     if (booking.bookingType === BookingType.ROOM && dto.rooms) {
@@ -435,7 +506,12 @@ export class BookingService {
       };
     }
 
-    return this.bookingRepository.save(booking);
+    const updated = await this.bookingRepository.save(booking);
+    return withI18nSuccess(
+      updated,
+      'Booking updated successfully',
+      BookingI18nKeys.updated,
+    );
   }
 
   async findOne(id: string) {
@@ -452,7 +528,12 @@ export class BookingService {
     session?: ClientSession,
   ) {
     const booking = await this.bookingRepository.findById(id);
-    if (!booking) throw new NotFoundDomainException('Booking not found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
 
     const isOwner = booking.userId && String(booking.userId) === userId;
     const isAdmin =
@@ -460,12 +541,17 @@ export class BookingService {
     if (!isOwner && !isAdmin) {
       throw new ForbiddenDomainException(
         'Only the booking owner or admin can cancel this booking',
+        'BOOKING_CANCEL_FORBIDDEN',
+        BookingI18nKeys.cancelForbidden,
       );
     }
 
     if (booking.paymentStatus === BookingPaymentStatus.PAID) {
-      throw new BadRequestException(
+      throw new DomainException(
         'Paid booking must be refunded before cancel',
+        400,
+        'PAID_MUST_REFUND',
+        BookingI18nKeys.paidMustRefundBeforeCancel,
       );
     }
 
@@ -512,15 +598,27 @@ export class BookingService {
       return this.bookingRepository.save(booking, txSession);
     };
 
-    return session
-      ? run(session)
-      : this.transactionService.runInTransaction((txSession) => run(txSession));
+    const saved = session
+      ? await run(session)
+      : await this.transactionService.runInTransaction((txSession) =>
+          run(txSession),
+        );
+    return withI18nSuccess(
+      saved,
+      'Booking cancelled successfully',
+      BookingI18nKeys.cancelled,
+    );
   }
 
   async markAsPaid(id: string, session?: ClientSession) {
     const booking = await this.findOne(id);
 
-    if (!booking) throw new NotFoundDomainException('Booking not found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
 
     booking.paymentStatus = BookingPaymentStatus.PAID;
     booking.status = BookingStatus.CONFIRMED;
@@ -530,7 +628,12 @@ export class BookingService {
 
   async markAsFailed(bookingId: string, session?: ClientSession) {
     const booking = await this.bookingRepository.findByIdAsDocument(bookingId);
-    if (!booking) throw new NotFoundDomainException('Booking not found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
 
     if (booking.status !== BookingStatus.PENDING) return;
 
@@ -546,7 +649,12 @@ export class BookingService {
     session?: ClientSession,
   ) {
     const booking = await this.bookingRepository.findByIdAsDocument(bookingId);
-    if (!booking) throw new NotFoundDomainException('Booking not found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
 
     booking.paymentStatus = BookingPaymentStatus.REFUNDED;
 
@@ -609,16 +717,30 @@ export class BookingService {
 
   async uploadReceipt(bookingId: string, file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('Receipt image is required');
+      throw new DomainException(
+        'Receipt image is required',
+        400,
+        'RECEIPT_REQUIRED',
+        BookingI18nKeys.receiptRequired,
+      );
     }
 
     const booking = await this.bookingRepository.uploadReceiptFind(bookingId);
     if (!booking) {
-      throw new NotFoundDomainException('Booking not found');
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'BOOKING_NOT_FOUND',
+        BookingI18nKeys.bookingNotFound,
+      );
     }
 
     if (booking.paymentStatus !== BookingPaymentStatus.UNPAID) {
-      throw new BadRequestException('Booking already paid or expired');
+      throw new DomainException(
+        'Booking already paid or expired',
+        400,
+        'BOOKING_NOT_UNPAID',
+        BookingI18nKeys.alreadyPaidOrExpired,
+      );
     }
 
     const result = await this.cloudinaryService.uploadFile(file, {
@@ -633,16 +755,25 @@ export class BookingService {
 
     await this.bookingRepository.save(booking);
 
-    return {
-      message: 'Receipt uploaded successfully',
-      receipt: booking.bankReceipt,
-    };
+    return withI18nSuccess(
+      {
+        message: 'Receipt uploaded successfully',
+        receipt: booking.bankReceipt,
+      },
+      'Receipt uploaded successfully',
+      BookingI18nKeys.receiptUploaded,
+    );
   }
 
   async verifyReceipt(id: string) {
     const booking = await this.bookingRepository.verifyReceiptFind(id);
     if (!booking?.bankReceipt) {
-      throw new BadRequestException('No receipt');
+      throw new DomainException(
+        'No receipt',
+        400,
+        'NO_RECEIPT',
+        BookingI18nKeys.noReceipt,
+      );
     }
 
     booking.bankReceipt.verified = true;
@@ -650,5 +781,10 @@ export class BookingService {
     booking.status = BookingStatus.CONFIRMED;
 
     await this.bookingRepository.save(booking);
+    return withI18nSuccess(
+      { verified: true },
+      'Receipt verified successfully',
+      BookingI18nKeys.receiptVerified,
+    );
   }
 }

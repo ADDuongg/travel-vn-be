@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
-import { ConflictException } from '@nestjs/common';
-
+import { DomainException } from 'src/common/exceptions';
 import { IdempotencyService } from './idempotency.service';
 import { Idempotency, IdempotencyStatus } from './schema/idempotency.schema';
 
@@ -41,6 +40,7 @@ describe('IdempotencyService', () => {
 
     it('returns cached response when key already COMPLETED (does not call handler)', async () => {
       const cachedResponse = { bookingId: 'bk_123', status: 'CONFIRMED' };
+      mockIdempotencyModel.create.mockRejectedValueOnce({ code: 11000 });
       mockIdempotencyModel.findOne.mockResolvedValue({
         status: IdempotencyStatus.COMPLETED,
         response: cachedResponse,
@@ -53,7 +53,8 @@ describe('IdempotencyService', () => {
       expect(handler).not.toHaveBeenCalled();
     });
 
-    it('throws ConflictException when request is still PROCESSING', async () => {
+    it('throws DomainException when request is still PROCESSING', async () => {
+      mockIdempotencyModel.create.mockRejectedValueOnce({ code: 11000 });
       mockIdempotencyModel.findOne.mockResolvedValue({
         status: IdempotencyStatus.PROCESSING,
       });
@@ -62,7 +63,7 @@ describe('IdempotencyService', () => {
 
       await expect(
         service.execute(key, userId, endpoint, handler),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(DomainException);
       expect(handler).not.toHaveBeenCalled();
     });
 
@@ -125,8 +126,13 @@ describe('IdempotencyService', () => {
       await expect(
         service.execute(key, userId, endpoint, handler),
       ).rejects.toThrow('downstream failure');
-      // updateOne should NOT have been called since handler threw
-      expect(mockIdempotencyModel.updateOne).not.toHaveBeenCalled();
+      expect(mockIdempotencyModel.updateOne).toHaveBeenCalledWith(
+        { key, userId },
+        expect.objectContaining({
+          status: 'FAILED',
+          error: 'downstream failure',
+        }),
+      );
     });
   });
 });
