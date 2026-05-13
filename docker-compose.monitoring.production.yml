@@ -89,6 +89,8 @@ services:
     image: grafana/promtail:2.9.10
     container_name: monitoring-production-promtail
     restart: unless-stopped
+    environment:
+      - DOCKER_API_VERSION=1.44
     command: ['-config.file=/etc/promtail/promtail.yml']
     volumes:
       - ./monitoring/promtail/promtail.production.yml:/etc/promtail/promtail.yml:ro
