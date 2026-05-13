@@ -277,9 +277,8 @@ deploy:production:
     - export IMAGE_TAG=production
 
     - docker compose -f docker-compose.production.yml pull backend-production
-    - docker compose -f docker-compose.production.yml up -d mongo redis
     - docker compose -f docker-compose.production.yml up -d --no-deps --force-recreate backend-production
-
+    - docker image prune -af
     - |
       for _ in $(seq 1 180); do
         if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:3002/health >/dev/null 2>&1; then
@@ -299,8 +298,6 @@ deploy:production:
       exit 1
 
     - echo "Deploy production success!"
-  after_script:
-    - docker image prune -f || true
   rules:
     - if: '$CI_COMMIT_BRANCH == "production"'
   environment:
