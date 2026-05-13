@@ -269,6 +269,8 @@ deploy:production:
   stage: deploy
   script:
     - cp "$CI_PROJECT_DIR/docker-compose.production.yml" /opt/travel-be/production/docker-compose.production.yml
+    - cp "$CI_PROJECT_DIR/docker-compose.monitoring.production.yml" /opt/travel-be/production/docker-compose.monitoring.production.yml
+    - rsync -av --delete "$CI_PROJECT_DIR/monitoring/" /opt/travel-be/production/monitoring/
     - cd /opt/travel-be/production
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
 
