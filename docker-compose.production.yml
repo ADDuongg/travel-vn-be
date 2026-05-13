@@ -2,8 +2,8 @@
 # DOCKER COMPOSE -- PRODUCTION ENVIRONMENT
 # =============================================================================
 #
-# Stack: NestJS API + MongoDB + Redis (tat ca container; du lieu Mongo/Redis
-# luu trong Docker volumes).
+# Stack: NestJS API + MongoDB + Redis + Elasticsearch (du lieu trong Docker volumes).
+# Elasticsearch: single-node, chi trong mang Docker (khong publish port 9200).
 #
 # Cach chay:
 #   docker compose -f docker-compose.production.yml up -d
@@ -15,6 +15,13 @@
 #   - DB_URI / REDIS_* trong .env phai tro toi service name mongo, redis.
 #   - Mongo auth: MONGO_USER + MONGO_PASSWORD trong .env; DB_URI co
 #     mongodb://USER:PASS@mongo:27017/TEN_DB?authSource=admin (PASS URL-encode neu co @).
+#   - Elasticsearch trong .env (backend): ELASTICSEARCH_ENABLED=true,
+#     ELASTICSEARCH_URL=http://elasticsearch:9200, ELASTICSEARCH_TOURS_INDEX=tours
+#     (xem .env.docker.example). Lan dau sau khi bat ES: tren VPS
+#     docker exec -it backend-production yarn run search:reindex-tours
+#     neu DB da co tour (dong bo Mongo -> ES). Local dev nguon TS: yarn search:reindex-tours:dev
+#   - Linux: neu ES loi vm.max_map_count, tang tren host: sysctl -w vm.max_map_count=262144
+#     (va ghi vao /etc/sysctl.d de persist).
 #
 # =============================================================================
 
@@ -109,6 +116,41 @@ services:
         max-size: '50m'
         max-file: '5'
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: backend-production-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      # Tang/giam theo RAM VPS; container nen ~2x heap hoac hon (JVM + page cache)
+      - ES_JAVA_OPTS=-Xms768m -Xmx768m
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - travel-vn-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.25'
+          memory: 512M
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'curl -fsS "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null'
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
   backend-production:
     # image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-production}'
     image: registry.gitlab.com/nvduong2302/travel-vn-be:production-latest
@@ -126,6 +168,8 @@ services:
       mongo:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      elasticsearch:
         condition: service_healthy
     restart: unless-stopped
     deploy:
@@ -165,3 +209,4 @@ networks:
 volumes:
   mongo_data:
   redis_data:
+  es_data:

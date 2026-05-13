@@ -36,7 +36,8 @@
     "db:reset": "ts-node scripts/database/reset.ts",
     "db:seed:rbac": "ts-node -r tsconfig-paths/register scripts/database/seed-rbac.ts",
     "db:seed:rbac:matrix": "ts-node -r tsconfig-paths/register scripts/database/seed-rbac.ts --sync-default-matrix",
-    "search:reindex-tours": "ts-node -r tsconfig-paths/register scripts/reindex-tours-es.ts"
+    "search:reindex-tours": "node dist/scripts/reindex-tours-es.js",
+    "search:reindex-tours:dev": "ts-node -r tsconfig-paths/register scripts/reindex-tours-es.ts"
   },
   "dependencies": {
     "@elastic/elasticsearch": "^8.19.1",

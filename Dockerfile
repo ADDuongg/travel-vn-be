@@ -69,5 +69,8 @@ EXPOSE 9001
 HEALTHCHECK --interval=15s --timeout=8s --start-period=180s --retries=5 \
   CMD wget -q -O /dev/null --timeout=5 http://127.0.0.1:9001/health || exit 1
 
+# One-off ES backfill (tours): docker exec -it backend-production yarn run search:reindex-tours
+# Can require: cwd /app, env same as API (compose env_file / ELASTICSEARCH_* + DB_URI).
+
 # Chay NestJS app
 CMD ["node", "dist/src/main.js"]
