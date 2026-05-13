@@ -57,7 +57,7 @@ export class TourBookingExpireService {
       await this.transactionService.runInTransaction(async (session) => {
         const inv = await this.inventoryModel
           .findById(booking.tourInventoryId)
-          .session(session);
+          .session(session ?? null);
         if (inv) {
           await this.tourInventoryService.releaseSlots(
             {
@@ -73,7 +73,7 @@ export class TourBookingExpireService {
         booking.paymentStatus = TourPaymentStatus.EXPIRED;
         booking.cancelledAt = new Date();
         booking.cancelReason = 'Expired - no payment within 1 hour';
-        await booking.save({ session });
+        await booking.save(session ? { session } : undefined);
       });
 
       this.logger.log(
