@@ -17,13 +17,14 @@ import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
 import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 import { BookingService } from './booking.service';
 import { BookingQueryDto } from './dto/booking-query.dto';
 import { CreateRoomBookingDto } from './dto/create-room-booking.dto';
 
 @ApiBearerAuth()
 @ApiTags('Client · Bookings')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @UseInterceptors(CrudAuditInterceptor)
 @Controller('client/bookings')
 export class BookingClientController {
@@ -39,13 +40,22 @@ export class BookingClientController {
   }
 
   @Get('me')
-  getMyBookings(@Req() req: { user: { userId: string } }, @Query() query: BookingQueryDto) {
+  getMyBookings(
+    @Req() req: { user: { userId: string } },
+    @Query() query: BookingQueryDto,
+  ) {
     return this.bookingService.getBookingsByUser(req.user.userId, query);
   }
 
   @Get('me/:id')
-  getMyBookingById(@Req() req: { user: { userId: string } }, @Param('id') bookingId: string) {
-    return this.bookingService.getBookingByUserAndId(req.user.userId, bookingId);
+  getMyBookingById(
+    @Req() req: { user: { userId: string } },
+    @Param('id') bookingId: string,
+  ) {
+    return this.bookingService.getBookingByUserAndId(
+      req.user.userId,
+      bookingId,
+    );
   }
 
   @Post(':id/receipt')

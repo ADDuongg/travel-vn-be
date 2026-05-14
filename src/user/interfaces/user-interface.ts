@@ -11,6 +11,8 @@ export interface AuthUser {
   /** Flat `resource.action` keys for RBAC (JWT + admin guards). */
   rbacPermissions?: string[];
   isSuperAdmin?: boolean;
+  /** false = not verified; undefined = legacy (treated as verified in JWT). */
+  isEmailVerified?: boolean;
 }
 
 export interface UserWithPassword {
@@ -26,4 +28,5 @@ export interface UserWithPassword {
   isSuperAdmin?: boolean;
   isActive?: boolean;
   deletedAt?: Date | null;
+  isEmailVerified?: boolean;
 }

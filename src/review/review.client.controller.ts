@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards, UseI
 import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
 import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
@@ -11,7 +12,7 @@ import { parseStatusCsv } from './review.util';
 
 @ApiBearerAuth()
 @ApiTags('Client · Reviews')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @UseInterceptors(CrudAuditInterceptor)
 @Controller('client/reviews')
 export class ReviewClientController {

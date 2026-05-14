@@ -14,10 +14,11 @@ import { CreatePaymentIntentTourDto } from './dto/create-payment-tour.dto';
 import { stripe } from 'src/stripe.service';
 import { IdempotencyService } from 'src/idempotency/idempotency.service';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 
 @ApiBearerAuth()
 @ApiTags('Client · Payments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @Controller('client/payments')
 export class PaymentClientController {
   constructor(

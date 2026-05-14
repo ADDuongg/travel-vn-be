@@ -4,6 +4,8 @@ export interface AccessTokenPayload {
   roles: string[];
   rbacPermissions?: string[];
   isSuperAdmin?: boolean;
+  /** false = client must verify email before guarded actions. */
+  isEmailVerified?: boolean;
   typ: 'access';
   iat?: number;
   exp?: number;

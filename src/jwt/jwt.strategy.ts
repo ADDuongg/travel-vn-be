@@ -26,6 +26,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       roles: (payload.roles as string[]) || [],
       rbacPermissions: rbac,
       isSuperAdmin: payload.isSuperAdmin === true,
+      isEmailVerified:
+        typeof payload.isEmailVerified === 'boolean'
+          ? payload.isEmailVerified
+          : undefined,
     };
   }
 }

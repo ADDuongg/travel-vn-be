@@ -25,15 +25,19 @@ export class UserRepository {
   }
 
   async findOneByUsernameOrEmail(username: string, email: string) {
+    const normalizedEmail = email.trim().toLowerCase();
     return this.userModel.findOne({
-      $or: [{ username }, { email }],
+      $or: [{ username }, { email: normalizedEmail }],
     });
   }
 
   async create(userDto: CreateUserDto, hashedPassword: string): Promise<User> {
     const { password: _p, ...rest } = userDto;
+    const email =
+      typeof rest.email === 'string' ? rest.email.trim().toLowerCase() : rest.email;
     const createdUser = new this.userModel({
       ...rest,
+      email,
       password: hashedPassword,
     });
     return createdUser.save();
@@ -50,7 +54,9 @@ export class UserRepository {
   async findOneByIdForAuth(id: string) {
     return this.userModel
       .findById(id)
-      .select('_id username roles isSuperAdmin isActive deletedAt')
+      .select(
+        '_id username roles isSuperAdmin isActive deletedAt isEmailVerified',
+      )
       .lean<Omit<
         import('./interfaces/user-interface').AuthUser,
         'permissions'

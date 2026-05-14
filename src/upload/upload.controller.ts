@@ -2,12 +2,19 @@ import {
   Controller,
   Post,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 
+@ApiTags('Upload')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @Controller('upload')
 export class UploadController {
   @Post()

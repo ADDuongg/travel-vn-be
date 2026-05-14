@@ -27,4 +27,13 @@ export const AuthI18nKeys = {
   logoutSuccess: 'auth.logout.success',
   logoutAlready: 'auth.logout.already',
   logoutAllSuccess: 'auth.logout_all.success',
+
+  emailNotVerified: 'auth.verify_email.required',
+  emailVerifySuccess: 'auth.verify_email.success',
+  emailAlreadyVerified: 'auth.verify_email.already',
+  emailVerifyInvalid: 'auth.verify_email.invalid_code',
+  emailVerifyResendThrottled: 'auth.verify_email.resend_throttled',
+  emailRequired: 'auth.register.email_required',
+  emailExists: 'auth.register.email_exists',
+  emailVerifySent: 'auth.verify_email.sent',
 } as const;

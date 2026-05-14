@@ -82,11 +82,24 @@ if (!dbLocal) {
   process.exit(1);
 }
 
+const mongoUriProductionRaw =
+  disk.MONGO_URI_PRODUCTION || process.env.MONGO_URI_PRODUCTION || '';
+const mongoUriProduction = mongoUriProductionRaw
+  ? rewriteMongoHostForHostMachine(mongoUriProductionRaw.trim())
+  : '';
+
+const dbProductionDebug =
+  disk.MONGO_DB_PRODUCTION_DEBUG ||
+  process.env.MONGO_DB_PRODUCTION_DEBUG ||
+  'travel_vn_prod_debug';
+
 export const config = {
   mongoUriLocal: resolveMongoUriLocal(),
   mongoUriStaging: process.env.MONGO_URI_STAGING || '',
+  mongoUriProduction,
   dbLocal,
   dbDebug: process.env.MONGO_DB_DEBUG || 'travel_vn_debug',
+  dbProductionDebug,
 };
 
 export function parseMongoUri(uri: string) {

@@ -66,6 +66,7 @@ import { HttpDurationObservabilityInterceptor } from './common/interceptors/http
 import { httpMetricsProviders } from './common/metrics/http.metrics';
 import { ResponseTransformInterceptor } from './interceptor/http-success.interceptor.filter';
 import { DatabaseTransactionModule } from './common/database/database-transaction.module';
+import { EmailVerifiedGuard } from './guards/email-verified.guard';
 
 @Module({
   imports: [
@@ -264,6 +265,7 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
   controllers: [AppController],
   providers: [
     AppService,
+    EmailVerifiedGuard,
     ...httpMetricsProviders,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     /** Outermost: wall-clock HTTP duration + Prometheus histogram on response finish. */

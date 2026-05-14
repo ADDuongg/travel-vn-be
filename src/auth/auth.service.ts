@@ -35,6 +35,7 @@ import {
 import { DomainException } from 'src/common/exceptions';
 import { withI18nSuccess } from 'src/common/i18n/success-envelope';
 import { AuthI18nKeys } from './auth.i18n-keys';
+import { isJwtEmailVerifiedEffective } from 'src/common/auth/email-verified.util';
 
 @Injectable()
 export class AuthService {
@@ -112,6 +113,7 @@ export class AuthService {
       permissions,
       rbacPermissions,
       isSuperAdmin: user.isSuperAdmin ?? false,
+      isEmailVerified: user.isEmailVerified,
     };
   }
 
@@ -141,6 +143,7 @@ export class AuthService {
       roles: user.roles,
       rbacPermissions: user.rbacPermissions ?? [],
       isSuperAdmin: user.isSuperAdmin ?? false,
+      isEmailVerified: isJwtEmailVerifiedEffective(user.isEmailVerified),
       typ: 'access',
     };
 
@@ -234,6 +237,7 @@ export class AuthService {
         permissions,
         rbacPermissions,
         isSuperAdmin: user.isSuperAdmin ?? false,
+        isEmailVerified: isJwtEmailVerifiedEffective(user.isEmailVerified),
       },
     };
   }
@@ -378,6 +382,193 @@ export class AuthService {
   }
 
   // =========================
+  // Verify email (OTP)
+  // =========================
+  async verifyEmail(emailRaw: string, code: string) {
+    const email = emailRaw.trim().toLowerCase();
+    if (!email) {
+      throw new DomainException(
+        'Email is required',
+        400,
+        'EMAIL_REQUIRED',
+        AuthI18nKeys.emailRequired,
+      );
+    }
+
+    const row = await this.userModel
+      .findOne({ email })
+      .select('_id username isEmailVerified')
+      .lean<{
+        _id: Types.ObjectId;
+        username: string;
+        isEmailVerified?: boolean;
+      } | null>();
+
+    if (!row) {
+      this.auditLogService.log({
+        category: AuditCategory.AUTH,
+        action: AuthAuditAction.EMAIL_VERIFY_FAILED,
+        resourceType: AuditResourceType.USER,
+        metadata: { email, reason: 'user_not_found' },
+      });
+      throw new DomainException(
+        'Invalid verification request',
+        400,
+        'EMAIL_VERIFY_INVALID',
+        AuthI18nKeys.emailVerifyInvalid,
+      );
+    }
+
+    if (isJwtEmailVerifiedEffective(row.isEmailVerified)) {
+      this.auditLogService.log({
+        category: AuditCategory.AUTH,
+        action: AuthAuditAction.EMAIL_VERIFIED,
+        resourceType: AuditResourceType.USER,
+        resourceId: row._id,
+        userId: row._id,
+        username: row.username,
+        metadata: { email, alreadyVerified: true },
+      });
+      return withI18nSuccess(
+        { message: 'Email already verified' },
+        'Email already verified',
+        AuthI18nKeys.emailAlreadyVerified,
+      );
+    }
+
+    try {
+      await this.otpService.verifyAndConsume(
+        OtpPurpose.VERIFY_EMAIL,
+        email,
+        code,
+      );
+    } catch (err) {
+      this.auditLogService.log({
+        category: AuditCategory.AUTH,
+        action: AuthAuditAction.EMAIL_VERIFY_FAILED,
+        resourceType: AuditResourceType.USER,
+        resourceId: row._id,
+        userId: row._id,
+        username: row.username,
+        metadata: { email },
+      });
+      throw err;
+    }
+
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        { _id: row._id, isEmailVerified: false },
+        { $set: { isEmailVerified: true, emailVerifiedAt: new Date() } },
+        { new: true },
+      )
+      .select('_id username')
+      .lean<{ _id: Types.ObjectId; username: string } | null>();
+
+    if (!updated) {
+      return withI18nSuccess(
+        { message: 'Email already verified' },
+        'Email already verified',
+        AuthI18nKeys.emailAlreadyVerified,
+      );
+    }
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.EMAIL_VERIFIED,
+      resourceType: AuditResourceType.USER,
+      resourceId: updated._id,
+      userId: updated._id,
+      username: updated.username,
+      metadata: { email },
+    });
+
+    return withI18nSuccess(
+      { message: 'Email verified successfully' },
+      'Email verified successfully',
+      AuthI18nKeys.emailVerifySuccess,
+    );
+  }
+
+  async resendVerifyEmail(emailRaw: string) {
+    const email = emailRaw.trim().toLowerCase();
+    if (!email) {
+      throw new DomainException(
+        'Email is required',
+        400,
+        'EMAIL_REQUIRED',
+        AuthI18nKeys.emailRequired,
+      );
+    }
+
+    const row = await this.userModel
+      .findOne({ email })
+      .select('_id username isEmailVerified')
+      .lean<{
+        _id: Types.ObjectId;
+        username: string;
+        isEmailVerified?: boolean;
+      } | null>();
+
+    if (!row) {
+      return withI18nSuccess(
+        {
+          message:
+            'If an account exists for this email, a verification code was sent',
+        },
+        'If an account exists for this email, a verification code was sent',
+        AuthI18nKeys.emailVerifySent,
+      );
+    }
+
+    if (isJwtEmailVerifiedEffective(row.isEmailVerified)) {
+      return withI18nSuccess(
+        { message: 'Email already verified' },
+        'Email already verified',
+        AuthI18nKeys.emailAlreadyVerified,
+      );
+    }
+
+    try {
+      await this.otpService.issue(OtpPurpose.VERIFY_EMAIL, email, {
+        meta: { userId: String(row._id), username: row.username },
+      });
+    } catch (err) {
+      if (
+        err instanceof DomainException &&
+        err.errorCode === 'RATE_LIMIT' &&
+        err.statusCode === 429
+      ) {
+        throw new DomainException(
+          'Too many resend attempts, try again later',
+          429,
+          'EMAIL_VERIFY_RESEND_THROTTLED',
+          AuthI18nKeys.emailVerifyResendThrottled,
+        );
+      }
+      throw err;
+    }
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.EMAIL_VERIFY_RESEND,
+      resourceType: AuditResourceType.USER,
+      resourceId: row._id,
+      userId: row._id,
+      username: row.username,
+      metadata: { email },
+    });
+
+    return withI18nSuccess(
+      {
+        message:
+          'If an account exists for this email, a verification code was sent',
+      },
+      'If an account exists for this email, a verification code was sent',
+      AuthI18nKeys.emailVerifySent,
+    );
+  }
+
+  // =========================
   // Register
   // =========================
   async register(
@@ -390,6 +581,26 @@ export class AuthService {
         400,
         'PASSWORD_CONFIRM_MISMATCH',
         AuthI18nKeys.passwordConfirmMismatch,
+      );
+    }
+
+    const emailNorm = dto.email?.trim().toLowerCase();
+    if (!emailNorm) {
+      throw new DomainException(
+        'Email is required',
+        400,
+        'EMAIL_REQUIRED',
+        AuthI18nKeys.emailRequired,
+      );
+    }
+
+    const emailTaken = await this.userModel.exists({ email: emailNorm });
+    if (emailTaken) {
+      throw new DomainException(
+        'Email already exists',
+        409,
+        'EMAIL_EXISTS',
+        AuthI18nKeys.emailExists,
       );
     }
 
@@ -413,7 +624,7 @@ export class AuthService {
       username: dto.username,
       password: dto.password,
       roles: ['user'],
-      email: dto.email,
+      email: emailNorm,
       fullName: dto.fullName,
       phone: dto.phone,
       dateOfBirth: dto.dateOfBirth,
@@ -422,6 +633,24 @@ export class AuthService {
         apis: [],
         routers: [],
       },
+      isEmailVerified: false,
+    });
+
+    await this.otpService.issue(OtpPurpose.VERIFY_EMAIL, emailNorm, {
+      meta: {
+        userId: String(created._id),
+        username: created.username,
+      },
+    });
+
+    this.auditLogService.log({
+      category: AuditCategory.AUTH,
+      action: AuthAuditAction.EMAIL_VERIFY_REQUEST,
+      resourceType: AuditResourceType.USER,
+      resourceId: created._id,
+      userId: created._id,
+      username: created.username,
+      metadata: { email: emailNorm },
     });
 
     const user: AuthUser = {
@@ -434,6 +663,7 @@ export class AuthService {
       },
       rbacPermissions: [],
       isSuperAdmin: false,
+      isEmailVerified: false,
     };
 
     const accessToken = this.signAccessToken(user);
@@ -454,13 +684,17 @@ export class AuthService {
       username: created.username,
       ip: meta.ip,
       userAgent: meta.userAgent,
+      metadata: { verifyEmailPending: true },
     });
 
     return withI18nSuccess(
       {
         access_token: accessToken,
         refresh_token: refreshToken,
-        account: user,
+        account: {
+          ...user,
+          isEmailVerified: isJwtEmailVerifiedEffective(user.isEmailVerified),
+        },
       },
       'Registered successfully',
       AuthI18nKeys.registerSuccess,
@@ -633,6 +867,9 @@ export class AuthService {
           permissions,
           rbacPermissions,
           isSuperAdmin: user.isSuperAdmin ?? false,
+          isEmailVerified: isJwtEmailVerifiedEffective(
+            (user as { isEmailVerified?: boolean }).isEmailVerified,
+          ),
         },
       };
     } catch (err) {
@@ -676,6 +913,9 @@ export class AuthService {
         permissions,
         rbacPermissions,
         isSuperAdmin: !!(user as { isSuperAdmin?: boolean }).isSuperAdmin,
+        isEmailVerified: isJwtEmailVerifiedEffective(
+          (user as { isEmailVerified?: boolean }).isEmailVerified,
+        ),
       },
       'Profile loaded',
       AuthI18nKeys.meSuccess,

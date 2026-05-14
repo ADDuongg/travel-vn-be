@@ -99,6 +99,7 @@ export class UserService {
     return {
       ...rest,
       permissions,
+      isEmailVerified: (user as { isEmailVerified?: boolean }).isEmailVerified,
     };
   }
 

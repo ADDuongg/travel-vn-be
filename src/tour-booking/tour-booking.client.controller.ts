@@ -17,13 +17,14 @@ import { AuditLog } from 'src/audit-log/decorators/audit-log.decorator';
 import { AuditResourceType } from 'src/audit-log/enums/audit-log.enum';
 import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 import { CancelTourBookingDto } from './dto/cancel-tour-booking.dto';
 import { CreateTourBookingDto } from './dto/create-tour-booking.dto';
 import { TourBookingService } from './tour-booking.service';
 
 @ApiBearerAuth()
 @ApiTags('Client · Tour bookings')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @UseInterceptors(CrudAuditInterceptor)
 @Controller('client/tour-bookings')
 export class TourBookingClientController {

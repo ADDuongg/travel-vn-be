@@ -76,6 +76,9 @@ export const envSchema = z
     LOGIN_FAIL_WINDOW_SEC: z.coerce.number().default(900),
     LOGIN_FAIL_LOCKOUT_SEC: z.coerce.number().default(900),
 
+    /** Soft-delete users with isEmailVerified=false older than this many days (cron). */
+    UNVERIFIED_USER_TTL_DAYS: z.coerce.number().min(1).default(7),
+
     // Resend (email)
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),

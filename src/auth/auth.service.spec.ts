@@ -17,6 +17,7 @@ import { RbacService } from 'src/rbac/rbac.service';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
 import { AuthAuditAction } from 'src/audit-log/enums/audit-log.enum';
 import { AuthUser } from 'src/user/interfaces/user-interface';
+import { OtpPurpose } from 'src/otp/otp.types';
 
 /* ────────── helpers ────────── */
 const userId = new Types.ObjectId('000000000000000000000001');
@@ -28,6 +29,7 @@ const mockUser = {
   roles: ['user'],
   permissions: { apis: [], routers: [] },
   isActive: true,
+  isEmailVerified: true,
 };
 
 const mockAuthUser: AuthUser = {
@@ -35,6 +37,7 @@ const mockAuthUser: AuthUser = {
   username: mockUser.username,
   roles: mockUser.roles,
   permissions: { apis: [], routers: [] },
+  isEmailVerified: true,
 };
 
 /* ────────── mocks ────────── */
@@ -52,6 +55,9 @@ const mockUserModel = {
       lean: jest.fn().mockResolvedValue({ isActive: true }),
     }),
   }),
+  findOne: jest.fn(),
+  findOneAndUpdate: jest.fn(),
+  exists: jest.fn(),
 };
 
 const mockUsersService = {
@@ -78,6 +84,7 @@ const mockEnvService = {
       LOGIN_FAIL_MAX_ATTEMPTS: 5,
       LOGIN_FAIL_WINDOW_SEC: 900,
       LOGIN_FAIL_LOCKOUT_SEC: 900,
+      UNVERIFIED_USER_TTL_DAYS: 7,
     };
     return (map[key] ?? def) as never;
   }),
@@ -127,6 +134,21 @@ describe('AuthService', () => {
         lean: jest.fn().mockResolvedValue({ isActive: true, deletedAt: null }),
       }),
     });
+    mockUserModel.findOne.mockImplementation(() => ({
+      select: () => ({
+        lean: () => Promise.resolve(null),
+      }),
+    }));
+    mockUserModel.exists.mockResolvedValue(null);
+    mockUserModel.findOneAndUpdate.mockImplementation(() => ({
+      select: () => ({
+        lean: () =>
+          Promise.resolve({
+            _id: userId,
+            username: 'testuser',
+          }),
+      }),
+    }));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -241,12 +263,20 @@ describe('AuthService', () => {
     });
 
     it('throws DomainException when username already exists', async () => {
+      mockUserModel.findOne.mockResolvedValueOnce(null);
       mockUsersService.findOne.mockResolvedValue(mockUser);
 
       await expect(service.register(dto)).rejects.toThrow(DomainException);
     });
 
+    it('throws DomainException when email already exists', async () => {
+      mockUserModel.exists.mockResolvedValueOnce(new Types.ObjectId());
+
+      await expect(service.register(dto)).rejects.toThrow(DomainException);
+    });
+
     it('creates user and returns access + refresh tokens on success', async () => {
+      mockUserModel.findOne.mockResolvedValue(null);
       mockUsersService.findOne.mockResolvedValue(null);
       mockUsersService.create.mockResolvedValue({
         _id: new Types.ObjectId(),
@@ -264,6 +294,99 @@ describe('AuthService', () => {
       expect(result.data).toHaveProperty('access_token');
       expect(result.data).toHaveProperty('refresh_token');
       expect(result.data).toHaveProperty('account');
+      expect(mockOtpService.issue).toHaveBeenCalledWith(
+        OtpPurpose.VERIFY_EMAIL,
+        'new@test.com',
+        expect.any(Object),
+      );
+      expect(mockUsersService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ isEmailVerified: false, email: 'new@test.com' }),
+      );
+    });
+  });
+
+  describe('verifyEmail', () => {
+    beforeEach(() => {
+      mockOtpService.verifyAndConsume.mockReset();
+      mockOtpService.verifyAndConsume.mockResolvedValue({});
+      mockUserModel.findOne.mockReset();
+      mockUserModel.findOne.mockImplementation(() => ({
+        select: () => ({
+          lean: () => Promise.resolve(null),
+        }),
+      }));
+    });
+
+    it('returns success when already verified', async () => {
+      mockUserModel.findOne.mockImplementationOnce(() => ({
+        select: () => ({
+          lean: () =>
+            Promise.resolve({
+              _id: userId,
+              username: 'u',
+              isEmailVerified: true,
+            }),
+        }),
+      }));
+
+      const result = await service.verifyEmail('a@b.com', '123456');
+
+      expect(result.data).toMatchObject({ message: 'Email already verified' });
+      expect(mockOtpService.verifyAndConsume).not.toHaveBeenCalled();
+    });
+
+    it('consumes OTP and updates user when pending', async () => {
+      mockUserModel.findOne.mockImplementationOnce(() => ({
+        select: () => ({
+          lean: () =>
+            Promise.resolve({
+              _id: userId,
+              username: 'u',
+              isEmailVerified: false,
+            }),
+        }),
+      }));
+
+      await service.verifyEmail('a@b.com', '123456');
+
+      expect(mockOtpService.verifyAndConsume).toHaveBeenCalled();
+      expect(mockUserModel.findOneAndUpdate).toHaveBeenCalled();
+    });
+  });
+
+  describe('resendVerifyEmail', () => {
+    beforeEach(() => {
+      mockOtpService.issue.mockClear();
+      mockUserModel.findOne.mockReset();
+      mockUserModel.findOne.mockImplementation(() => ({
+        select: () => ({
+          lean: () => Promise.resolve(null),
+        }),
+      }));
+    });
+
+    it('returns neutral message when user not found', async () => {
+      const result = await service.resendVerifyEmail('ghost@test.com');
+
+      expect(result.data.message).toContain('verification');
+      expect(mockOtpService.issue).not.toHaveBeenCalled();
+    });
+
+    it('issues OTP when user exists and not verified', async () => {
+      mockUserModel.findOne.mockImplementationOnce(() => ({
+        select: () => ({
+          lean: () =>
+            Promise.resolve({
+              _id: userId,
+              username: 'u',
+              isEmailVerified: false,
+            }),
+        }),
+      }));
+
+      await service.resendVerifyEmail('a@b.com');
+
+      expect(mockOtpService.issue).toHaveBeenCalled();
     });
   });
 

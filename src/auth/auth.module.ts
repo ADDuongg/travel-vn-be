@@ -18,6 +18,7 @@ import { RbacModule } from 'src/rbac/rbac.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshTokenCleanupService } from './refresh-token-cleanup.service';
+import { UnverifiedUserCleanupService } from './unverified-user-cleanup.service';
 import {
   RefreshToken,
   RefreshTokenSchema,
@@ -38,7 +39,13 @@ import {
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, PermissionService, RefreshTokenCleanupService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    PermissionService,
+    RefreshTokenCleanupService,
+    UnverifiedUserCleanupService,
+  ],
   exports: [AuthService, PermissionService],
 })
 export class AuthModule {}

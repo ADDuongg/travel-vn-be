@@ -29,6 +29,13 @@ export class User {
   @Prop({ unique: true, sparse: true })
   email?: string;
 
+  /** `false` = registered, not yet verified. Omitted/undefined = legacy users (treated as verified in JWT/guard). */
+  @Prop({ type: Boolean })
+  isEmailVerified?: boolean;
+
+  @Prop({ type: Date })
+  emailVerifiedAt?: Date;
+
   @Prop()
   fullName?: string;
 
@@ -89,3 +96,5 @@ export const UserSchema = SchemaFactory.createForClass(User);
 
 UserSchema.index({ deletedAt: 1 }, { sparse: true });
 UserSchema.index({ deletedBy: 1 }, { sparse: true });
+UserSchema.index({ isEmailVerified: 1, createdAt: 1 });
+UserSchema.index({ emailVerifiedAt: 1 }, { sparse: true });

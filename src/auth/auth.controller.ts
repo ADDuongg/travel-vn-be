@@ -30,6 +30,7 @@ import {
 } from './dto/forgot-password-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResendVerifyEmailDto, VerifyEmailDto } from './dto/verify-email.dto';
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -208,6 +209,18 @@ export class AuthController {
       dto.code,
       dto.newPassword,
     );
+  }
+
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
+  @Post('verify-email')
+  verifyEmail(@Body() dto: VerifyEmailDto) {
+    return this.authService.verifyEmail(dto.email, dto.code);
+  }
+
+  @Throttle({ auth: { ttl: 60_000, limit: 10 } })
+  @Post('resend-verify-email')
+  resendVerifyEmail(@Body() dto: ResendVerifyEmailDto) {
+    return this.authService.resendVerifyEmail(dto.email);
   }
 
   @Post('logout')

@@ -3,6 +3,7 @@ import { DomainException, NotFoundDomainException, ForbiddenDomainException } fr
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
+import { EmailVerifiedGuard } from 'src/guards/email-verified.guard';
 import { CrudAuditInterceptor } from 'src/audit-log/interceptors/crud-audit.interceptor';
 
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -10,7 +11,7 @@ import { UserService } from './user.service';
 
 @ApiBearerAuth()
 @ApiTags('Client · Users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, EmailVerifiedGuard)
 @UseInterceptors(CrudAuditInterceptor)
 @Controller('client/users')
 export class UserClientController {

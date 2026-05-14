@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsDate,
   IsEmail,
   IsIn,
@@ -109,4 +110,12 @@ export class CreateUserDto {
   @ValidateNested()
   @Type(() => AddressDto)
   address?: AddressDto;
+
+  /**
+   * Internal: `false` on self-registration for verify-email flow.
+   * Omit for admin-created users (undefined = legacy verified in JWT).
+   */
+  @IsOptional()
+  @IsBoolean()
+  isEmailVerified?: boolean;
 }

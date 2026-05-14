@@ -184,3 +184,6 @@ stripe listen --forward-to localhost:9001/payments/webhook/stripe
 <!-- re-index for entity -->
 
 docker exec -it backend-production yarn run search:reindex-tours
+
+yarn db:seed:from-production # dump prod → restore MONGO_DB_LOCAL → sanitize → migrate
+yarn db:pull:production
