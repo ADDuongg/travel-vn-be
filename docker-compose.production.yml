@@ -116,40 +116,39 @@ services:
         max-size: '50m'
         max-file: '5'
 
-  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
-    container_name: backend-production-elasticsearch
-    restart: unless-stopped
-    environment:
-      - discovery.type=single-node
-      - xpack.security.enabled=false
-      # Tang/giam theo RAM VPS; container nen ~2x heap hoac hon (JVM + page cache)
-      - ES_JAVA_OPTS=-Xms384m -Xmx384m
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-    networks:
-      - travel-vn-network
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 2048M
-        reservations:
-          cpus: '0.25'
-          memory: 512M
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - 'curl -fsS "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null'
-      interval: 15s
-      timeout: 10s
-      retries: 10
-      start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: '50m'
-        max-file: '5'
+  # elasticsearch:
+  #   image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+  #   container_name: backend-production-elasticsearch
+  #   restart: unless-stopped
+  #   environment:
+  #     - discovery.type=single-node
+  #     - xpack.security.enabled=false
+  #     - ES_JAVA_OPTS=-Xms384m -Xmx384m
+  #   volumes:
+  #     - es_data:/usr/share/elasticsearch/data
+  #   networks:
+  #     - travel-vn-network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '1.0'
+  #         memory: 2048M
+  #       reservations:
+  #         cpus: '0.25'
+  #         memory: 512M
+  #   healthcheck:
+  #     test:
+  #       - CMD-SHELL
+  #       - 'curl -fsS "http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s" >/dev/null'
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 10
+  #     start_period: 60s
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: '50m'
+  #       max-file: '5'
 
   backend-production:
     # image: '${CI_REGISTRY_IMAGE:-registry.gitlab.com/nvduong2302/travel-vn-be}:${IMAGE_TAG:-production}'
