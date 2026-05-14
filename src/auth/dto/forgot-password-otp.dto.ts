@@ -1,4 +1,4 @@
-import { IsString, Length } from 'class-validator';
+import { IsString, Length, Matches } from 'class-validator';
 
 export class ForgotPasswordRequestDto {
   /**
@@ -10,10 +10,18 @@ export class ForgotPasswordRequestDto {
 
 export class ForgotPasswordConfirmDto {
   /**
-   * Token đặt lại mật khẩu đã được gửi qua email.
+   * Username, email hoặc số điện thoại (cùng giá trị đã dùng ở bước request).
    */
   @IsString()
-  token: string;
+  identifier: string;
+
+  /**
+   * Mã OTP 6 chữ số đã được gửi qua email.
+   */
+  @IsString()
+  @Length(6, 6)
+  @Matches(/^\d{6}$/)
+  code: string;
 
   /**
    * Mật khẩu mới.

@@ -1,8 +1,3 @@
-interface ResetPasswordTemplateData {
-  username: string;
-  confirmUrl: string;
-}
-
 interface OtpTemplateBaseData {
   code: string;
   expiresAt: string;
@@ -15,35 +10,6 @@ interface VerifyEmailOtpTemplateData extends OtpTemplateBaseData {
 
 interface GenericOtpTemplateData extends OtpTemplateBaseData {
   purpose: string;
-}
-
-export function resetPasswordTemplate(data: ResetPasswordTemplateData) {
-  return {
-    subject: '[VN Tours] Đặt lại mật khẩu của bạn',
-    html: `
-    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-      <h2 style="color: #2563eb; margin-bottom: 16px;">Yêu cầu đặt lại mật khẩu</h2>
-      <p>Chào ${data.username || 'bạn'},</p>
-      <p>Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn.</p>
-      <p>Nhấn vào nút bên dưới để đặt lại mật khẩu. Liên kết này sẽ hết hạn sau <strong>15 phút</strong>:</p>
-      <a href="${data.confirmUrl}"
-         style="display:inline-block;padding:10px 16px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:6px;margin:12px 0;">
-        Đặt lại mật khẩu
-      </a>
-      <p style="word-break: break-all; font-size: 12px; color: #64748b;">
-        Nếu nút không hoạt động, hãy sao chép và dán đường dẫn sau vào trình duyệt của bạn:<br/>
-        <span>${data.confirmUrl}</span>
-      </p>
-      <p style="color: #64748b; font-size: 13px;">
-        Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này.
-      </p>
-      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
-      <p style="color: #94a3b8; font-size: 12px;">
-        Email này được gửi tự động từ hệ thống VN Tours.
-      </p>
-    </div>
-  `,
-  };
 }
 
 export function verifyEmailOtpTemplate(data: VerifyEmailOtpTemplateData) {

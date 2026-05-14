@@ -4,7 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 
 import { ApiRole, ApiRoleSchema } from 'src/api-role/schema/api-role.schema';
 import { EnvModule } from 'src/env/env.module';
-import { MailModule } from 'src/mail/mail.module';
 import { OtpModule } from 'src/otp/otp.module';
 import {
   RouterRole,
@@ -31,7 +30,6 @@ import {
     RbacModule,
     OtpModule,
     EnvModule,
-    MailModule,
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: RouterRole.name, schema: RouterRoleSchema },

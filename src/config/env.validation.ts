@@ -66,6 +66,16 @@ export const envSchema = z
     OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
     OTP_RESEND_WINDOW_SEC: z.coerce.number().default(60),
 
+    /** Redis attempt limiter: wrong OTP entry per purpose+target (across re-issues). */
+    OTP_ENTRY_MAX_ATTEMPTS: z.coerce.number().default(5),
+    OTP_ENTRY_WINDOW_SEC: z.coerce.number().default(900),
+    OTP_ENTRY_LOCKOUT_SEC: z.coerce.number().default(900),
+
+    /** Redis attempt limiter: failed login per username+IP. */
+    LOGIN_FAIL_MAX_ATTEMPTS: z.coerce.number().default(5),
+    LOGIN_FAIL_WINDOW_SEC: z.coerce.number().default(900),
+    LOGIN_FAIL_LOCKOUT_SEC: z.coerce.number().default(900),
+
     // Resend (email)
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),

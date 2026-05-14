@@ -13,14 +13,14 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshToken } from './schema/refresh_token.schema';
 import { EnvService } from 'src/env/env.service';
 import { OtpService } from 'src/otp/otp.service';
-import { MailService } from 'src/mail/mail.service';
-import { resetPasswordTemplate } from 'src/notification/email/templates/auth-notification.templates';
+import { OtpPurpose } from 'src/otp/otp.types';
+import { AttemptLimiterService } from 'src/attempt-limiter/attempt-limiter.service';
+import type { AttemptLimiterOptions } from 'src/attempt-limiter/attempt-limiter.types';
 
 import {
   AccessTokenPayload,
   JwtDecoded,
   RefreshTokenPayload,
-  ResetPasswordPayload,
 } from './interfaces/jwt-payload.interface';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { PermissionService } from '../permission/permission.service';
@@ -49,21 +49,50 @@ export class AuthService {
     private readonly permissionService: PermissionService,
     private readonly rbacService: RbacService,
     private readonly otpService: OtpService,
-    private readonly mailService: MailService,
+    private readonly attemptLimiter: AttemptLimiterService,
     private readonly auditLogService: AuditLogService,
   ) {}
 
   // =========================
   // Validate user
   // =========================
-  async validateUser(username: string, pass: string): Promise<AuthUser | null> {
+  async validateUser(
+    username: string,
+    pass: string,
+    ip?: string,
+  ): Promise<AuthUser | null> {
+    const limiterOpts = this.loginLimiterOptions(username, ip);
+    const limiterStatus = await this.attemptLimiter.check(limiterOpts);
+    if (limiterStatus.locked) {
+      this.auditLogService.log({
+        category: AuditCategory.AUTH,
+        action: AuthAuditAction.LOGIN_LOCKED,
+        resourceType: AuditResourceType.AUTH_SESSION,
+        ip,
+        metadata: {
+          username,
+          retryAfterSec: limiterStatus.retryAfterSec,
+        },
+      });
+      throw new DomainException(
+        'Too many login attempts, try again later',
+        429,
+        'LOGIN_LOCKED',
+        AuthI18nKeys.loginTooManyAttempts,
+      );
+    }
+
     const user = await this.usersService.findOne(username);
     if (!user) return null;
 
     const match = await bcrypt.compare(pass, user.password);
-    if (!match) return null;
+    if (!match) {
+      await this.attemptLimiter.hit(limiterOpts);
+      return null;
+    }
 
     if (!user.isActive || user.deletedAt) {
+      await this.attemptLimiter.hit(limiterOpts);
       return null;
     }
 
@@ -83,6 +112,20 @@ export class AuthService {
       permissions,
       rbacPermissions,
       isSuperAdmin: user.isSuperAdmin ?? false,
+    };
+  }
+
+  private loginLimiterOptions(
+    username: string,
+    ip?: string,
+  ): AttemptLimiterOptions {
+    const safeIp = typeof ip === 'string' && ip.length > 0 ? ip : 'unknown';
+    return {
+      scope: 'login-fail',
+      key: `${username}:${safeIp}`,
+      maxAttempts: this.env.get('LOGIN_FAIL_MAX_ATTEMPTS'),
+      windowSec: this.env.get('LOGIN_FAIL_WINDOW_SEC'),
+      lockoutSec: this.env.get('LOGIN_FAIL_LOCKOUT_SEC'),
     };
   }
 
@@ -148,6 +191,10 @@ export class AuthService {
   // Login
   // =========================
   async login(user: AuthUser, meta: { ip?: string; userAgent?: string } = {}) {
+    await this.attemptLimiter.reset(
+      this.loginLimiterOptions(user.username, meta.ip),
+    );
+
     const accessToken = this.signAccessToken(user);
     const { token: refreshToken, jti } = this.signRefreshToken(user);
 
@@ -192,9 +239,14 @@ export class AuthService {
   }
 
   // =========================
-  // Quên mật khẩu với token
+  // Quên mật khẩu (OTP)
   // =========================
-  async requestPasswordReset(identifier: string) {
+  private async findUserForPasswordReset(identifier: string): Promise<{
+    _id: Types.ObjectId;
+    username: string;
+    email: string;
+    tokenVersion?: number;
+  }> {
     type ResetUser = {
       _id: Types.ObjectId;
       username: string;
@@ -212,9 +264,7 @@ export class AuthService {
       })
       .select('_id username email tokenVersion')
       .lean<ResetUser | null>();
-    console.log(
-      `RESET_PASSWORD identifier=${identifier} userEmail=${user?.email}`,
-    );
+
     if (!user) {
       throw new DomainException(
         'User not found',
@@ -224,8 +274,8 @@ export class AuthService {
       );
     }
 
-    const target = user.email;
-    if (!target) {
+    const email = user.email?.trim();
+    if (!email) {
       throw new DomainException(
         'User does not have an email',
         400,
@@ -234,32 +284,22 @@ export class AuthService {
       );
     }
 
-    const payload: ResetPasswordPayload = {
-      sub: String(user._id),
-      typ: 'reset-password' as const,
-      tokenVersion: user.tokenVersion ?? 0,
-    };
-
-    const token = this.jwtService.sign(payload, {
-      secret: this.env.get('JWT_SECRET', 'your_jwt_secret'),
-      expiresIn: '15m',
-      issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
-      audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
-      jwtid: uuidv4(),
-    });
-
-    const feBaseUrl = this.env.get('FE_BASE_URL', 'http://localhost:5173');
-    const confirmUrl = `${feBaseUrl}/forgot-password/confirm?token=${encodeURIComponent(token)}`;
-
-    const template = resetPasswordTemplate({
+    return {
+      _id: user._id,
       username: user.username,
-      confirmUrl,
-    });
+      email,
+      tokenVersion: user.tokenVersion,
+    };
+  }
 
-    await this.mailService.send({
-      to: target,
-      subject: template.subject,
-      html: template.html,
+  async requestPasswordReset(identifier: string) {
+    const user = await this.findUserForPasswordReset(identifier);
+
+    await this.otpService.issue(OtpPurpose.RESET_PASSWORD, user.email, {
+      meta: {
+        userId: String(user._id),
+        username: user.username,
+      },
     });
 
     this.auditLogService.log({
@@ -278,7 +318,11 @@ export class AuthService {
     );
   }
 
-  async resetPasswordWithToken(token: string, newPassword: string) {
+  async resetPasswordWithOtp(
+    identifier: string,
+    code: string,
+    newPassword: string,
+  ) {
     if (!newPassword || newPassword.length < 6) {
       throw new DomainException(
         'New password is too short',
@@ -288,40 +332,19 @@ export class AuthService {
       );
     }
 
-    let payload: ResetPasswordPayload | null = null;
-    try {
-      payload = this.jwtService.verify<ResetPasswordPayload>(token, {
-        secret: this.env.get('JWT_SECRET', 'your_jwt_secret'),
-        issuer: this.env.get('JWT_ISSUER', 'vn-tours'),
-        audience: this.env.get('JWT_AUDIENCE', 'vn-tours-clients'),
-      });
-    } catch {
-      throw new DomainException(
-        'Invalid or expired reset token',
-        401,
-        'INVALID_RESET_TOKEN',
-        AuthI18nKeys.invalidExpiredResetToken,
-      );
-    }
+    const user = await this.findUserForPasswordReset(identifier);
 
-    if (
-      !payload?.sub ||
-      payload.typ !== 'reset-password' ||
-      typeof payload.tokenVersion !== 'number'
-    ) {
-      throw new DomainException(
-        'Invalid reset token',
-        401,
-        'INVALID_RESET_TOKEN',
-        AuthI18nKeys.invalidResetToken,
-      );
-    }
+    await this.otpService.verifyAndConsume(
+      OtpPurpose.RESET_PASSWORD,
+      user.email,
+      code,
+    );
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     const updated = await this.userModel
       .findOneAndUpdate(
-        { _id: payload.sub, tokenVersion: payload.tokenVersion },
+        { _id: user._id, tokenVersion: user.tokenVersion ?? 0 },
         { $set: { password: hashedPassword }, $inc: { tokenVersion: 1 } },
         { new: true },
       )
@@ -337,7 +360,7 @@ export class AuthService {
       );
     }
 
-    await this.logoutAll(payload.sub);
+    await this.logoutAll(String(user._id));
 
     this.auditLogService.log({
       category: AuditCategory.AUTH,

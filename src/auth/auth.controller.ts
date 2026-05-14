@@ -95,6 +95,7 @@ export class AuthController {
     const user = await this.authService.validateUser(
       dto.username,
       dto.password,
+      typeof req.ip === 'string' ? req.ip : undefined,
     );
 
     if (!user) {
@@ -202,7 +203,11 @@ export class AuthController {
   @Post('forgot-password/confirm')
   @Throttle({ auth: { ttl: 60_000, limit: 10 } })
   async confirmForgotPassword(@Body() dto: ForgotPasswordConfirmDto) {
-    return this.authService.resetPasswordWithToken(dto.token, dto.newPassword);
+    return this.authService.resetPasswordWithOtp(
+      dto.identifier,
+      dto.code,
+      dto.newPassword,
+    );
   }
 
   @Post('logout')

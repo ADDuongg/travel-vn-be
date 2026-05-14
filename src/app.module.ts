@@ -52,6 +52,7 @@ import { NotificationModule } from './notification/notification.module';
 import { ChatModule } from './chat/chat.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { RedisModule } from './redis/redis.module';
+import { AttemptLimiterModule } from './attempt-limiter/attempt-limiter.module';
 import { EnvService } from './env/env.service';
 import { FavoriteModule } from './favorite/favorite.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
@@ -83,6 +84,7 @@ import { DatabaseTransactionModule } from './common/database/database-transactio
       defaultMetrics: { enabled: true },
     }),
     RedisModule.forRootAsync({ isGlobal: true }),
+    AttemptLimiterModule,
     JwtModule.registerAsync({
       global: true,
       imports: [EnvModule],

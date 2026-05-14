@@ -11,10 +11,11 @@ import { User } from 'src/user/schema/user.schema';
 import { UserService } from 'src/user/user.service';
 import { EnvService } from 'src/env/env.service';
 import { OtpService } from 'src/otp/otp.service';
-import { MailService } from 'src/mail/mail.service';
+import { AttemptLimiterService } from 'src/attempt-limiter/attempt-limiter.service';
 import { PermissionService } from '../permission/permission.service';
 import { RbacService } from 'src/rbac/rbac.service';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
+import { AuthAuditAction } from 'src/audit-log/enums/audit-log.enum';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 
 /* ────────── helpers ────────── */
@@ -68,14 +69,17 @@ const mockJwtService = {
 const mockEnvService = {
   isProduction: jest.fn().mockReturnValue(false),
   get: jest.fn((key: string, def?: string) => {
-    const map: Record<string, string> = {
+    const map: Record<string, string | number> = {
       JWT_SECRET: 'test_jwt_secret_minimum_16chars',
       JWT_REFRESH_SECRET: 'test_refresh_secret_min_16chars',
       JWT_REFRESH_TTL: '7d',
       JWT_ISSUER: 'test-app',
       JWT_AUDIENCE: 'test-clients',
+      LOGIN_FAIL_MAX_ATTEMPTS: 5,
+      LOGIN_FAIL_WINDOW_SEC: 900,
+      LOGIN_FAIL_LOCKOUT_SEC: 900,
     };
-    return map[key] ?? def;
+    return (map[key] ?? def) as never;
   }),
 };
 
@@ -88,12 +92,24 @@ const mockRbacService = {
 };
 
 const mockOtpService = {
-  requestOtp: jest.fn(),
-  verifyOtp: jest.fn(),
+  issue: jest.fn().mockResolvedValue({}),
+  verifyAndConsume: jest.fn().mockResolvedValue({}),
 };
 
-const mockMailService = {
-  send: jest.fn().mockResolvedValue(undefined),
+const mockAttemptLimiterService = {
+  check: jest.fn().mockResolvedValue({
+    locked: false,
+    count: 0,
+    remainingAttempts: 5,
+    retryAfterSec: 0,
+  }),
+  hit: jest.fn().mockResolvedValue({
+    locked: false,
+    count: 1,
+    remainingAttempts: 4,
+    retryAfterSec: 0,
+  }),
+  reset: jest.fn().mockResolvedValue(undefined),
 };
 
 const mockAuditLogService = {
@@ -126,7 +142,7 @@ describe('AuthService', () => {
         { provide: PermissionService, useValue: mockPermissionService },
         { provide: RbacService, useValue: mockRbacService },
         { provide: OtpService, useValue: mockOtpService },
-        { provide: MailService, useValue: mockMailService },
+        { provide: AttemptLimiterService, useValue: mockAttemptLimiterService },
         { provide: AuditLogService, useValue: mockAuditLogService },
       ],
     }).compile();
@@ -142,7 +158,11 @@ describe('AuthService', () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);
 
-      const result = await service.validateUser('testuser', 'plain_pass');
+      const result = await service.validateUser(
+        'testuser',
+        'plain_pass',
+        undefined,
+      );
 
       expect(result).toMatchObject({ username: 'testuser' });
       expect(mockPermissionService.resolvePermissions).toHaveBeenCalledWith(
@@ -157,18 +177,47 @@ describe('AuthService', () => {
     it('returns null when user does not exist', async () => {
       mockUsersService.findOne.mockResolvedValue(null);
 
-      const result = await service.validateUser('unknown', 'any');
+      const result = await service.validateUser(
+        'unknown',
+        'any',
+        undefined,
+      );
 
       expect(result).toBeNull();
     });
 
-    it('returns null when password does not match', async () => {
+    it('throws DomainException when login limiter reports locked', async () => {
+      mockAttemptLimiterService.check.mockResolvedValueOnce({
+        locked: true,
+        count: 5,
+        remainingAttempts: 0,
+        retryAfterSec: 120,
+      });
+
+      await expect(
+        service.validateUser('testuser', 'plain_pass', '127.0.0.1'),
+      ).rejects.toThrow(DomainException);
+
+      expect(mockUsersService.findOne).not.toHaveBeenCalled();
+      expect(mockAuditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: AuthAuditAction.LOGIN_LOCKED,
+        }),
+      );
+    });
+
+    it('records hit when password does not match', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
       jest.spyOn(bcrypt, 'compare').mockResolvedValue(false as never);
 
-      const result = await service.validateUser('testuser', 'wrong_pass');
+      await service.validateUser('testuser', 'wrong_pass', '10.0.0.1');
 
-      expect(result).toBeNull();
+      expect(mockAttemptLimiterService.hit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'login-fail',
+          key: 'testuser:10.0.0.1',
+        }),
+      );
     });
   });
 
@@ -229,8 +278,16 @@ describe('AuthService', () => {
       });
       mockRefreshTokenModel.create.mockResolvedValue({});
 
-      const result = await service.login(mockAuthUser);
+      const result = await service.login(mockAuthUser, {
+        ip: '192.168.1.10',
+      });
 
+      expect(mockAttemptLimiterService.reset).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'login-fail',
+          key: 'testuser:192.168.1.10',
+        }),
+      );
       expect(result.access_token).toBe('mocked_token');
       expect(result.refresh_token).toBe('mocked_token');
       expect(result.account.username).toBe('testuser');

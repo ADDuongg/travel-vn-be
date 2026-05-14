@@ -19,6 +19,7 @@ export const AuthI18nKeys = {
   sessionLoggedOut: 'auth.logout.session_logged_out',
 
   loginSuccess: 'auth.login.success',
+  loginTooManyAttempts: 'auth.login.too_many_attempts',
   registerSuccess: 'auth.register.success',
   refreshSuccess: 'auth.refresh.success',
   passwordResetEmailSent: 'auth.reset.email_sent',

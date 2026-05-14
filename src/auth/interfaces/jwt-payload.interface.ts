@@ -17,14 +17,6 @@ export interface RefreshTokenPayload {
   exp?: number;
 }
 
-export interface ResetPasswordPayload {
-  sub: string;
-  typ: 'reset-password';
-  tokenVersion: number;
-  iat?: number;
-  exp?: number;
-}
-
 export interface JwtDecoded {
   exp: number;
 }
