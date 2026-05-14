@@ -174,3 +174,8 @@ stripe listen --forward-to localhost:9001/payments/webhook/stripe
 <!-- re-index for entity -->
 
 docker exec -it backend-production yarn run search:reindex-tours
+
+<!-- cleanup daily -->
+
+docker image prune -af
+docker builder prune -af
