@@ -123,13 +123,13 @@ docker exec backend-staging-mongo mongorestore \
 /tmp/travel-vn -->
 <!-- lệnh này chạy trên vps -->
 
-docker exec backend-staging-mongo mongorestore \
+docker exec backend-production-mongo mongorestore \
  --username duongnv \
- --password 'xxx' \
+ --password 'YOUR_PASSWORD' \
  --authenticationDatabase admin \
  --drop \
- --db travel-vn \
- /tmp/travel-vn
+ --db e-commerce \
+ /tmp/e-commerce
 
 <!-- lệnh này chạy trên local nếu muốn nhanh -->
 <!-- ./db-mongo/e-commerce là thư mục ở local chứa database -->
@@ -143,6 +143,15 @@ mongorestore \
 --drop \
 --db e-commerce \
 ./db-mongo/e-commerce
+
+<!-- backup folder db ra ngoài trên vps-->
+
+docker exec backend-production-mongo mongodump \
+ --username duongnv \
+ --password 'YOUR_PASSWORD' \
+ --authenticationDatabase admin \
+ --db travel-vn \
+ --out /tmp/backup-before-restore
 
 <!-- copy thư mục db vào dump folder -->
 
@@ -159,6 +168,7 @@ ssh -N -L 27117:127.0.0.1:27017 username@vps_id
 <!-- check spaces vps -->
 
 df -h
+free -h
 docker system df
 
 <!-- cleanup unused and old docker -->
@@ -174,8 +184,3 @@ stripe listen --forward-to localhost:9001/payments/webhook/stripe
 <!-- re-index for entity -->
 
 docker exec -it backend-production yarn run search:reindex-tours
-
-<!-- cleanup daily -->
-
-docker image prune -af
-docker builder prune -af
