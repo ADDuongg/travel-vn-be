@@ -124,7 +124,7 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       # Tang/giam theo RAM VPS; container nen ~2x heap hoac hon (JVM + page cache)
-      - ES_JAVA_OPTS=-Xms768m -Xmx768m
+      - ES_JAVA_OPTS=-Xms384m -Xmx384m
     volumes:
       - es_data:/usr/share/elasticsearch/data
     networks:
