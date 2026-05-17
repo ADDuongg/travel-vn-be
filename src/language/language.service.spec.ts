@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { LanguageService } from './language.service';
 import { Language } from './schema/language.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { UpdateLanguageDto } from './dto/update-language.dto';
 
 describe('LanguageService', () => {
   let service: LanguageService;
@@ -24,7 +25,10 @@ describe('LanguageService', () => {
   beforeEach(async () => {
     save.mockClear();
     cloudinaryService = {
-      uploadFile: jest.fn(),
+      uploadFile: jest.fn().mockResolvedValue({
+        secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/new-flag.jpg',
+        public_id: 'languages/flags/new-flag',
+      }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
       isConfigured: jest.fn().mockReturnValue(true),
     };
@@ -71,6 +75,26 @@ describe('LanguageService', () => {
     expect(cloudinaryService.deleteFile).not.toHaveBeenCalled();
     expect(cloudinaryService.uploadFile).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalled();
+  });
+
+  it('keeps flagUrl when dto sends empty flagUrl after upload', async () => {
+    await service.update(
+      'en',
+      { name: 'English', flagUrl: '' } as UpdateLanguageDto & { flagUrl: string },
+      {
+        fieldname: 'flag',
+        originalname: 'flag.jpg',
+        encoding: '7bit',
+        mimetype: 'image/jpeg',
+        size: 100,
+        buffer: Buffer.from('fake'),
+      } as Express.Multer.File,
+    );
+
+    expect(langDoc.flagUrl).toBe(
+      'https://res.cloudinary.com/demo/image/upload/v1/new-flag.jpg',
+    );
+    expect(langDoc.flagPublicId).toBe('languages/flags/new-flag');
   });
 
   it('returns 503 when cloudinary is not configured but flag file is sent', async () => {

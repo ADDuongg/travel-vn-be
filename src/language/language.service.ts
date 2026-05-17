@@ -4,7 +4,9 @@ import { Model } from 'mongoose';
 import { CreateLanguageDto } from './dto/create-language.dto';
 import { UpdateLanguageDto } from './dto/update-language.dto';
 import { Language, LanguageDocument } from './schema/language.schema';
+import { UploadApiResponse } from 'cloudinary';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { CloudinaryResponse } from 'src/cloudinary/cloudinary.response';
 import {
   DomainException,
   NotFoundDomainException,
@@ -37,12 +39,7 @@ export class LanguageService {
     let flag;
 
     if (hasMulterFileContent(file)) {
-      const uploaded = await this.uploadFlag(file);
-
-      flag = {
-        flagUrl: uploaded.secure_url,
-        flagPublicId: uploaded.public_id,
-      };
+      flag = await this.uploadFlag(file);
     }
 
     const created = await this.languageModel.create({
@@ -66,8 +63,6 @@ export class LanguageService {
     dto: UpdateLanguageDto,
     file?: Express.Multer.File,
   ) {
-    delete (dto as any).code;
-
     const lang = await this.findByCode(code);
     if (!lang) {
       throw new NotFoundDomainException(
@@ -84,13 +79,12 @@ export class LanguageService {
           .catch(() => undefined);
       }
 
-      const uploaded = await this.uploadFlag(file);
-
-      lang.flagUrl = uploaded.secure_url;
-      lang.flagPublicId = uploaded.public_id;
+      const flag = await this.uploadFlag(file);
+      lang.flagUrl = flag.flagUrl;
+      lang.flagPublicId = flag.flagPublicId;
     }
 
-    Object.assign(lang, dto);
+    this.applyUpdateDto(lang, dto);
     const saved = await lang.save();
     return withI18nSuccess(
       saved,
@@ -140,7 +134,54 @@ export class LanguageService {
       .exec();
   }
 
-  private async uploadFlag(file: Express.Multer.File) {
+  /** Chỉ gán field text/boolean — không ghi đè flag từ multipart (flagUrl rỗng từ FE). */
+  private applyUpdateDto(lang: LanguageDocument, dto: UpdateLanguageDto) {
+    if (dto.name !== undefined) {
+      lang.name = dto.name;
+    }
+    if (typeof dto.isActive === 'boolean') {
+      lang.isActive = dto.isActive;
+    }
+  }
+
+  private toFlagFields(result: CloudinaryResponse): {
+    flagUrl: string;
+    flagPublicId: string;
+  } {
+    if (
+      result &&
+      typeof result === 'object' &&
+      'error' in result &&
+      result.error
+    ) {
+      const err = (result as { error?: { message?: string } }).error;
+      throw new DomainException(
+        err?.message ?? 'Cloudinary upload error',
+        400,
+        'LANGUAGE_FLAG_UPLOAD_FAILED',
+        LanguageI18nKeys.flagUploadFailed,
+      );
+    }
+
+    const uploaded = result as UploadApiResponse;
+    const flagUrl = uploaded.secure_url ?? uploaded.url;
+    const flagPublicId = uploaded.public_id;
+
+    if (!flagUrl || !flagPublicId) {
+      throw new DomainException(
+        'Invalid upload result',
+        400,
+        'LANGUAGE_FLAG_UPLOAD_FAILED',
+        LanguageI18nKeys.flagUploadFailed,
+      );
+    }
+
+    return { flagUrl, flagPublicId };
+  }
+
+  private async uploadFlag(
+    file: Express.Multer.File,
+  ): Promise<{ flagUrl: string; flagPublicId: string }> {
     if (!this.cloudinaryService.isConfigured()) {
       throw new DomainException(
         'Image upload is not configured on the server',
@@ -151,10 +192,14 @@ export class LanguageService {
     }
 
     try {
-      return await this.cloudinaryService.uploadFile(file, {
+      const result = await this.cloudinaryService.uploadFile(file, {
         folder: 'languages/flags',
       });
+      return this.toFlagFields(result);
     } catch (err) {
+      if (err instanceof DomainException) {
+        throw err;
+      }
       const message = err instanceof Error ? err.message : 'Flag upload failed';
       throw new DomainException(
         message,

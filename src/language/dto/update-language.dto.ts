@@ -7,10 +7,6 @@ export class UpdateLanguageDto {
   @IsNotEmpty()
   name?: string;
 
-  @IsOptional()
-  @IsString()
-  flagUrl?: string;
-
   @TransformValue()
   @IsOptional()
   @IsBoolean()
