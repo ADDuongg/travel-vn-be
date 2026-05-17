@@ -6,7 +6,11 @@ import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 
 describe('LanguageService', () => {
   let service: LanguageService;
-  let cloudinaryService: { uploadFile: jest.Mock; deleteFile: jest.Mock };
+  let cloudinaryService: {
+    uploadFile: jest.Mock;
+    deleteFile: jest.Mock;
+    isConfigured: jest.Mock;
+  };
 
   const save = jest.fn().mockResolvedValue({ code: 'EN', name: 'English' });
   const langDoc = {
@@ -22,6 +26,7 @@ describe('LanguageService', () => {
     cloudinaryService = {
       uploadFile: jest.fn(),
       deleteFile: jest.fn().mockResolvedValue(undefined),
+      isConfigured: jest.fn().mockReturnValue(true),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -57,5 +62,23 @@ describe('LanguageService', () => {
     expect(cloudinaryService.deleteFile).not.toHaveBeenCalled();
     expect(cloudinaryService.uploadFile).not.toHaveBeenCalled();
     expect(save).toHaveBeenCalled();
+  });
+
+  it('returns 503 when cloudinary is not configured but flag file is sent', async () => {
+    cloudinaryService.isConfigured.mockReturnValue(false);
+
+    await expect(
+      service.update('en', { name: 'English' }, {
+        fieldname: 'flag',
+        originalname: 'flag.jpg',
+        encoding: '7bit',
+        mimetype: 'image/jpeg',
+        size: 100,
+        buffer: Buffer.from('fake'),
+      } as Express.Multer.File),
+    ).rejects.toMatchObject({
+      statusCode: 503,
+      errorCode: 'CLOUDINARY_NOT_CONFIGURED',
+    });
   });
 });

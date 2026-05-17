@@ -5,7 +5,10 @@ import { CreateLanguageDto } from './dto/create-language.dto';
 import { UpdateLanguageDto } from './dto/update-language.dto';
 import { Language, LanguageDocument } from './schema/language.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
-import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 import { withI18nSuccess } from 'src/common/i18n/success-envelope';
 import { hasMulterFileContent } from 'src/utils/multer.util';
 import { LanguageI18nKeys } from './language.i18n-keys';
@@ -34,7 +37,7 @@ export class LanguageService {
     let flag;
 
     if (hasMulterFileContent(file)) {
-      const uploaded = await this.cloudinaryService.uploadFile(file);
+      const uploaded = await this.uploadFlag(file);
 
       flag = {
         flagUrl: uploaded.secure_url,
@@ -66,7 +69,7 @@ export class LanguageService {
     delete (dto as any).code;
 
     const lang = await this.languageModel.findOne({
-      code: code.toUpperCase(),
+      code,
     });
 
     if (!lang) {
@@ -78,11 +81,13 @@ export class LanguageService {
     }
 
     if (hasMulterFileContent(file)) {
-      if (lang.flagPublicId) {
-        await this.cloudinaryService.deleteFile(lang.flagPublicId);
+      if (lang.flagPublicId && this.cloudinaryService.isConfigured()) {
+        await this.cloudinaryService
+          .deleteFile(lang.flagPublicId)
+          .catch(() => undefined);
       }
 
-      const uploaded = await this.cloudinaryService.uploadFile(file);
+      const uploaded = await this.uploadFlag(file);
 
       lang.flagUrl = uploaded.secure_url;
       lang.flagPublicId = uploaded.public_id;
@@ -99,7 +104,7 @@ export class LanguageService {
 
   async remove(code: string) {
     const lang = await this.languageModel.findOne({
-      code: code.toUpperCase(),
+      code,
     });
 
     if (!lang) {
@@ -110,8 +115,10 @@ export class LanguageService {
       );
     }
 
-    if (lang.flagPublicId) {
-      await this.cloudinaryService.deleteFile(lang.flagPublicId);
+    if (lang.flagPublicId && this.cloudinaryService.isConfigured()) {
+      await this.cloudinaryService
+        .deleteFile(lang.flagPublicId)
+        .catch(() => undefined);
     }
 
     await lang.deleteOne();
@@ -120,5 +127,30 @@ export class LanguageService {
       'Language deleted successfully',
       LanguageI18nKeys.deleted,
     );
+  }
+
+  private async uploadFlag(file: Express.Multer.File) {
+    if (!this.cloudinaryService.isConfigured()) {
+      throw new DomainException(
+        'Image upload is not configured on the server',
+        503,
+        'CLOUDINARY_NOT_CONFIGURED',
+        LanguageI18nKeys.uploadUnavailable,
+      );
+    }
+
+    try {
+      return await this.cloudinaryService.uploadFile(file, {
+        folder: 'languages/flags',
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Flag upload failed';
+      throw new DomainException(
+        message,
+        400,
+        'LANGUAGE_FLAG_UPLOAD_FAILED',
+        LanguageI18nKeys.flagUploadFailed,
+      );
+    }
   }
 }

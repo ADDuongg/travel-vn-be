@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Inject, Injectable } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import * as streamifier from 'streamifier';
@@ -12,6 +13,10 @@ export class CloudinaryService {
     private readonly client: CloudinaryClient | null,
   ) {}
 
+  isConfigured(): boolean {
+    return this.client !== null;
+  }
+
   private getClient(): CloudinaryClient {
     if (!this.client) {
       throw new Error(
@@ -21,11 +26,26 @@ export class CloudinaryService {
     return this.client;
   }
 
+  private fileSource(file: Express.Multer.File): Buffer {
+    if (file.buffer?.length) {
+      return file.buffer;
+    }
+    if (file.path) {
+      return readFileSync(file.path);
+    }
+    return Buffer.alloc(0);
+  }
+
   uploadFile(
     file: Express.Multer.File,
     options?: { folder?: string; public_id?: string },
   ): Promise<CloudinaryResponse> {
     const cli = this.getClient();
+    const source = this.fileSource(file);
+    if (!source.length) {
+      return Promise.reject(new Error('Empty file'));
+    }
+
     return new Promise((resolve, reject) => {
       const uploadStream = cli.uploader.upload_stream(
         {
@@ -53,7 +73,7 @@ export class CloudinaryService {
         },
       );
 
-      streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      streamifier.createReadStream(source).pipe(uploadStream);
     });
   }
 
