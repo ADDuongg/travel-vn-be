@@ -7,6 +7,7 @@ import { Language, LanguageDocument } from './schema/language.schema';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
 import { withI18nSuccess } from 'src/common/i18n/success-envelope';
+import { hasMulterFileContent } from 'src/utils/multer.util';
 import { LanguageI18nKeys } from './language.i18n-keys';
 
 @Injectable()
@@ -32,7 +33,7 @@ export class LanguageService {
 
     let flag;
 
-    if (file) {
+    if (hasMulterFileContent(file)) {
       const uploaded = await this.cloudinaryService.uploadFile(file);
 
       flag = {
@@ -76,7 +77,7 @@ export class LanguageService {
       );
     }
 
-    if (file) {
+    if (hasMulterFileContent(file)) {
       if (lang.flagPublicId) {
         await this.cloudinaryService.deleteFile(lang.flagPublicId);
       }
