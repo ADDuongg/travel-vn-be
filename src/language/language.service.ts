@@ -24,7 +24,7 @@ export class LanguageService {
   async create(dto: CreateLanguageDto, file?: Express.Multer.File) {
     const code = dto.code.toUpperCase();
 
-    const existed = await this.languageModel.findOne({ code });
+    const existed = await this.findByCode(code);
     if (existed) {
       throw new DomainException(
         'Language code already exists',
@@ -68,10 +68,7 @@ export class LanguageService {
   ) {
     delete (dto as any).code;
 
-    const lang = await this.languageModel.findOne({
-      code,
-    });
-
+    const lang = await this.findByCode(code);
     if (!lang) {
       throw new NotFoundDomainException(
         'Language not found',
@@ -103,10 +100,7 @@ export class LanguageService {
   }
 
   async remove(code: string) {
-    const lang = await this.languageModel.findOne({
-      code,
-    });
-
+    const lang = await this.findByCode(code);
     if (!lang) {
       throw new NotFoundDomainException(
         'Language not found',
@@ -127,6 +121,23 @@ export class LanguageService {
       'Language deleted successfully',
       LanguageI18nKeys.deleted,
     );
+  }
+
+  /**
+   * Case-insensitive lookup. Schema `uppercase: true` casts plain `{ code: 'en' }`
+   * queries to `EN`, which misses legacy lowercase documents in MongoDB.
+   */
+  private findByCode(code: string): Promise<LanguageDocument | null> {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      return Promise.resolve(null);
+    }
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.languageModel
+      .findOne({
+        code: { $regex: `^${escaped}$`, $options: 'i' },
+      })
+      .exec();
   }
 
   private async uploadFlag(file: Express.Multer.File) {

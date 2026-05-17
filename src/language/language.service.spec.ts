@@ -35,7 +35,16 @@ describe('LanguageService', () => {
         {
           provide: getModelToken(Language.name),
           useValue: {
-            findOne: jest.fn().mockResolvedValue(langDoc),
+            findOne: jest.fn().mockImplementation((filter) => {
+              const codeFilter = filter?.code;
+              if (
+                codeFilter?.$regex === '^en$' &&
+                codeFilter?.$options === 'i'
+              ) {
+                return { exec: () => Promise.resolve(langDoc) };
+              }
+              return { exec: () => Promise.resolve(null) };
+            }),
           },
         },
         { provide: CloudinaryService, useValue: cloudinaryService },
