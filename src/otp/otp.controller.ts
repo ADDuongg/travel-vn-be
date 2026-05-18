@@ -1,19 +1,8 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { OtpService } from './otp.service';
-import { OtpPurpose } from './otp.types';
-
-class SendOtpDto {
-  purpose: OtpPurpose;
-  target: string;
-  meta?: Record<string, unknown>;
-}
-
-class VerifyOtpDto {
-  purpose: OtpPurpose;
-  target: string;
-  code: string;
-}
 
 @Controller('otp')
 export class OtpController {
