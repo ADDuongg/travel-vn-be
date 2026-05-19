@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-base-to-string */
 import { Injectable, Logger } from '@nestjs/common';
-import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 import { withI18nSuccess } from 'src/common/i18n/success-envelope';
 import { TourI18nKeys } from './tour.i18n-keys';
 import { FilterQuery, SortOrder, Types } from 'mongoose';
@@ -31,16 +34,6 @@ import { ES_FALLBACK_TOTAL } from './tour-es.metrics';
 type StoredThumbnail = { url: string; publicId?: string; alt?: string };
 type StoredGalleryItem = StoredThumbnail & { order?: number };
 
-/* interface PaginatedResult<T> {
-  items: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-}
- */
 @Injectable()
 export class TourService {
   private readonly logger = new Logger(TourService.name);
@@ -73,11 +66,7 @@ export class TourService {
     );
   }
 
-  /**
-   * Create a new tour
-   */
   async create(dto: CreateTourDto) {
-    // Check slug uniqueness
     const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
     if (existedSlug) {
       throw new DomainException(
@@ -88,7 +77,6 @@ export class TourService {
       );
     }
 
-    // Check code uniqueness
     const existedCode = await this.tourRepository.findOneByCode(dto.code);
     if (existedCode) {
       throw new DomainException(
@@ -99,7 +87,6 @@ export class TourService {
       );
     }
 
-    // Validate provinces
     const provinces = await this.provincesService.findAllForDropdown();
     const provinceIds = provinces.map((p: any) => String(p._id));
 
@@ -128,7 +115,6 @@ export class TourService {
     const gallery = this.normalizeGallery(dto.gallery);
     const thumbnail = this.resolveThumbnail(dto.thumbnail, gallery);
 
-    // Create tour
     const created = await this.tourRepository.create({
       slug: dto.slug,
       code: dto.code,
@@ -226,9 +212,8 @@ export class TourService {
     }
 
     const objectIds = ids.map((id) => new Types.ObjectId(id));
-    const rows = await this.tourRepository.findManyByIdsOrderedPopulate(
-      objectIds,
-    );
+    const rows =
+      await this.tourRepository.findManyByIdsOrderedPopulate(objectIds);
 
     let enrichedItems: unknown[] = rows;
     if (userId) {
@@ -273,7 +258,6 @@ export class TourService {
       transportTypes,
     } = query;
 
-    // Build filter
     const filter: FilterQuery<TourDocument> = { isActive: true };
 
     if (destinationId && Types.ObjectId.isValid(destinationId)) {
@@ -316,7 +300,6 @@ export class TourService {
       ];
     }
 
-    // Build sort
     let sort: Record<string, SortOrder> = {};
     switch (sortBy) {
       case TourSortBy.PRICE_ASC:
@@ -340,7 +323,6 @@ export class TourService {
         break;
     }
 
-    // Execute query
     const skip = (page - 1) * limit;
     const [items, total] = await this.tourRepository.findPageMongo({
       filter,
@@ -375,9 +357,6 @@ export class TourService {
     };
   }
 
-  /**
-   * Find tour by ID
-   */
   async findById(id: string, userId?: string): Promise<any> {
     if (!Types.ObjectId.isValid(id)) {
       throw new DomainException(
@@ -408,9 +387,6 @@ export class TourService {
     return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
-  /**
-   * Find tour by slug
-   */
   async findBySlug(slug: string, userId?: string): Promise<any> {
     const tour = await this.tourRepository.findOneActiveBySlug(slug);
 
@@ -432,9 +408,6 @@ export class TourService {
     return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
-  /**
-   * Update tour
-   */
   async update(id: string, dto: UpdateTourDto) {
     const tour = await this.tourRepository.findById(id);
     if (!tour) {
@@ -445,7 +418,6 @@ export class TourService {
       );
     }
 
-    // Check slug uniqueness
     if (dto.slug !== undefined && dto.slug !== tour.slug) {
       const existedSlug = await this.tourRepository.findOneBySlug(dto.slug);
       if (existedSlug) {
@@ -459,7 +431,6 @@ export class TourService {
       tour.slug = dto.slug;
     }
 
-    // Check code uniqueness
     if (dto.code !== undefined && dto.code !== tour.code) {
       const existedCode = await this.tourRepository.findOneByCode(dto.code);
       if (existedCode) {
@@ -473,7 +444,10 @@ export class TourService {
       tour.code = dto.code;
     }
 
-    if (dto.departureProvinceId !== undefined || dto.destinations !== undefined) {
+    if (
+      dto.departureProvinceId !== undefined ||
+      dto.destinations !== undefined
+    ) {
       const provinces = await this.provincesService.findAllForDropdown();
       const provinceIds = provinces.map((p: any) => String(p._id));
 
@@ -546,7 +520,6 @@ export class TourService {
       tour.gallery = nextGallery;
     }
 
-    // Update fields
     const prevIsActive = tour.isActive;
 
     if (dto.isActive !== undefined) tour.isActive = dto.isActive;
@@ -565,7 +538,9 @@ export class TourService {
         minGuests: dto.capacity.minGuests ?? tour.capacity.minGuests ?? 1,
         maxGuests: dto.capacity.maxGuests,
         privateAvailable:
-          dto.capacity.privateAvailable ?? tour.capacity.privateAvailable ?? false,
+          dto.capacity.privateAvailable ??
+          tour.capacity.privateAvailable ??
+          false,
       } as any;
     }
     if (dto.pricing !== undefined) {
@@ -674,9 +649,6 @@ export class TourService {
     }
   }
 
-  /**
-   * Find all active tours for options/dropdown
-   */
   async findAllActive(destinationId?: string): Promise<any[]> {
     const filter: FilterQuery<TourDocument> = { isActive: true };
 
@@ -687,9 +659,6 @@ export class TourService {
     return this.tourRepository.findActiveForOptions(filter);
   }
 
-  /**
-   * Find featured tours
-   */
   async findFeatured(limit: number = 6, userId?: string): Promise<any[]> {
     const items = await this.tourRepository.findFeatured(limit);
     if (!userId) return items;

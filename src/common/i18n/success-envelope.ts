@@ -7,7 +7,6 @@ export type I18nSuccessEnvelope<T = unknown> = {
   messageKey: string;
 };
 
-/** Wrap service return value so the success interceptor picks message + messageKey. */
 export function withI18nSuccess<T>(
   data: T,
   message: string,

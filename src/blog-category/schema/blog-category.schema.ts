@@ -3,7 +3,6 @@ import { Document } from 'mongoose';
 
 export type BlogCategoryDocument = BlogCategory & Document;
 
-/** Mã ngôn ngữ (lowercase) -> chuỗi hiển thị. */
 export type DynamicLocalized = Record<string, string>;
 
 @Schema({ collection: 'blog-categories', timestamps: true })

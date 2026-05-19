@@ -32,7 +32,6 @@ export class ProductController {
 
   @Post()
   @UseInterceptors(
-    // FileInterceptor('image', {
     FilesInterceptor('image', 10, {
       storage: diskStorage({
         destination: (req, file, cb) => {
@@ -52,10 +51,7 @@ export class ProductController {
   )
   create(
     @Body() createProductDto: CreateProductDto,
-    // upload 1 file
-    // @UploadedFile() file: Express.Multer.File,
 
-    // upload multiple files
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     const imageFilenames = files.map((file) => file.filename);

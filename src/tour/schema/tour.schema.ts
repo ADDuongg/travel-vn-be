@@ -4,11 +4,6 @@ import { Province } from 'src/provinces/schema/province.schema';
 
 export type TourDocument = Tour & Document;
 
-/* =======================
-   SUB SCHEMAS
-======================= */
-
-// Lịch trình từng ngày
 @Schema({ _id: false })
 export class TourItineraryDay {
   @Prop({ required: true })
@@ -28,7 +23,6 @@ export class TourItineraryDay {
 export const TourItineraryDaySchema =
   SchemaFactory.createForClass(TourItineraryDay);
 
-// Địa điểm tour đi qua
 @Schema({ _id: false })
 export class TourDestination {
   @Prop({ type: Types.ObjectId, ref: Province.name, required: true })
@@ -41,7 +35,6 @@ export class TourDestination {
 export const TourDestinationSchema =
   SchemaFactory.createForClass(TourDestination);
 
-// Thông tin liên hệ
 @Schema({ _id: false })
 export class TourContact {
   @Prop()
@@ -56,7 +49,6 @@ export class TourContact {
 
 export const TourContactSchema = SchemaFactory.createForClass(TourContact);
 
-// Giá tour
 @Schema({ _id: false })
 export class TourPricing {
   @Prop({ required: true })
@@ -77,17 +69,11 @@ export class TourPricing {
 
 export const TourPricingSchema = SchemaFactory.createForClass(TourPricing);
 
-/* =======================
-   TOUR SCHEMA
-======================= */
-
 @Schema({
   collection: 'tours',
   timestamps: true,
 })
 export class Tour {
-  /* ================= CORE ================= */
-
   @Prop({ required: true, unique: true })
   slug: string;
 
@@ -99,8 +85,6 @@ export class Tour {
 
   @Prop({ required: true, enum: ['DOMESTIC', 'INTERNATIONAL', 'DAILY'] })
   tourType: string;
-
-  /* ================= DURATION ================= */
 
   @Prop({
     type: {
@@ -114,8 +98,6 @@ export class Tour {
     nights: number;
   };
 
-  /* ================= DESTINATIONS ================= */
-
   @Prop({
     type: [TourDestinationSchema],
     required: true,
@@ -128,8 +110,6 @@ export class Tour {
     required: true,
   })
   departureProvinceId: Types.ObjectId;
-
-  /* ================= TRANSLATIONS ================= */
 
   @Prop({
     type: Object,
@@ -154,15 +134,11 @@ export class Tour {
     };
   };
 
-  /* ================= ITINERARY ================= */
-
   @Prop({
     type: [TourItineraryDaySchema],
     default: [],
   })
   itinerary: TourItineraryDay[];
-
-  /* ================= CAPACITY ================= */
 
   @Prop({
     type: {
@@ -178,17 +154,11 @@ export class Tour {
     privateAvailable: boolean;
   };
 
-  /* ================= PRICING ================= */
-
   @Prop({ type: TourPricingSchema, required: true })
   pricing: TourPricing;
 
-  /* ================= CONTACT ================= */
-
   @Prop({ type: TourContactSchema })
   contact?: TourContact;
-
-  /* ================= MEDIA ================= */
 
   @Prop({
     type: {
@@ -221,8 +191,6 @@ export class Tour {
     order?: number;
   }>;
 
-  /* ================= AMENITIES / TRANSPORT ================= */
-
   @Prop({
     type: [{ type: Types.ObjectId, ref: 'Amenity' }],
     default: [],
@@ -234,8 +202,6 @@ export class Tour {
     default: [],
   })
   transportTypes: string[];
-
-  /* ================= BOOKING CONFIG ================= */
 
   @Prop({
     type: {
@@ -253,8 +219,6 @@ export class Tour {
     depositPercent: number;
   };
 
-  /* ================= SALE / DISCOUNT ================= */
-
   @Prop({
     type: Object,
     default: {},
@@ -267,8 +231,6 @@ export class Tour {
     endDate?: Date;
   };
 
-  /* ================= RATING ================= */
-
   @Prop({
     type: {
       average: { type: Number, default: 0 },
@@ -280,8 +242,6 @@ export class Tour {
     average: number;
     total: number;
   };
-
-  /* ================= SCHEDULE (Ngày khởi hành) ================= */
 
   @Prop({
     type: {
@@ -305,8 +265,6 @@ export class Tour {
     }>;
   };
 
-  /* ================= DIFFICULTY ================= */
-
   @Prop({
     type: String,
     enum: ['EASY', 'MODERATE', 'CHALLENGING', 'DIFFICULT'],
@@ -316,8 +274,6 @@ export class Tour {
 }
 
 export const TourSchema = SchemaFactory.createForClass(Tour);
-
-/* ================= INDEXES ================= */
 
 TourSchema.index({ isActive: 1 });
 TourSchema.index({ tourType: 1 });

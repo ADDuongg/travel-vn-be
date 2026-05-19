@@ -21,7 +21,9 @@ describe('AmenitiesPublicController', () => {
       ],
     }).compile();
 
-    controller = module.get<AmenitiesPublicController>(AmenitiesPublicController);
+    controller = module.get<AmenitiesPublicController>(
+      AmenitiesPublicController,
+    );
   });
 
   it('should be defined', () => {

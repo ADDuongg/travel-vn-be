@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Types } from 'mongoose';
 
-import {
-  BookingStatus,
-  BookingPaymentStatus,
-} from './schema/booking.schema';
+import { BookingStatus, BookingPaymentStatus } from './schema/booking.schema';
 import { BookingRepository } from './booking.repository';
 import { PaymentRepository } from 'src/payment/payment.repository';
 
@@ -18,21 +15,17 @@ export class BookingReconcileService {
     private readonly paymentRepository: PaymentRepository,
   ) {}
 
-  /*
-    Reconcile payment success nhưng booking chưa confirm
-   */
   @Cron(CronExpression.EVERY_10_MINUTES)
   async reconcilePaidBookings() {
     const safeBefore = new Date(Date.now() - 2 * 60 * 1000);
 
-    const payments = await this.paymentRepository.findSucceededBefore(
-      safeBefore,
-    );
+    const payments =
+      await this.paymentRepository.findSucceededBefore(safeBefore);
 
     if (!payments.length) return;
 
     for (const payment of payments) {
-      const bookingId = payment.bookingId as Types.ObjectId | undefined;
+      const bookingId = payment.bookingId;
       if (!bookingId) continue;
 
       const booking = await this.bookingRepository.findById(

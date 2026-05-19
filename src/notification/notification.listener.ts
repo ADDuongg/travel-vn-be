@@ -65,7 +65,6 @@ export class NotificationListener {
     });
   }
 
-  /** Run queue adds in parallel; log rejections but do not fail the whole batch. */
   private async addJobsAllSettled<T>(
     items: T[],
     addOne: (item: T) => Promise<unknown>,
@@ -96,7 +95,6 @@ export class NotificationListener {
 
     if (adminUsers.length === 0) return;
 
-    // 1) In-app notifications (per recipient)
     await this.addJobsAllSettled(adminUsers, (admin) =>
       this.enqueueNotificationJob(
         'guide-registered-inapp',
@@ -117,7 +115,6 @@ export class NotificationListener {
       ),
     );
 
-    // 2) Emails (per email recipient)
     const emailRecipients = new Set<string>();
     const adminEmail = this.envService.get('ADMIN_EMAIL');
     if (adminEmail) emailRecipients.add(adminEmail);
@@ -158,7 +155,6 @@ export class NotificationListener {
       `Guide verified event: ${payload.guideId}, verified=${payload.isVerified}`,
     );
 
-    // In-app notification (single recipient)
     await this.enqueueNotificationJob(
       'guide-verified-inapp',
       createNotificationJobEnvelope({
@@ -178,7 +174,6 @@ export class NotificationListener {
       [payload.userId, payload.guideId, normalized.eventId],
     );
 
-    // Email (single recipient, only if available)
     if (payload.userEmail) {
       await this.enqueueNotificationJob(
         'guide-verified-email',
@@ -614,7 +609,6 @@ export class NotificationListener {
     );
   }
 
-  /** User client — đơn tour hết hạn thanh toán (cron). */
   @OnEvent(NotificationEvent.TOUR_BOOKING_PAYMENT_EXPIRED)
   async onTourBookingPaymentExpiredClient(event: unknown) {
     const normalized =
@@ -647,7 +641,6 @@ export class NotificationListener {
     );
   }
 
-  /** User client — đặt phòng hết hạn thanh toán (cron). */
   @OnEvent(NotificationEvent.ROOM_BOOKING_PAYMENT_EXPIRED)
   async onRoomBookingPaymentExpiredClient(event: unknown) {
     const normalized =

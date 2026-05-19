@@ -1,30 +1,3 @@
-# =============================================================================
-# DOCKER COMPOSE -- PRODUCTION ENVIRONMENT
-# =============================================================================
-#
-# Stack: NestJS API + MongoDB + Redis + Elasticsearch (du lieu trong Docker volumes).
-# Elasticsearch: single-node, chi trong mang Docker (khong publish port 9200).
-#
-# Cach chay:
-#   docker compose -f docker-compose.production.yml up -d
-#
-# Luu y:
-#   - Image backend: ${CI_REGISTRY_IMAGE}:${IMAGE_TAG} (mac dinh :production)
-#   - Dat CI_REGISTRY_IMAGE + IMAGE_TAG trong .env cung thu muc (xem .env.example).
-#   - Dat backup dinh ky cho volume mongo_data (va redis neu can).
-#   - DB_URI / REDIS_* trong .env phai tro toi service name mongo, redis.
-#   - Mongo auth: MONGO_USER + MONGO_PASSWORD trong .env; DB_URI co
-#     mongodb://USER:PASS@mongo:27017/TEN_DB?authSource=admin (PASS URL-encode neu co @).
-#   - Elasticsearch trong .env (backend): ELASTICSEARCH_ENABLED=true,
-#     ELASTICSEARCH_URL=http://elasticsearch:9200, ELASTICSEARCH_TOURS_INDEX=tours
-#     (xem .env.docker.example). Lan dau sau khi bat ES: tren VPS
-#     docker exec -it backend-production yarn run search:reindex-tours
-#     neu DB da co tour (dong bo Mongo -> ES). Local dev nguon TS: yarn search:reindex-tours:dev
-#   - Linux: neu ES loi vm.max_map_count, tang tren host: sysctl -w vm.max_map_count=262144
-#     (va ghi vao /etc/sysctl.d de persist).
-#
-# =============================================================================
-
 services:
   mongo:
     image: mongo:7.0
@@ -44,8 +17,6 @@ services:
     volumes:
       - mongo_data:/data/db
       - ./mongo-keyfile:/etc/mongo-keyfile:ro
-    # Chi loopback VPS. Dung port host KHAC staging (staging dung 27017) neu ca hai
-    # cung chay tren mot VPS. Vi du SSH tunnel: -L 27018:127.0.0.1:27018
     ports:
       - '127.0.0.1:27018:27017'
     networks:

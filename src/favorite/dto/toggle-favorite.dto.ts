@@ -11,4 +11,3 @@ export class ToggleFavoriteDto {
   @IsMongoId()
   entityId: string;
 }
-

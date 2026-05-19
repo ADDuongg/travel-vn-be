@@ -12,9 +12,6 @@ import {
 import { Type } from 'class-transformer';
 import { TransformValue } from 'src/utils/transform.util';
 
-/**
- * Một block ngôn ngữ trong highlight.translations[lang] — DTO dùng @IsObject() cho cả bản ghi vì key động.
- */
 export class HighlightTranslationLangBlockDto {
   @IsString()
   name: string;
@@ -27,7 +24,6 @@ export class HighlightTranslationLangBlockDto {
 class ProvinceHighlightDto {
   @IsOptional()
   @IsObject()
-  /** Mã ngôn ngữ (lowercase) -> { name, description? } */
   translations?: Record<string, HighlightTranslationLangBlockDto>;
 
   @IsOptional()
@@ -40,10 +36,6 @@ class ProvinceHighlightDto {
   };
 }
 
-/**
- * Các field có thể gửi lên khi cập nhật province (JSON).
- * Dùng làm cơ sở cho `UpdateProvinceDto` = PartialType (toàn bộ optional).
- */
 export class ProvinceContentDto {
   @IsOptional()
   @TransformValue()

@@ -32,7 +32,7 @@ export class PermissionService {
         return JSON.parse(cached) as { routers: string[]; apis: string[] };
       }
     } catch {
-      // best-effort cache
+      void 0;
     }
 
     const [routerRoles, apiRoles] = await Promise.all([
@@ -49,7 +49,7 @@ export class PermissionService {
     try {
       await this.redis.set(cacheKey, JSON.stringify(result), 'EX', 300);
     } catch {
-      // best-effort cache
+      void 0;
     }
     return result;
   }

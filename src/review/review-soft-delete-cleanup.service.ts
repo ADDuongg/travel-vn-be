@@ -13,9 +13,8 @@ export class ReviewSoftDeleteCleanupService {
   @Cron(CronExpression.EVERY_DAY_AT_5AM)
   async purgeOldSoftDeletedReviews() {
     const cutoff = new Date(Date.now() - NINETY_DAYS_MS);
-    const result = await this.reviewRepository.deleteManySoftDeletedBefore(
-      cutoff,
-    );
+    const result =
+      await this.reviewRepository.deleteManySoftDeletedBefore(cutoff);
 
     if (result.deletedCount > 0) {
       this.logger.log(

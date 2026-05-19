@@ -41,12 +41,14 @@ describe('ResponseTransformInterceptor', () => {
   it('uses @ResponseMessageKey metadata', (done) => {
     const reflector = new Reflector();
     const handler = () => {};
-    jest.spyOn(reflector, 'get').mockImplementation((key: string, tgt: unknown) => {
-      if (key === RESPONSE_MESSAGE_KEY_METADATA && tgt === handler) {
-        return 'auth.login.success';
-      }
-      return undefined;
-    });
+    jest
+      .spyOn(reflector, 'get')
+      .mockImplementation((key: string, tgt: unknown) => {
+        if (key === RESPONSE_MESSAGE_KEY_METADATA && tgt === handler) {
+          return 'auth.login.success';
+        }
+        return undefined;
+      });
     const interceptor = createInterceptor(reflector);
     const ctx = mockContext(handler, reflector);
     const next: CallHandler = { handle: () => of({ ok: true }) };
@@ -64,13 +66,7 @@ describe('ResponseTransformInterceptor', () => {
     const ctx = mockContext(() => {}, reflector);
     const next: CallHandler = {
       handle: () =>
-        of(
-          withI18nSuccess(
-            { a: 1 },
-            'Custom message',
-            'booking.created',
-          ),
-        ),
+        of(withI18nSuccess({ a: 1 }, 'Custom message', 'booking.created')),
     };
 
     interceptor.intercept(ctx, next).subscribe((body: any) => {

@@ -7,20 +7,14 @@ export const envSchema = z
       .default('development'),
     PORT: z.coerce.number().default(9001),
 
-    // Database
     DB_URI: z.string().min(1, 'DB_URI is required'),
 
-    /**
-     * Multi-document transactions require a replica set or mongos.
-     * When unset: enabled only in production (local standalone Mongo → set false or use docker-compose Mongo with --replSet).
-     */
     MONGO_TRANSACTIONS_ENABLED: z.preprocess((v) => {
       if (v === undefined || v === '') return undefined;
       if (v === false || v === 'false' || v === '0') return false;
       return v === true || v === 'true' || v === '1';
     }, z.boolean().optional()),
 
-    // JWT
     JWT_SECRET: z.string().min(8, 'JWT_SECRET must be at least 8 characters'),
     JWT_REFRESH_SECRET: z
       .string()
@@ -29,77 +23,61 @@ export const envSchema = z
     JWT_ISSUER: z.string().default('vn-tours'),
     JWT_AUDIENCE: z.string().default('vn-tours-clients'),
 
-    // Stripe (optional in dev so we don't fail if not set)
     STRIPE_SECRET_KEY: z.string().optional(),
     STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
-    // Cloudinary (optional)
     CLOUDINARY_CLOUD_NAME: z.string().optional(),
     CLOUDINARY_API_KEY: z.string().optional(),
     CLOUDINARY_API_SECRET: z.string().optional(),
 
-    // CORS — keep in sync with main.ts fallback (must include Next/Vite + CRA ports)
     CORS_ORIGINS: z
       .string()
       .default(
         'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000,http://127.0.0.1:3000',
       ),
 
-    // Logging — override log level at runtime without redeploy (e.g. LOG_LEVEL=debug on prod)
     LOG_LEVEL: z
       .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
       .optional(),
 
-    /** Shown on every structured log line (Loki/Grafana cardinality). Default: tours-api */
     SERVICE_NAME: z.string().min(1).default('tours-api'),
 
-    /** Release/version label for observability (e.g. Docker image tag, git SHA). */
     APP_VERSION: z.string().optional(),
 
-    // Redis (for BullMQ)
     REDIS_HOST: z.string().default('localhost'),
     REDIS_PORT: z.coerce.number().default(6379),
     REDIS_PASSWORD: z.string().optional(),
 
-    // OTP
     OTP_TTL_MINUTES: z.coerce.number().default(5),
     OTP_MAX_ATTEMPTS: z.coerce.number().default(5),
     OTP_RESEND_WINDOW_SEC: z.coerce.number().default(60),
 
-    /** Redis attempt limiter: wrong OTP entry per purpose+target (across re-issues). */
     OTP_ENTRY_MAX_ATTEMPTS: z.coerce.number().default(5),
     OTP_ENTRY_WINDOW_SEC: z.coerce.number().default(900),
     OTP_ENTRY_LOCKOUT_SEC: z.coerce.number().default(900),
 
-    /** Redis attempt limiter: failed login per username+IP. */
     LOGIN_FAIL_MAX_ATTEMPTS: z.coerce.number().default(5),
     LOGIN_FAIL_WINDOW_SEC: z.coerce.number().default(900),
     LOGIN_FAIL_LOCKOUT_SEC: z.coerce.number().default(900),
 
-    /** Soft-delete users with isEmailVerified=false older than this many days (cron). */
     UNVERIFIED_USER_TTL_DAYS: z.coerce.number().min(1).default(7),
 
-    // Resend (email)
     RESEND_API_KEY: z.string().optional(),
     RESEND_FROM_EMAIL: z.string().default('noreply@example.com'),
     ADMIN_EMAIL: z.string().optional(),
     RESEND_FORCE_TO: z.string().optional(),
 
-    // OpenAI
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_BASE_URL: z.string().optional(),
     OPENAI_MODEL: z.string().optional(),
 
-    // LLM provider switching (OpenAI / Ollama / ...)
     LLM_PROVIDER: z.enum(['openai', 'ollama']).optional(),
     OLLAMA_BASE_URL: z.string().optional(),
     OLLAMA_MODEL: z.string().optional(),
     OLLAMA_API_KEY: z.string().optional(),
 
-    // FE base URL (dùng trong email link reset password)
     FE_BASE_URL: z.string().url().default('http://localhost:5173'),
 
-    // Elasticsearch (optional; when enabled, ELASTICSEARCH_URL is required)
     ELASTICSEARCH_ENABLED: z
       .preprocess((v) => v === true || v === 'true' || v === '1', z.boolean())
       .default(false),

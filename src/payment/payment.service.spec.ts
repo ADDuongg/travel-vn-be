@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Types } from 'mongoose';
-import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
 import { DatabaseTransactionService } from 'src/common/database/database-transaction.service';
 import { PaymentService } from './payment.service';
@@ -285,7 +288,9 @@ describe('PaymentService', () => {
         refundedAmount: 0,
         status: PaymentStatus.SUCCEEDED,
       });
-      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(payment);
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
+        payment,
+      );
       mockPaymentRepository.save.mockResolvedValue(payment);
       stripeModule.stripe.refunds.create.mockResolvedValue({
         id: 're_test_123',
@@ -312,7 +317,9 @@ describe('PaymentService', () => {
         refundedAmount: 0,
         status: PaymentStatus.SUCCEEDED,
       });
-      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(payment);
+      mockPaymentRepository.findRefundableByBookingId.mockResolvedValue(
+        payment,
+      );
       mockPaymentRepository.save.mockResolvedValue(payment);
       stripeModule.stripe.refunds.create.mockResolvedValue({
         id: 're_partial',

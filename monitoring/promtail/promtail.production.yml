@@ -1,7 +1,3 @@
-# Promtail config — PRODUCTION.
-#
-# Tránh thêm label cardinality cao (requestId, userId, jobId) — query bằng `| json`
-# trong LogQL để filter theo các field này khi cần debug.
 
 server:
   http_listen_port: 9080

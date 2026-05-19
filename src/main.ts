@@ -52,7 +52,6 @@ async function bootstrap() {
   const port = env.get('PORT', 9001);
   const isProduction = env.isProduction();
 
-  // Security headers — CORP same-origin blocks cross-origin fetch reading JSON in some browsers
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -60,7 +59,6 @@ async function bootstrap() {
   );
   app.use(cookieParser());
 
-  // CORS from env (comma-separated origins, fallback to localhost for dev)
   const corsOrigins = env
     .get(
       'CORS_ORIGINS',
@@ -78,7 +76,6 @@ async function bootstrap() {
     maxAge: 86400,
   });
 
-  // Swagger (dev only) — filtered UIs for public vs client vs admin prefixes
   if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('VN Tours API')

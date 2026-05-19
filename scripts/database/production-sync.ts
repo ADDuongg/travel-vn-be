@@ -1,14 +1,3 @@
-/**
- * Production → local workflows (read-only against production).
- *
- * - seed: mongodump prod → restore MONGO_DB_LOCAL → sanitize → migrate-mongo
- * - pull: mongodump prod → restore MONGO_DB_PRODUCTION_DEBUG (raw; no sanitize)
- *
- * Requires: MongoDB Database Tools, MONGO_URI_PRODUCTION in .env (tunnel/VPN as needed).
- * Never writes to production.
- *
- * yarn db:seed:from-production | yarn db:pull:production
- */
 import { execSync } from 'child_process';
 import * as path from 'path';
 import mongoose from 'mongoose';
@@ -36,7 +25,6 @@ function parseMode(argv: string[]): Mode {
   process.exit(1);
 }
 
-/** URI pathname may not match MONGO_DB_LOCAL; driver default DB follows pathname. */
 function mongoUriWithDatabase(uri: string, databaseName: string): string {
   const u = new URL(uri);
   u.pathname = `/${databaseName.replace(/^\/+/, '')}`;

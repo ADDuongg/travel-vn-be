@@ -20,7 +20,6 @@ function readDotenvFromDisk(): Record<string, string> {
 
 const disk = readDotenvFromDisk();
 
-/** Docker Compose service name; only resolvable inside the container network. */
 export function rewriteMongoHostForHostMachine(uri: string): string {
   if (!uri || runningInDocker()) {
     return uri;
@@ -37,9 +36,6 @@ export function rewriteMongoHostForHostMachine(uri: string): string {
   return uri;
 }
 
-/**
- * Prefer `.env` on disk so host-side scripts work even when preload/dotenvx injects `mongo`.
- */
 function resolveMongoUriLocal(): string {
   const raw = disk.MONGO_URI_LOCAL || process.env.MONGO_URI_LOCAL;
   if (!raw) {
@@ -49,17 +45,10 @@ function resolveMongoUriLocal(): string {
   return rewriteMongoHostForHostMachine(raw);
 }
 
-/**
- * Options for connecting from the host to a single-node replica set published on localhost.
- * Without this, the driver follows RS hostnames (e.g. `mongo`) and fails with ENOTFOUND.
- */
 export const mongooseLocalConnectOptions: ConnectOptions = runningInDocker()
   ? {}
   : { directConnection: true };
 
-/**
- * Same Mongo as Nest `DB_URI` when set, else `MONGO_URI_LOCAL` (for seed-rbac / app parity).
- */
 export function resolveAppMongoUri(): string {
   const raw =
     disk.DB_URI ||
@@ -75,8 +64,7 @@ export function resolveAppMongoUri(): string {
   return rewriteMongoHostForHostMachine(raw);
 }
 
-const dbLocal =
-  disk.MONGO_DB_LOCAL || process.env.MONGO_DB_LOCAL;
+const dbLocal = disk.MONGO_DB_LOCAL || process.env.MONGO_DB_LOCAL;
 if (!dbLocal) {
   console.error(`\x1b[31m[ERROR]\x1b[0m Missing MONGO_DB_LOCAL in .env`);
   process.exit(1);

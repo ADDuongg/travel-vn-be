@@ -26,7 +26,6 @@ export class BlogPublicController {
     return this.blogService.findRelatedBySlug(slug);
   }
 
-  /** Optional Bearer token for future personalized fields on the detail view. */
   @Get(':slug')
   @UseGuards(JwtOptionalAuthGuard)
   @ApiBearerAuth()

@@ -28,4 +28,3 @@ export class MyFavoritesQueryDto {
   @IsString()
   lang?: string;
 }
-

@@ -1,5 +1,9 @@
 import { Controller, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { ApiCode } from 'src/common/decorators/api-code.decorator';
@@ -26,7 +30,12 @@ export class RoomInventoryAdminController {
     @Query('to') to: string,
   ) {
     if (!from || !to) {
-      throw new DomainException('from and to are required', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'from and to are required',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     const roomObjectId = new Types.ObjectId(roomId);
@@ -38,7 +47,12 @@ export class RoomInventoryAdminController {
       fromDate = parseDateOnly(from);
       toDate = parseDateOnly(to);
     } catch {
-      throw new DomainException('Invalid date format', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'Invalid date format',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     await this.inventoryService.ensureInventoryExists(

@@ -1,12 +1,3 @@
-/**
- * Types for Hotel API - copy to FE project
- *
- * APIs (public reads):
- * - GET /api/v1/public/hotels?provinceId=...&page=1&limit=12 - List hotels (paginated)
- * - GET /api/v1/public/hotels/options?provinceId=... - Dropdown options
- * - GET /api/v1/public/hotels/:id - Hotel detail
- */
-
 export interface HotelTranslation {
   name: string;
   description?: string;

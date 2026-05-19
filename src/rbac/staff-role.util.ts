@@ -1,6 +1,5 @@
 import { RBAC_ROLE_CODES } from './constants';
 
-/** Whether `roles[]` overlaps the seeded portal staff roles (`super_admin` … `viewer`). Case-insensitive. */
 export function hasPortalStaffRole(roles: string[] | undefined): boolean {
   if (!roles?.length) return false;
   const canon = RBAC_ROLE_CODES.map((r) => r.toLowerCase());

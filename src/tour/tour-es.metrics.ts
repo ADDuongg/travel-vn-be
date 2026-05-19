@@ -1,6 +1,5 @@
 import { makeCounterProvider } from '@willsoto/nestjs-prometheus';
 
-/** Prometheus metric names (must match @InjectMetric / makeCounterProvider `name`). */
 export const ES_FALLBACK_TOTAL = 'es_fallback_total';
 export const ES_SYNC_SUCCESS_TOTAL = 'es_sync_success_total';
 export const ES_SYNC_FAILED_TOTAL = 'es_sync_failed_total';

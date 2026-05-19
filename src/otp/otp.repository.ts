@@ -33,9 +33,6 @@ export class OtpRepository {
     await this.client.del(key);
   }
 
-  /**
-   * Tăng số lần thử và trả về bản ghi mới nhất.
-   */
   async incrementAttempts(
     purpose: OtpPurpose,
     target: string,

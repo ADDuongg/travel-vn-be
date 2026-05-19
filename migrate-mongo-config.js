@@ -2,13 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Keep process.env in sync for other keys
 dotenv.config({ override: true });
 
-/**
- * Preload hooks (e.g. dotenvx) can set MONGO_URI_LOCAL to Docker hostname `mongo` before
- * this file runs. Read the value straight from `.env` so host-side `yarn db:migrate` works.
- */
 function mongoUriLocalFromDisk() {
   const envPath = path.join(process.cwd(), '.env');
   if (!fs.existsSync(envPath)) {
@@ -18,7 +13,6 @@ function mongoUriLocalFromDisk() {
   return parsed.MONGO_URI_LOCAL || null;
 }
 
-/** Docker Compose service name; resolvable only inside the Docker network. */
 function rewriteMongoHostForHostMachine(uri) {
   if (!uri || fs.existsSync('/.dockerenv')) {
     return uri;
@@ -45,7 +39,6 @@ if (!uri) {
 
 const dbName = process.env.MONGO_DB_LOCAL || 'travel_vn_local';
 
-/** RS member host is `mongo` inside Compose; from the laptop only `localhost` resolves. */
 const runningInDocker = fs.existsSync('/.dockerenv');
 
 const config = {

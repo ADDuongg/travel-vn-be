@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Hotel, HotelSchema } from 'src/hotel/schema/hotel.schema';
 import { Room, RoomSchema } from 'src/room/schema/room.schema';
-import { TourGuide, TourGuideSchema } from 'src/tour-guide/schema/tour-guide.schema';
+import {
+  TourGuide,
+  TourGuideSchema,
+} from 'src/tour-guide/schema/tour-guide.schema';
 import { Tour, TourSchema } from 'src/tour/schema/tour.schema';
 import { FavoriteAdminController } from './favorite.admin.controller';
 import { FavoriteClientController } from './favorite.client.controller';
@@ -25,4 +28,3 @@ import { Favorite, FavoriteSchema } from './schema/favorite.schema';
   exports: [FavoriteService],
 })
 export class FavoriteModule {}
-

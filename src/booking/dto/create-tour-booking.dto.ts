@@ -8,8 +8,6 @@ import {
 } from 'class-validator';
 
 export class CreateTourBookingDto {
-  /* ===== TOUR ===== */
-
   @IsString()
   @IsNotEmpty()
   tourId: string;
@@ -20,8 +18,6 @@ export class CreateTourBookingDto {
   @IsNumber()
   @Min(1)
   participants: number;
-
-  /* ===== USER (OPTIONAL) ===== */
 
   @IsOptional()
   @IsString()

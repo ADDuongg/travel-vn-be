@@ -18,10 +18,6 @@ export class TourIndexQueueService {
     private readonly tourIndexQueue: Queue<TourIndexSyncJobData>,
   ) {}
 
-  /**
-   * Enqueue a single-tour ES upsert/delete sync. Does not await worker completion.
-   * Swallows enqueue errors so Mongo writes are not blocked when Redis is down.
-   */
   async enqueue(
     tourId: string,
     operation: TourIndexSyncOperation,

@@ -1,8 +1,3 @@
-/**
- * Types for TourGuide (FE / API response).
- * Schema: src/tour-guide/schema/tour-guide.schema.ts
- */
-
 export interface TourGuideTranslation {
   bio: string;
   shortBio?: string;

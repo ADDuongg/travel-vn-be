@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
@@ -95,9 +99,6 @@ export class TourBookingService {
     return basePrice;
   }
 
-  /**
-   * Tính tổng tiền: adults * price + children * childPrice + infants * infantPrice
-   */
   private calculateAmount(
     tour: TourDocument,
     inventory: TourInventoryDocument | null,
@@ -129,23 +130,39 @@ export class TourBookingService {
     const departureDate = parseDateOnly(dto.departureDate);
 
     const tour = await this.tourModel.findById(tourId);
-    if (!tour) throw new NotFoundDomainException('Tour not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!tour)
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
 
     const inventory = await this.tourInventoryService.getByTourAndDate(
       tourId,
       departureDate,
     );
     if (!inventory) {
-      throw new DomainException('No availability for this tour on the selected date', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'No availability for this tour on the selected date',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const totalGuests = dto.adults + (dto.children ?? 0) + (dto.infants ?? 0);
     if (totalGuests < (tour.capacity?.minGuests ?? 1)) {
-      throw new DomainException(`Minimum ${tour.capacity?.minGuests ?? 1} guest(s, 400, 'BAD_REQUEST', 'tour.booking.bad_request') required`,
+      throw new DomainException(
+        `Minimum ${tour.capacity?.minGuests ?? 1} guest(s, 400, 'BAD_REQUEST', 'tour.booking.bad_request') required`,
       );
     }
     if (inventory.availableSlots < totalGuests) {
-      throw new DomainException(`Not enough slots. Available: ${inventory.availableSlots}, requested: ${totalGuests}`, 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        `Not enough slots. Available: ${inventory.availableSlots}, requested: ${totalGuests}`,
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const { totalAmount, currency } = this.calculateAmount(
@@ -240,13 +257,23 @@ export class TourBookingService {
       )
       .lean();
 
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     return booking as TourBooking;
   }
 
   async getById(id: string): Promise<TourBooking> {
     if (!Types.ObjectId.isValid(id)) {
-      throw new DomainException('Invalid booking ID', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Invalid booking ID',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
     const booking = await this.bookingModel
       .findById(id)
@@ -257,7 +284,12 @@ export class TourBookingService {
       )
       .exec();
 
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     return booking;
   }
 
@@ -311,15 +343,30 @@ export class TourBookingService {
       .populate('tourInventoryId', 'departureDate totalSlots status')
       .exec();
 
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     return booking;
   }
 
   async confirm(id: string): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(id);
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     if (booking.status !== TourBookingStatus.PENDING) {
-      throw new DomainException('Only PENDING bookings can be confirmed', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Only PENDING bookings can be confirmed',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
     booking.status = TourBookingStatus.CONFIRMED;
     const saved = await booking.save();
@@ -342,9 +389,6 @@ export class TourBookingService {
     return saved;
   }
 
-  /**
-   * Hủy đơn. Chỉ chủ đơn (booking.userId === userId) hoặc admin mới được hủy.
-   */
   async cancel(
     id: string,
     reason?: string,
@@ -354,20 +398,34 @@ export class TourBookingService {
     session?: ClientSession,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(id);
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
 
     const isOwner = booking.userId && String(booking.userId) === userId;
     const isAdmin =
       role === 'admin' || (Array.isArray(roles) && roles.includes('admin'));
     if (!isOwner && !isAdmin) {
-      throw new ForbiddenDomainException('Only the booking owner or admin can cancel this booking', 'FORBIDDEN', 'tour.booking.forbidden');
+      throw new ForbiddenDomainException(
+        'Only the booking owner or admin can cancel this booking',
+        'FORBIDDEN',
+        'tour.booking.forbidden',
+      );
     }
 
     if (
       booking.status === TourBookingStatus.CANCELLED ||
       booking.status === TourBookingStatus.COMPLETED
     ) {
-      throw new DomainException('Booking cannot be cancelled', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Booking cannot be cancelled',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const totalGuests = booking.adults + booking.children + booking.infants;
@@ -420,9 +478,19 @@ export class TourBookingService {
     dto: PaymentTourBookingDto,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(id);
-    if (!booking) throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     if (booking.status === TourBookingStatus.CANCELLED) {
-      throw new DomainException('Cannot pay a cancelled booking', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Cannot pay a cancelled booking',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     booking.paidAmount = (booking.paidAmount ?? 0) + dto.amount;
@@ -465,10 +533,6 @@ export class TourBookingService {
     return saved;
   }
 
-  /**
-   * Gọi từ Payment webhook khi Stripe payment_intent.succeeded.
-   * Cập nhật paidAmount, payment (STRIPE), status PAID/CONFIRMED.
-   */
   async markAsPaid(
     tourBookingId: string,
     amount: number,
@@ -476,7 +540,12 @@ export class TourBookingService {
     session?: ClientSession,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(tourBookingId);
-    if (!booking) throw new NotFoundDomainException('Tour booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Tour booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     if (booking.status === TourBookingStatus.CANCELLED) {
       return booking;
     }
@@ -521,16 +590,17 @@ export class TourBookingService {
     return saved;
   }
 
-  /**
-   * Gọi từ Payment webhook khi Stripe payment_intent.payment_failed.
-   * Hủy đơn và release slots để người khác có thể đặt.
-   */
   async markAsFailed(
     tourBookingId: string,
     session?: ClientSession,
   ): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(tourBookingId);
-    if (!booking) throw new NotFoundDomainException('Tour booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+    if (!booking)
+      throw new NotFoundDomainException(
+        'Tour booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     if (booking.status !== TourBookingStatus.PENDING) {
       return booking;
     }
@@ -611,25 +681,41 @@ export class TourBookingService {
     };
   }
 
-  /**
-   * User upload ảnh chuyển khoản (bank receipt). Chỉ đơn PENDING và chưa thanh toán đủ.
-   */
   async uploadReceipt(tourBookingId: string, file: Express.Multer.File) {
     if (!file) {
-      throw new DomainException('Receipt image is required', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Receipt image is required',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const booking = await this.bookingModel.findById(tourBookingId);
     if (!booking) {
-      throw new NotFoundDomainException('Tour booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+      throw new NotFoundDomainException(
+        'Tour booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     }
 
     if (booking.status === TourBookingStatus.CANCELLED) {
-      throw new DomainException('Cannot upload receipt for cancelled booking', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Cannot upload receipt for cancelled booking',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     if (booking.status === TourBookingStatus.PAID) {
-      throw new DomainException('Booking already paid', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Booking already paid',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const result = await this.cloudinaryService.uploadFile(file, {
@@ -650,17 +736,24 @@ export class TourBookingService {
     };
   }
 
-  /**
-   * Admin xác nhận đã nhận tiền chuyển khoản (verify receipt) → cập nhật paidAmount, status PAID.
-   */
   async verifyReceipt(id: string): Promise<TourBooking> {
     const booking = await this.bookingModel.findById(id);
     if (!booking?.bankReceipt) {
-      throw new DomainException('No receipt to verify', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'No receipt to verify',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     if (booking.status === TourBookingStatus.CANCELLED) {
-      throw new DomainException('Cannot verify receipt for cancelled booking', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Cannot verify receipt for cancelled booking',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     booking.bankReceipt.verified = true;
@@ -680,15 +773,22 @@ export class TourBookingService {
     return booking;
   }
 
-  /**
-   * Admin gán hoặc thay đổi hướng dẫn viên cho booking.
-   */
   async assignGuide(bookingId: string, guideId: string): Promise<TourBooking> {
     if (!Types.ObjectId.isValid(bookingId)) {
-      throw new DomainException('Invalid booking ID', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Invalid booking ID',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
     if (!Types.ObjectId.isValid(guideId)) {
-      throw new DomainException('Invalid guide ID', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Invalid guide ID',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     const [booking, guide] = await Promise.all([
@@ -697,11 +797,20 @@ export class TourBookingService {
     ]);
 
     if (!booking) {
-      throw new NotFoundDomainException('Booking not found', 'NOT_FOUND', 'tour.booking.not_found');
+      throw new NotFoundDomainException(
+        'Booking not found',
+        'NOT_FOUND',
+        'tour.booking.not_found',
+      );
     }
 
     if (!guide || !guide.isActive) {
-      throw new DomainException('Tour guide not found or inactive', 400, 'BAD_REQUEST', 'tour.booking.bad_request');
+      throw new DomainException(
+        'Tour guide not found or inactive',
+        400,
+        'BAD_REQUEST',
+        'tour.booking.bad_request',
+      );
     }
 
     booking.guideId = guide._id as Types.ObjectId | undefined;

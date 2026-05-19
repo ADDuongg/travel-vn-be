@@ -83,7 +83,7 @@ export class CrudAuditInterceptor implements NestInterceptor {
         const doc = await model.findById(resourceId).lean().exec();
         oldValue = doc as Record<string, any> | null;
       } catch {
-        // Model not found or query failed — skip old value
+        void 0;
       }
     }
 

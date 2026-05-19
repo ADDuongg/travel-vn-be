@@ -30,9 +30,6 @@ export class Idempotency {
   })
   status: IdempotencyStatus;
 
-  /*
-    dùng để detect trường hợp cùng key nhưng payload khác
-   */
   @Prop()
   requestHash?: string;
 

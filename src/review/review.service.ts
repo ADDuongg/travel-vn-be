@@ -54,7 +54,12 @@ export class ReviewService {
     } = params;
 
     if (!rating && !comment) {
-      throw new DomainException('Rating or comment is required', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Rating or comment is required',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
 
     const filter: Record<string, unknown> = {
@@ -71,7 +76,12 @@ export class ReviewService {
     const existing = await this.reviewRepository.findOneForUpsert(filter);
 
     if (existing?.deletedAt) {
-      throw new DomainException('Review was deleted', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Review was deleted',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
 
     if (existing?.status === ReviewStatus.HIDDEN) {
@@ -90,7 +100,12 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new DomainException('Could not save review', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Could not save review',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
 
     if (
@@ -266,7 +281,12 @@ export class ReviewService {
       input.status === ReviewStatus.HIDDEN &&
       review.status !== ReviewStatus.APPROVED
     ) {
-      throw new DomainException('Only approved reviews can be moved to HIDDEN', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Only approved reviews can be moved to HIDDEN',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
 
     const adminOid = new Types.ObjectId(adminUserId);

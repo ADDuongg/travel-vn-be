@@ -31,11 +31,9 @@ export class TourInventory {
   })
   departureDate: Date;
 
-  /** Tổng số chỗ cho ngày khởi hành này */
   @Prop({ type: Number, required: true, min: 0 })
   totalSlots: number;
 
-  /** Số chỗ còn trống */
   @Prop({ type: Number, required: true, min: 0 })
   availableSlots: number;
 
@@ -46,7 +44,6 @@ export class TourInventory {
   })
   status: TourInventoryStatus;
 
-  /** Giá đặc biệt theo ngày (optional). Nếu null dùng giá tour. */
   @Prop()
   specialPrice?: number;
 

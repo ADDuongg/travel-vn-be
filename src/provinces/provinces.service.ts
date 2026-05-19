@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -137,7 +141,12 @@ export class ProvincesService {
 
   async findBySlug(slug: string) {
     const province = await this.provinceModel.findOne({ slug }).lean();
-    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
+    if (!province)
+      throw new NotFoundDomainException(
+        'Province not found',
+        'NOT_FOUND',
+        'provinces.not_found',
+      );
     const [provinceWithCounts] = await this.attachCountsToProvinces([province]);
     return provinceWithCounts;
   }
@@ -152,7 +161,6 @@ export class ProvincesService {
       .lean();
   }
 
-  /** Dropdown: _id, code, slug, name, fullName, wards */
   async findAllForDropdown() {
     const langCodes = await this.getActiveLangCodes();
     const nameSort = this.sortKeyForName(langCodes);
@@ -163,13 +171,15 @@ export class ProvincesService {
       .lean();
   }
 
-  /**
-   * Chỉ JSON — ảnh upload trước qua `POST /api/v1/admin/media/upload`, gửi `url`/`publicId` trong body.
-   */
   async update(id: string, dto: UpdateProvinceDto) {
     const requiredLangs = await this.getActiveLangCodes();
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
+    if (!province)
+      throw new NotFoundDomainException(
+        'Province not found',
+        'NOT_FOUND',
+        'provinces.not_found',
+      );
 
     if (dto.translations !== undefined)
       province.translations = dto.translations;
@@ -233,7 +243,12 @@ export class ProvincesService {
 
   async softDelete(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
+    if (!province)
+      throw new NotFoundDomainException(
+        'Province not found',
+        'NOT_FOUND',
+        'provinces.not_found',
+      );
     province.isActive = false;
     await province.save();
     return { message: 'Province deactivated successfully' };
@@ -241,7 +256,12 @@ export class ProvincesService {
 
   async restore(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
+    if (!province)
+      throw new NotFoundDomainException(
+        'Province not found',
+        'NOT_FOUND',
+        'provinces.not_found',
+      );
     province.isActive = true;
     await province.save();
     return { message: 'Province restored successfully' };
@@ -249,7 +269,12 @@ export class ProvincesService {
 
   async togglePopular(id: string) {
     const province = await this.provinceModel.findById(id).exec();
-    if (!province) throw new NotFoundDomainException('Province not found', 'NOT_FOUND', 'provinces.not_found');
+    if (!province)
+      throw new NotFoundDomainException(
+        'Province not found',
+        'NOT_FOUND',
+        'provinces.not_found',
+      );
     province.isPopular = !province.isPopular;
     return province.save().then((p) => p.toObject());
   }
@@ -459,7 +484,12 @@ export class ProvincesService {
     const parsed = this.parseJsonIfString(raw);
     if (!Array.isArray(parsed)) {
       if (parsed && typeof parsed === 'object') {
-        throw new DomainException('highlights must be a JSON array', 400, 'BAD_REQUEST', 'provinces.bad_request');
+        throw new DomainException(
+          'highlights must be a JSON array',
+          400,
+          'BAD_REQUEST',
+          'provinces.bad_request',
+        );
       }
       return [];
     }
@@ -567,7 +597,6 @@ export class ProvincesService {
     return Object.keys(out).length ? out : null;
   }
 
-  /** highlights[] cũ: name: { vi, en }, description?: { vi, en } */
   private legacyNameDescriptionToTranslations(
     raw: Record<string, unknown>,
   ): Record<string, { name?: unknown; description?: unknown }> | null {

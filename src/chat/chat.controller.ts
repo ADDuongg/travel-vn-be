@@ -5,7 +5,6 @@ import { ChatRequestDto } from './dto/chat.dto';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
 
 @Controller('api/chat')
-// @UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 

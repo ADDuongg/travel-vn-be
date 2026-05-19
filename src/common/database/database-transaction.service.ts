@@ -12,11 +12,6 @@ export class DatabaseTransactionService {
     private readonly config: ConfigService<EnvConfig, true>,
   ) {}
 
-  /**
-   * Runs `runner` inside a MongoDB transaction when `MONGO_TRANSACTIONS_ENABLED` is true
-   * (default: true in production only). Otherwise runs sequentially without a session — required
-   * for standalone `mongod` (no replica set).
-   */
   async runInTransaction<T>(
     runner: (session: ClientSession | undefined) => Promise<T>,
     options?: TransactionOptions,

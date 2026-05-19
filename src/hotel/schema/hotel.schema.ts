@@ -4,10 +4,6 @@ import { Province } from 'src/provinces/schema/province.schema';
 
 export type HotelDocument = Hotel & Document;
 
-/* =======================
-   SUB SCHEMA
-======================= */
-
 @Schema({ _id: false })
 export class HotelContact {
   @Prop()
@@ -33,17 +29,11 @@ export class HotelLocation {
 
 export const HotelLocationSchema = SchemaFactory.createForClass(HotelLocation);
 
-/* =======================
-   HOTEL SCHEMA
-======================= */
-
 @Schema({
   collection: 'hotels',
   timestamps: true,
 })
 export class Hotel {
-  /* ================= CORE ================= */
-
   @Prop({ required: true, unique: true })
   slug: string;
 
@@ -53,8 +43,6 @@ export class Hotel {
   @Prop({ default: 3, min: 1, max: 5 })
   starRating: number;
 
-  /* ================= PROVINCE ================= */
-
   @Prop({
     type: Types.ObjectId,
     ref: Province.name,
@@ -62,8 +50,6 @@ export class Hotel {
   })
   provinceId: Types.ObjectId;
 
-  /* ================= TRANSLATIONS ================= */
-  /** Keys: langCode (vi, en, ...). Values: translated fields */
   @Prop({
     type: Object,
     required: true,
@@ -83,17 +69,11 @@ export class Hotel {
     };
   };
 
-  /* ================= CONTACT ================= */
-
   @Prop({ type: HotelContactSchema })
   contact?: HotelContact;
 
-  /* ================= LOCATION ================= */
-
   @Prop({ type: HotelLocationSchema })
   location?: HotelLocation;
-
-  /* ================= MEDIA ================= */
 
   @Prop({
     type: {
@@ -126,15 +106,11 @@ export class Hotel {
     order?: number;
   }>;
 
-  /* ================= AMENITIES (hotel-level) ================= */
-
   @Prop({
     type: [{ type: Types.ObjectId, ref: 'Amenity' }],
     default: [],
   })
   amenities: Types.ObjectId[];
-
-  /* ================= RATING ================= */
 
   @Prop({
     type: {
@@ -150,8 +126,6 @@ export class Hotel {
 }
 
 export const HotelSchema = SchemaFactory.createForClass(Hotel);
-
-/* ================= INDEX ================= */
 
 HotelSchema.index({ provinceId: 1 });
 HotelSchema.index({ isActive: 1 });

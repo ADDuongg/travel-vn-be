@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -22,7 +26,6 @@ export class IdempotencyService {
     private readonly idempotencyModel: Model<IdempotencyDocument>,
   ) {}
 
-  /* use with HTTP request */
   async execute<T>(
     key: string,
     userId: string,
@@ -38,7 +41,6 @@ export class IdempotencyService {
         expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
       });
     } catch (error: any) {
-      // Mongo duplicate key error
       if (error.code === 11000) {
         const existing = await this.idempotencyModel.findOne({
           key,
@@ -46,14 +48,24 @@ export class IdempotencyService {
         });
 
         if (!existing) {
-          throw new DomainException('Idempotency record not found', 409, 'CONFLICT', 'idempotency.conflict');
+          throw new DomainException(
+            'Idempotency record not found',
+            409,
+            'CONFLICT',
+            'idempotency.conflict',
+          );
         }
 
         if (existing.status === IdempotencyStatus.COMPLETED) {
           return existing.response;
         }
 
-        throw new DomainException('Request is being processed', 409, 'CONFLICT', 'idempotency.conflict');
+        throw new DomainException(
+          'Request is being processed',
+          409,
+          'CONFLICT',
+          'idempotency.conflict',
+        );
       }
 
       throw error;
@@ -73,7 +85,6 @@ export class IdempotencyService {
 
       return result;
     } catch (error) {
-      // cleanup nếu business fail
       await this.idempotencyModel.updateOne(
         { key, userId },
         {
@@ -87,11 +98,6 @@ export class IdempotencyService {
     }
   }
 
-  /**
-   * Run a job handler at most once per (jobId, jobName).
-   * Used by Bull workers: on success mark COMPLETED so retries skip; on failure delete so retry can run again.
-   */
-  /* use with BullMQ job and something like background job */
   async executeJobOnce(
     jobId: string,
     jobName: string,
@@ -110,7 +116,6 @@ export class IdempotencyService {
         expireAt: new Date(Date.now() + IDEMPOTENCY_PROCESSING_MAX_MS),
       });
     } catch (error: any) {
-      // duplicate key
       if (error.code === 11000) {
         const existing = await this.idempotencyModel.findOne({
           key,
@@ -127,7 +132,6 @@ export class IdempotencyService {
         }
 
         if (existing.status === IdempotencyStatus.PROCESSING) {
-          // another worker processing
           return;
         }
 

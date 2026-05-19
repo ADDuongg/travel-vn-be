@@ -34,15 +34,15 @@ export class BlogPostQueryDto {
 
   @IsOptional()
   @IsString()
-  category?: string; // category slug
+  category?: string;
 
   @IsOptional()
   @IsString()
-  tag?: string; // tag slug
+  tag?: string;
 
   @IsOptional()
   @IsString()
-  province?: string; // province slug
+  province?: string;
 
   @IsOptional()
   @IsEnum(BlogPostSort)

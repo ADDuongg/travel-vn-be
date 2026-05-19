@@ -56,10 +56,7 @@ export class TourGuideAdminController {
   @RequirePermissions('tour_guide.update')
   @AuditLog(AuditResourceType.TOUR_GUIDE)
   @ApiCode('tour-guide.admin.update')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateTourGuideDto,
-  ) {
+  update(@Param('id') id: string, @Body() dto: UpdateTourGuideDto) {
     return this.tourGuideService.update(id, dto);
   }
 

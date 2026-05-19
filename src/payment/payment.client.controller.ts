@@ -1,5 +1,18 @@
-import { Body, Controller, Get, Headers, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -37,7 +50,12 @@ export class PaymentClientController {
   ) {
     const userId = req.user?.userId;
     if (!key) {
-      throw new DomainException('Idempotency-Key is required', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Idempotency-Key is required',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     return this.idempotencyService.execute(
@@ -66,7 +84,12 @@ export class PaymentClientController {
   ) {
     const userId = req.user?.userId;
     if (!key) {
-      throw new DomainException('Idempotency-Key is required', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Idempotency-Key is required',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     return this.idempotencyService.execute(

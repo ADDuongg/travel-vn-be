@@ -9,7 +9,10 @@ import { PermissionGuard } from 'src/guards/permission.guard';
 
 import { RbacService } from './rbac.service';
 import { RbacAdminController } from './rbac.admin.controller';
-import { RbacPermission, RbacPermissionSchema } from './schemas/rbac-permission.schema';
+import {
+  RbacPermission,
+  RbacPermissionSchema,
+} from './schemas/rbac-permission.schema';
 import {
   RbacRolePermission,
   RbacRolePermissionSchema,
@@ -27,9 +30,7 @@ import {
   ],
   controllers: [RbacAdminController],
   providers: [RbacService, AdminGuard, PermissionGuard],
-  /**
-   * Re-export UserModule so AdminGuard (UserService) resolves in feature modules (e.g. MediaModule).
-   */
+
   exports: [RbacService, AdminGuard, PermissionGuard, UserModule],
 })
 export class RbacModule {}

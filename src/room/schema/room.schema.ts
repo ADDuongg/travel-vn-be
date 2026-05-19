@@ -6,21 +6,18 @@ export type RoomDocument = Room & Document;
 
 @Schema({ timestamps: true, collection: 'rooms' })
 export class Room {
-  /* ================= CORE ================= */
-
   @Prop({ required: true, unique: true })
-  code: string; // STD_DELUXE
+  code: string;
 
   @Prop({ required: true, unique: true })
   slug: string;
 
   @Prop({ required: true })
-  roomType: string; // e.g., Master, Deluxe
+  roomType: string;
 
   @Prop({ default: true })
   isActive: boolean;
 
-  /* ================= CAPACITY ================= */
   @Prop({
     type: {
       baseAdults: { type: Number, required: true },
@@ -39,15 +36,12 @@ export class Room {
     roomSize?: number;
   };
 
-  /* ================= RELATION ================= */
   @Prop({
     type: Types.ObjectId,
     ref: Hotel.name,
     required: true,
   })
   hotelId: Types.ObjectId;
-
-  /* ================= PRICING ================= */
 
   @Prop({
     type: {
@@ -66,8 +60,6 @@ export class Room {
     extraAdultPrice?: number;
     extraChildPrice?: number;
   };
-
-  /* ================= MEDIA ================= */
 
   @Prop({
     type: {
@@ -96,8 +88,6 @@ export class Room {
     order?: number;
   }>;
 
-  /* ================= TRANSLATIONS ================= */
-
   @Prop({
     type: Object,
     required: true,
@@ -116,15 +106,11 @@ export class Room {
     };
   };
 
-  /* ================= AMENITIES ================= */
-
   @Prop({
     type: [{ type: Types.ObjectId, ref: 'Amenity' }],
     default: [],
   })
   amenities: Types.ObjectId[];
-
-  /* ================= BOOKING CONFIG ================= */
 
   @Prop({
     type: {
@@ -140,8 +126,6 @@ export class Room {
     allowInstantBooking: boolean;
   };
 
-  /* ================= INVENTORY ================= */
-
   @Prop({
     type: {
       totalRooms: { type: Number, required: true },
@@ -151,8 +135,6 @@ export class Room {
   inventory: {
     totalRooms: number;
   };
-
-  /* ================= SEO ================= */
 
   @Prop({
     type: {
@@ -165,8 +147,6 @@ export class Room {
     description?: string;
   };
 
-  /* ================= SALE / DISCOUNT ================= */
-
   @Prop({
     type: Object,
     default: {},
@@ -178,8 +158,6 @@ export class Room {
     startDate?: Date;
     endDate?: Date;
   };
-
-  /* ================= RATING ================= */
 
   @Prop({
     type: {

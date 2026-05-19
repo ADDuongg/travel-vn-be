@@ -1,7 +1,3 @@
-# Promtail config — STAGING.
-#
-# Backend chạy trong container `backend-staging`, do đó stdout JSON Pino
-# được Promtail parse và set label `level`, `app_service`, `app_environment`.
 
 server:
   http_listen_port: 9080

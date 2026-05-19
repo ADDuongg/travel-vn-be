@@ -117,10 +117,6 @@ export class LanguageService {
     );
   }
 
-  /**
-   * Case-insensitive lookup. Schema `uppercase: true` casts plain `{ code: 'en' }`
-   * queries to `EN`, which misses legacy lowercase documents in MongoDB.
-   */
   private findByCode(code: string): Promise<LanguageDocument | null> {
     const trimmed = code.trim();
     if (!trimmed) {
@@ -134,7 +130,6 @@ export class LanguageService {
       .exec();
   }
 
-  /** Chỉ gán field text/boolean — không ghi đè flag từ multipart (flagUrl rỗng từ FE). */
   private applyUpdateDto(lang: LanguageDocument, dto: UpdateLanguageDto) {
     if (dto.name !== undefined) {
       lang.name = dto.name;

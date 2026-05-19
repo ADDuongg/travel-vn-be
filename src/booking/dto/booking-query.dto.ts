@@ -1,4 +1,3 @@
-// bookings/dto/booking-query.dto.ts
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -24,7 +23,6 @@ export class SortDto {
 }
 
 export class BookingQueryDto {
-  /* pagination (0-based) */
   @Type(() => Number)
   @IsNumber()
   @Min(0)
@@ -37,12 +35,10 @@ export class BookingQueryDto {
   @IsOptional()
   pageSize = 10;
 
-  /* search */
   @IsString()
   @IsOptional()
   q?: string;
 
-  /* filters */
   @IsOptional()
   @IsIn(Object.values(BookingStatus))
   status?: BookingStatus;
@@ -55,7 +51,6 @@ export class BookingQueryDto {
   @IsIn(Object.values(BookingType))
   bookingType?: BookingType = BookingType.ROOM;
 
-  /* sorting */
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SortDto)

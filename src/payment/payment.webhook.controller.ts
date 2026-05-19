@@ -4,10 +4,6 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { PaymentService } from './payment.service';
 
-/**
- * Mounted at `/payments/*` — excluded from `api/v1` global prefix (see main.ts).
- * Webhook expects raw body; middleware applied in main.ts on `/payments/webhook/stripe`.
- */
 @ApiTags('Payments · Webhook')
 @Controller('payments')
 export class PaymentWebhookController {

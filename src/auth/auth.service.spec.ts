@@ -19,7 +19,6 @@ import { AuthAuditAction } from 'src/audit-log/enums/audit-log.enum';
 import { AuthUser } from 'src/user/interfaces/user-interface';
 import { OtpPurpose } from 'src/otp/otp.types';
 
-/* ────────── helpers ────────── */
 const userId = new Types.ObjectId('000000000000000000000001');
 
 const mockUser = {
@@ -40,7 +39,6 @@ const mockAuthUser: AuthUser = {
   isEmailVerified: true,
 };
 
-/* ────────── mocks ────────── */
 const mockRefreshTokenModel = {
   findOne: jest.fn(),
   create: jest.fn(),
@@ -172,9 +170,6 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
   });
 
-  /* ═══════════════════════════════════════════════
-     validateUser
-  ═══════════════════════════════════════════════ */
   describe('validateUser', () => {
     it('returns AuthUser when username and password are correct', async () => {
       mockUsersService.findOne.mockResolvedValue(mockUser);
@@ -199,11 +194,7 @@ describe('AuthService', () => {
     it('returns null when user does not exist', async () => {
       mockUsersService.findOne.mockResolvedValue(null);
 
-      const result = await service.validateUser(
-        'unknown',
-        'any',
-        undefined,
-      );
+      const result = await service.validateUser('unknown', 'any', undefined);
 
       expect(result).toBeNull();
     });
@@ -243,9 +234,6 @@ describe('AuthService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     register
-  ═══════════════════════════════════════════════ */
   describe('register', () => {
     const dto = {
       username: 'newuser',
@@ -300,7 +288,10 @@ describe('AuthService', () => {
         expect.any(Object),
       );
       expect(mockUsersService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ isEmailVerified: false, email: 'new@test.com' }),
+        expect.objectContaining({
+          isEmailVerified: false,
+          email: 'new@test.com',
+        }),
       );
     });
   });
@@ -390,9 +381,6 @@ describe('AuthService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     login
-  ═══════════════════════════════════════════════ */
   describe('login', () => {
     it('returns tokens and account info', async () => {
       mockJwtService.sign.mockReturnValue('mocked_token');
@@ -417,9 +405,6 @@ describe('AuthService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     refresh
-  ═══════════════════════════════════════════════ */
   describe('refresh', () => {
     const mockTokenRecord = {
       jti: 'some-jti',
@@ -506,9 +491,6 @@ describe('AuthService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     logout
-  ═══════════════════════════════════════════════ */
   describe('logout', () => {
     it('throws UnauthorizedException when token type is not refresh', async () => {
       mockJwtService.verify.mockReturnValue({
@@ -533,9 +515,7 @@ describe('AuthService', () => {
         isRevoked: true,
       });
 
-      await expect(service.logout('token')).rejects.toThrow(
-        DomainException,
-      );
+      await expect(service.logout('token')).rejects.toThrow(DomainException);
     });
 
     it('returns success message when logout succeeds', async () => {
@@ -560,9 +540,6 @@ describe('AuthService', () => {
     });
   });
 
-  /* ═══════════════════════════════════════════════
-     logoutAll
-  ═══════════════════════════════════════════════ */
   describe('logoutAll', () => {
     it('revokes all active tokens for the user and returns count', async () => {
       mockRefreshTokenModel.updateMany.mockResolvedValue({ modifiedCount: 3 });

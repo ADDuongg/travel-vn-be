@@ -1,12 +1,3 @@
-# Loki single-binary config — LOCAL.
-#
-# - Filesystem storage trong volume `loki_local_data`.
-# - Single tenant (auth_enabled=false) vì stack nội bộ Docker network.
-# - Retention 7d, đủ debug local.
-# - Không bật structured metadata (giữ tương thích Loki 2.9.x).
-#
-# Loki listens nội bộ tại :3100 trong Compose network.
-
 auth_enabled: false
 
 server:

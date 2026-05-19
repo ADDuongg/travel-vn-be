@@ -22,11 +22,6 @@ import { UpdateProvinceDto } from './dto/update-province.dto';
 export class ProvincesAdminController {
   constructor(private readonly provincesService: ProvincesService) {}
 
-  /**
-   * JSON only (no file upload). Use `POST /api/v1/admin/media/upload` first then
-   * pass the resulting `url` / `public_id` into `thumbnail`, `gallery`,
-   * `highlights[].thumbnail`.
-   */
   @Patch(':id')
   @RequirePermissions('province.update')
   @ApiCode('province.admin.update')

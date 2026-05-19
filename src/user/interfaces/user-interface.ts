@@ -8,10 +8,10 @@ export interface AuthUser {
     routers: string[];
     apis: string[];
   };
-  /** Flat `resource.action` keys for RBAC (JWT + admin guards). */
+
   rbacPermissions?: string[];
   isSuperAdmin?: boolean;
-  /** false = not verified; undefined = legacy (treated as verified in JWT). */
+
   isEmailVerified?: boolean;
 }
 

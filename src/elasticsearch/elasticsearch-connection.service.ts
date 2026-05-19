@@ -42,7 +42,6 @@ export class ElasticsearchConnectionService implements OnModuleInit {
 
     const apiKey = this.env.get('ELASTICSEARCH_API_KEY')?.trim();
 
-    /* optional */
     const username = this.env.get('ELASTICSEARCH_USERNAME')?.trim();
     const password = this.env.get('ELASTICSEARCH_PASSWORD') ?? '';
 
@@ -56,7 +55,7 @@ export class ElasticsearchConnectionService implements OnModuleInit {
       node,
       ...(auth ? { auth } : {}),
       tls: {
-        rejectUnauthorized: false, // dev only
+        rejectUnauthorized: false,
       },
       maxRetries: 3,
       requestTimeout: 60000,

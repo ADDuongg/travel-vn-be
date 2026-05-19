@@ -1,11 +1,3 @@
-/**
- * Bulk reindex all MongoDB tours into Elasticsearch (index from ELASTICSEARCH_TOURS_INDEX).
- * Requires ELASTICSEARCH_ENABLED=true, ELASTICSEARCH_URL, and DB_URI (same as the API).
- * Env: ConfigModule loads `.env` from process.cwd(); Docker injects vars without a file.
- *
- * Production image: `yarn search:reindex-tours` → `node dist/scripts/reindex-tours-es.js`
- * Local TS source: `yarn search:reindex-tours:dev`
- */
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from '../src/app.module';

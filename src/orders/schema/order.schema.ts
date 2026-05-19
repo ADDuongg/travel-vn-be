@@ -1,4 +1,3 @@
-// order.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 export type OrderDocument = Order & Document;

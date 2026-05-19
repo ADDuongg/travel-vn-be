@@ -32,7 +32,6 @@ export class NotificationQueryDto {
   @IsBoolean()
   isRead?: boolean;
 
-  /** Lọc theo loại (GUIDE_VERIFIED, GUIDE_REGISTRATION_PENDING, ...) */
   @IsOptional()
   @IsEnum(NotificationType)
   type?: NotificationType;

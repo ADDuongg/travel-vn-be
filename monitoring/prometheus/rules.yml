@@ -31,7 +31,6 @@ groups:
           description: >-
             Counter `es_sync_failed_total` tăng — xem BullMQ/logs và Prometheus series theo label `operation`.
 
-      # Process CPU của Node Nest (second/second có thể vượt 1 core = >1 — chỉnh theo SLA)
       - alert: NestProcessCpuHigh
         expr: rate(process_cpu_seconds_total{job="nestjs-api"}[5m]) > 0.85
         for: 10m

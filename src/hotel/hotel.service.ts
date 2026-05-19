@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
@@ -30,14 +34,15 @@ export class HotelService {
     private readonly favoriteService: FavoriteService,
   ) {}
 
-  /**
-   * Create a new hotel.
-   * Validates provinceId exists before creating.
-   */
   async create(dto: CreateHotelDto): Promise<Hotel> {
     const existed = await this.hotelModel.findOne({ slug: dto.slug });
     if (existed) {
-      throw new DomainException('Hotel slug already exists', 409, 'CONFLICT', 'hotel.conflict');
+      throw new DomainException(
+        'Hotel slug already exists',
+        409,
+        'CONFLICT',
+        'hotel.conflict',
+      );
     }
 
     const provinces = await this.provincesService.findAllForDropdown();
@@ -45,7 +50,12 @@ export class HotelService {
       (p: { _id: unknown }) => String(p._id) === dto.provinceId,
     );
     if (!provinceExists) {
-      throw new DomainException('Province not found', 400, 'BAD_REQUEST', 'hotel.bad_request');
+      throw new DomainException(
+        'Province not found',
+        400,
+        'BAD_REQUEST',
+        'hotel.bad_request',
+      );
     }
 
     const gallery = this.normalizeGallery(dto.gallery);
@@ -66,9 +76,6 @@ export class HotelService {
     });
   }
 
-  /**
-   * Get hotel IDs in a province (for room filtering).
-   */
   async findIdsByProvinceId(provinceId: string): Promise<string[]> {
     const hotels = await this.hotelModel
       .find({
@@ -80,9 +87,6 @@ export class HotelService {
     return hotels.map((h) => (h._id as Types.ObjectId).toString());
   }
 
-  /**
-   * Find all active hotels (same document shape as findById: full schema + populated province & amenities).
-   */
   async findAllActive(query: HotelQueryDto = {}, userId?: string) {
     const { provinceId, page = 1, limit = 12 } = query;
     const filter: Record<string, unknown> = { isActive: true };
@@ -142,9 +146,6 @@ export class HotelService {
     return result.items;
   }
 
-  /**
-   * Find hotel by ID.
-   */
   async findById(
     id: string,
     userId?: string,
@@ -166,19 +167,25 @@ export class HotelService {
     return { ...obj, isFavorited: isFavorited.isFavorited };
   }
 
-  /**
-   * Update hotel by ID.
-   */
   async update(id: string, dto: UpdateHotelDto): Promise<Hotel> {
     const hotel = await this.hotelModel.findById(id);
     if (!hotel) {
-      throw new NotFoundDomainException('Hotel not found', 'NOT_FOUND', 'hotel.not_found');
+      throw new NotFoundDomainException(
+        'Hotel not found',
+        'NOT_FOUND',
+        'hotel.not_found',
+      );
     }
 
     if (dto.slug !== undefined && dto.slug !== hotel.slug) {
       const existed = await this.hotelModel.findOne({ slug: dto.slug });
       if (existed) {
-        throw new DomainException('Hotel slug already exists', 409, 'CONFLICT', 'hotel.conflict');
+        throw new DomainException(
+          'Hotel slug already exists',
+          409,
+          'CONFLICT',
+          'hotel.conflict',
+        );
       }
       hotel.slug = dto.slug;
     }
@@ -189,7 +196,12 @@ export class HotelService {
         (p: { _id: unknown }) => String(p._id) === dto.provinceId,
       );
       if (!provinceExists) {
-        throw new DomainException('Province not found', 400, 'BAD_REQUEST', 'hotel.bad_request');
+        throw new DomainException(
+          'Province not found',
+          400,
+          'BAD_REQUEST',
+          'hotel.bad_request',
+        );
       }
       hotel.provinceId = new Types.ObjectId(dto.provinceId);
     }
@@ -254,7 +266,11 @@ export class HotelService {
   async remove(id: string): Promise<boolean> {
     const hotel = await this.hotelModel.findById(id);
     if (!hotel) {
-      throw new NotFoundDomainException('Hotel not found', 'NOT_FOUND', 'hotel.not_found');
+      throw new NotFoundDomainException(
+        'Hotel not found',
+        'NOT_FOUND',
+        'hotel.not_found',
+      );
     }
 
     await this.cleanupOrphanMedia({
@@ -267,8 +283,6 @@ export class HotelService {
     await hotel.deleteOne();
     return true;
   }
-
-  /* ===== Media helpers (JSON-only pattern) ===== */
 
   private pickThumbnail(input: ThumbnailRefDto): StoredThumbnail {
     return {

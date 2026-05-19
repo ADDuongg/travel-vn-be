@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Model, Types } from 'mongoose';
 import {
@@ -26,10 +30,6 @@ export class RoomInventoryService {
     private readonly roomModel: Model<RoomDocument>,
   ) {}
 
-  /* ======================================================
-     CREATE / ENSURE
-     ====================================================== */
-
   async ensureInventoryExists(
     roomId: Types.ObjectId,
     from: Date,
@@ -50,7 +50,13 @@ export class RoomInventoryService {
     const existingDates = new Set(existing.map((i) => i.date.getTime()));
 
     const room = await this.roomModel.findById(roomId).session(session ?? null);
-    if (!room) throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+    if (!room)
+      throw new DomainException(
+        'Room not found',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
 
     const toCreate = nights
       .filter((d) => !existingDates.has(d.getTime()))
@@ -63,7 +69,6 @@ export class RoomInventoryService {
 
     if (toCreate.length === 0) return;
 
-    // Upserts avoid E11000 duplicate key under concurrent transactions (insertMany would abort txn → 500).
     await this.RoomInventoryModel.bulkWrite(
       toCreate.map((doc) => ({
         updateOne: {
@@ -80,10 +85,6 @@ export class RoomInventoryService {
       session ? { session } : {},
     );
   }
-
-  /* ======================================================
-     READ / CHECK
-     ====================================================== */
 
   async getInventoryByRange(
     roomId: Types.ObjectId,
@@ -125,9 +126,6 @@ export class RoomInventoryService {
     return inventories.length === nights.length;
   }
 
-  /**
-   * Get room IDs that have at least 1 room available for every night in [from, to).
-   */
   async getRoomIdsWithAvailability(
     from: Date,
     to: Date,
@@ -147,32 +145,46 @@ export class RoomInventoryService {
     return result.map((r) => r._id);
   }
 
-  /* ======================================================
-     BOOK / CANCEL
-     ====================================================== */
-
-  /* ======================================================
-     ADMIN
-     ====================================================== */
-
   async updateInventoryTotal(
     inventoryId: Types.ObjectId,
     newTotal: number,
   ): Promise<RoomInventoryDocument> {
     const inventory = await this.RoomInventoryModel.findById(inventoryId);
-    if (!inventory) throw new DomainException('Inventory not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+    if (!inventory)
+      throw new DomainException(
+        'Inventory not found',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
 
     const room = await this.roomModel.findById(inventory.roomId);
-    if (!room) throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+    if (!room)
+      throw new DomainException(
+        'Room not found',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
 
     if (newTotal > room.inventory.totalRooms) {
-      throw new DomainException('Total exceeds Room.totalRooms', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'Total exceeds Room.totalRooms',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     const booked = inventory.total - inventory.available;
 
     if (newTotal < booked) {
-      throw new DomainException('New total less than booked rooms', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'New total less than booked rooms',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     inventory.total = newTotal;
@@ -187,7 +199,12 @@ export class RoomInventoryService {
 
     const booked = inventory.total - inventory.available;
     if (booked > 0) {
-      throw new DomainException('Cannot delete inventory with bookings', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'Cannot delete inventory with bookings',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     await inventory.deleteOne();
@@ -205,23 +222,25 @@ export class RoomInventoryService {
       return 0;
     }
 
-    // Lấy inventory đã tồn tại trong range
     const inventories = await this.RoomInventoryModel.find({
       roomId,
       date: { $in: nights },
     });
 
-    // Nếu CHƯA có inventory nào → room mới
     if (inventories.length === 0) {
       const room = await this.roomModel.findById(roomId);
       if (!room) {
-        throw new DomainException('Room not found', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+        throw new DomainException(
+          'Room not found',
+          400,
+          'BAD_REQUEST',
+          'room.inventory.bad_request',
+        );
       }
 
       return room.inventory.totalRooms;
     }
 
-    // Nếu CÓ inventory → lấy min available
     const minAvailable = Math.min(...inventories.map((inv) => inv.available));
 
     return Math.max(0, minAvailable);
@@ -250,7 +269,12 @@ export class RoomInventoryService {
       );
 
       if (res.modifiedCount === 0) {
-        throw new DomainException('Not enough availability', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+        throw new DomainException(
+          'Not enough availability',
+          400,
+          'BAD_REQUEST',
+          'room.inventory.bad_request',
+        );
       }
     }
   }
@@ -277,7 +301,6 @@ export class RoomInventoryService {
   }
 
   async countFutureInventories(roomId: string) {
-    // Compare against today (Vietnam) at UTC midnight to avoid timezone drift
     const todayVNString = todayInVietnam();
     const todayVN = parseDateOnly(todayVNString);
     return this.RoomInventoryModel.countDocuments({

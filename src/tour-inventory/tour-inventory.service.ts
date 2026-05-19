@@ -43,10 +43,6 @@ export class TourInventoryService {
     }
   }
 
-  /**
-   * Lấy danh sách availability theo tháng (YYYY-MM)
-   * GET /api/v1/public/tour-inventory/tours/:tourId/availability?month=2025-03
-   */
   async getAvailabilityByMonth(
     tourId: string,
     month: string,
@@ -61,7 +57,12 @@ export class TourInventoryService {
     }>
   > {
     if (!Types.ObjectId.isValid(tourId)) {
-      throw new DomainException('Invalid tour ID', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        'Invalid tour ID',
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     const [year, monthNum] = month.split('-').map(Number);
@@ -99,9 +100,6 @@ export class TourInventoryService {
     }));
   }
 
-  /**
-   * Block (giảm) số chỗ khi có booking
-   */
   async blockSlots(
     dto: BlockSlotsDto,
     session?: ClientSession,
@@ -117,15 +115,29 @@ export class TourInventoryService {
       .session(session ?? null);
 
     if (!inv) {
-      throw new NotFoundDomainException('Tour inventory not found for this tour and departure date', 'NOT_FOUND', 'tour.inventory.not_found');
+      throw new NotFoundDomainException(
+        'Tour inventory not found for this tour and departure date',
+        'NOT_FOUND',
+        'tour.inventory.not_found',
+      );
     }
 
     if (inv.status === TourInventoryStatus.CANCELLED) {
-      throw new DomainException('This departure is cancelled', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        'This departure is cancelled',
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     if (inv.availableSlots < dto.slots) {
-      throw new DomainException(`Not enough slots. Available: ${inv.availableSlots}, requested: ${dto.slots}`, 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        `Not enough slots. Available: ${inv.availableSlots}, requested: ${dto.slots}`,
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     const prevStatus = inv.status;
@@ -166,9 +178,6 @@ export class TourInventoryService {
     return inv.save(session ? { session } : undefined);
   }
 
-  /**
-   * Release (trả lại) số chỗ khi cancel booking
-   */
   async releaseSlots(
     dto: ReleaseSlotsDto,
     session?: ClientSession,
@@ -184,7 +193,11 @@ export class TourInventoryService {
       .session(session ?? null);
 
     if (!inv) {
-      throw new NotFoundDomainException('Tour inventory not found for this tour and departure date', 'NOT_FOUND', 'tour.inventory.not_found');
+      throw new NotFoundDomainException(
+        'Tour inventory not found for this tour and departure date',
+        'NOT_FOUND',
+        'tour.inventory.not_found',
+      );
     }
 
     const prevStatus = inv.status;
@@ -231,9 +244,6 @@ export class TourInventoryService {
     return inv.save(session ? { session } : undefined);
   }
 
-  /**
-   * Đảm bảo có bản ghi inventory cho tour + ngày khởi hành (Admin tạo slot)
-   */
   async ensureInventory(
     tourId: string,
     departureDate: string,
@@ -241,22 +251,41 @@ export class TourInventoryService {
     specialPrice?: number,
   ): Promise<TourInventoryDocument> {
     if (!Types.ObjectId.isValid(tourId)) {
-      throw new DomainException('Invalid tour ID', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        'Invalid tour ID',
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     const tour = await this.tourModel.findById(tourId);
     if (!tour) {
-      throw new NotFoundDomainException('Tour not found', 'NOT_FOUND', 'tour.inventory.not_found');
+      throw new NotFoundDomainException(
+        'Tour not found',
+        'NOT_FOUND',
+        'tour.inventory.not_found',
+      );
     }
 
     const date = parseDateOnly(departureDate);
     if (date.getTime() < Date.now()) {
-      throw new DomainException('Departure date must be in the future', 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        'Departure date must be in the future',
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     const maxGuests = tour.capacity?.maxGuests ?? 100;
     if (totalSlots < 1 || totalSlots > maxGuests) {
-      throw new DomainException(`totalSlots must be between 1 and ${maxGuests}`, 400, 'BAD_REQUEST', 'tour.inventory.bad_request');
+      throw new DomainException(
+        `totalSlots must be between 1 and ${maxGuests}`,
+        400,
+        'BAD_REQUEST',
+        'tour.inventory.bad_request',
+      );
     }
 
     let inv = await this.inventoryModel.findOne({
@@ -267,7 +296,8 @@ export class TourInventoryService {
     if (inv) {
       const booked = inv.totalSlots - inv.availableSlots;
       if (totalSlots < booked) {
-        throw new DomainException(`Cannot set totalSlots below already booked (${booked}, 400, 'BAD_REQUEST', 'tour.inventory.bad_request')`,
+        throw new DomainException(
+          `Cannot set totalSlots below already booked (${booked}, 400, 'BAD_REQUEST', 'tour.inventory.bad_request')`,
         );
       }
       inv.totalSlots = totalSlots;
@@ -289,9 +319,6 @@ export class TourInventoryService {
     return inv;
   }
 
-  /**
-   * Lấy 1 inventory theo tour + ngày (dùng trong TourBookingService)
-   */
   async getByTourAndDate(
     tourId: Types.ObjectId,
     departureDate: Date,
@@ -304,9 +331,6 @@ export class TourInventoryService {
     });
   }
 
-  /**
-   * Kiểm tra còn đủ chỗ không
-   */
   async canBook(
     tourId: Types.ObjectId,
     departureDate: Date,

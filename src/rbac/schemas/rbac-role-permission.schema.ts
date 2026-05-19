@@ -25,8 +25,10 @@ export class RbacRolePermission {
   permissionId: Types.ObjectId;
 }
 
-export const RbacRolePermissionSchema = SchemaFactory.createForClass(
-  RbacRolePermission,
-);
+export const RbacRolePermissionSchema =
+  SchemaFactory.createForClass(RbacRolePermission);
 
-RbacRolePermissionSchema.index({ roleId: 1, permissionId: 1 }, { unique: true });
+RbacRolePermissionSchema.index(
+  { roleId: 1, permissionId: 1 },
+  { unique: true },
+);

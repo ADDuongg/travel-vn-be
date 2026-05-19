@@ -56,10 +56,6 @@ export class AttemptLimiterService {
     return this.toStatus(false, 0, count, opts.maxAttempts);
   }
 
-  /**
-   * Records a failed attempt. If already locked, does not increment the counter.
-   * When count reaches `maxAttempts`, sets a lock key with `lockoutSec` TTL.
-   */
   async hit(opts: AttemptLimiterOptions): Promise<AttemptLimiterStatus> {
     const lk = this.lockKey(opts);
     const ck = this.countKey(opts);

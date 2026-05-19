@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { withI18nSuccess } from 'src/common/i18n/success-envelope';
 import { UserI18nKeys } from './user.i18n-keys';
 import * as bcrypt from 'bcryptjs';
@@ -23,9 +26,6 @@ export class UserService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  /**
-   * Enforces `/api/v1/admin/*` access — active portal staff (`super_admin`…`viewer` or `User.isSuperAdmin`).
-   */
   async assertAdminPortalAccess(userId: string): Promise<void> {
     const u = await this.userRepository.findByIdForAdminAccess(userId);
 
@@ -202,22 +202,18 @@ export class UserService {
     return this.userRepository.resetPasswordHashed(id, hashedPassword);
   }
 
-  /** Thêm role vào user (dùng cho TourGuide register). */
   async addRole(userId: string, role: string): Promise<void> {
     await this.userRepository.addRoleIfMissing(userId, role);
   }
 
-  /** Bỏ role khỏi user (dùng cho TourGuide soft delete). */
   async removeRole(userId: string, role: string): Promise<void> {
     await this.userRepository.removeRole(userId, role);
   }
 
-  /** Lấy thông tin cơ bản của user (cho notification). */
   async findBasicInfo(userId: string) {
     return this.userRepository.findBasicInfo(userId);
   }
 
-  /** Tìm _id của users có fullName khớp search (cho TourGuide search). */
   async findIdsByFullNameSearch(search: string): Promise<Types.ObjectId[]> {
     return this.userRepository.findIdsByFullNameSearch(search);
   }

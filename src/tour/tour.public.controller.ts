@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { TourService } from './tour.service';
 import { TourQueryDto } from './dto/tour-query.dto';
@@ -18,7 +11,10 @@ export class TourPublicController {
 
   @Get()
   @UseGuards(JwtOptionalAuthGuard)
-  findAll(@Query() query: TourQueryDto, @Req() req: { user?: { userId: string } }) {
+  findAll(
+    @Query() query: TourQueryDto,
+    @Req() req: { user?: { userId: string } },
+  ) {
     return this.tourService.findAll(query, req.user?.userId);
   }
 
@@ -38,7 +34,10 @@ export class TourPublicController {
 
   @Get('slug/:slug')
   @UseGuards(JwtOptionalAuthGuard)
-  findBySlug(@Param('slug') slug: string, @Req() req: { user?: { userId: string } }) {
+  findBySlug(
+    @Param('slug') slug: string,
+    @Req() req: { user?: { userId: string } },
+  ) {
     return this.tourService.findBySlug(slug, req.user?.userId);
   }
 

@@ -1,6 +1,3 @@
-/**
- * URL-safe slug from arbitrary text (supports Vietnamese diacritics).
- */
 export function toSlug(input: string): string {
   if (typeof input !== 'string' || !input.trim()) {
     return 'item';
@@ -17,9 +14,6 @@ export function toSlug(input: string): string {
   );
 }
 
-/**
- * If base slug is taken, appends -2, -3, ... until `isTaken` returns false.
- */
 export async function withUniqueSuffix(
   base: string,
   isTaken: (slug: string) => Promise<boolean>,

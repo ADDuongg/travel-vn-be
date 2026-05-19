@@ -34,5 +34,5 @@ export class BlogTagQueryDto {
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
-  includeDeleted?: boolean; // admin only, ignored for public
+  includeDeleted?: boolean;
 }

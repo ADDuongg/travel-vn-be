@@ -14,7 +14,6 @@ import {
 } from './schema/tour-booking.schema';
 import { TourBookingService } from './tour-booking.service';
 
-/** Delay để tránh chạy trước webhook (chỉ reconcile payment đã tạo > 2 phút). */
 const SAFE_BEFORE_MS = 2 * 60 * 1000;
 
 @Injectable()
@@ -29,10 +28,6 @@ export class TourBookingReconcileService {
     private readonly tourBookingService: TourBookingService,
   ) {}
 
-  /**
-   * Reconcile: payment SUCCEEDED nhưng tour booking chưa được cập nhật PAID.
-   * Gọi markAsPaid để đồng bộ lại.
-   */
   @Cron(CronExpression.EVERY_10_MINUTES)
   async reconcilePaidTourBookings() {
     const safeBefore = new Date(Date.now() - SAFE_BEFORE_MS);

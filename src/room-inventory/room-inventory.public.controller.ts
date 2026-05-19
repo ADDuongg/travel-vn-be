@@ -1,5 +1,9 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { RoomInventoryService } from './room-inventory.service';
@@ -17,7 +21,12 @@ export class RoomInventoryPublicController {
     @Query('to') to: string,
   ) {
     if (!from || !to) {
-      throw new DomainException('from and to are required', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'from and to are required',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     let fromDate: Date;
@@ -27,7 +36,12 @@ export class RoomInventoryPublicController {
       fromDate = parseDateOnly(from);
       toDate = parseDateOnly(to);
     } catch {
-      throw new DomainException('Invalid date', 400, 'BAD_REQUEST', 'room.inventory.bad_request');
+      throw new DomainException(
+        'Invalid date',
+        400,
+        'BAD_REQUEST',
+        'room.inventory.bad_request',
+      );
     }
 
     const maxRooms = await this.inventoryService.getMaxRoomsCanBook(

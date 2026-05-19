@@ -1,64 +1,17 @@
-# =============================================================================
-# GITLAB CI/CD PIPELINE -- NestJS API Backend
-# =============================================================================
-#
-# Pipeline nay tu dong: lint, test, build Docker image, deploy len VPS.
-#
-# 4 STAGES:
-#   1. validate  -- Lint code (chay tren MOI branch)
-#   2. test      -- Unit tests (chay tren MOI branch)
-#   3. build     -- Build Docker image + push len GitLab Container Registry
-#                   (chi branch staging hoac production)
-#   4. deploy    -- Pull image moi, restart container tren VPS
-#                   (chi branch staging hoac production)
-#
-# BRANCH STRATEGY:
-#   - Branch "staging"    → build + deploy len staging  (127.0.0.1:3001 → container :9001)
-#   - Branch "production" → build + deploy len production (127.0.0.1:3002 → container :9001)
-#   - Cac branch khac     → chi chay validate + test (khong deploy)
-#
-# KHAC BIET VOI FE:
-#   - Khong can --build-arg (env vars la runtime, truyen qua docker-compose env_file)
-#   - Health check goi API endpoint thay vi static file
-#   - NestJS can nhieu thoi gian khoi dong hon nginx (sleep 15s)
-#
-# GITLAB CI VARIABLES (Settings > CI/CD > Variables):
-#   - CI_REGISTRY, CI_REGISTRY_USER, CI_REGISTRY_PASSWORD, CI_REGISTRY_IMAGE (GitLab tu cung cap)
-#   - Image day du: $CI_REGISTRY_IMAGE:staging | $CI_REGISTRY_IMAGE:production (+ tag theo SHA)
-#   - App secrets: .env tren VPS (gom CI_REGISTRY_IMAGE + IMAGE_TAG cho docker compose)
-#
-# =============================================================================
-
-# ---------------------------------------------------------------------------
-# STAGES -- Dinh nghia thu tu chay cua pipeline
-# ---------------------------------------------------------------------------
 stages:
   # - validate
   # - test
   - build
   - deploy
 
-# ---------------------------------------------------------------------------
-# GLOBAL VARIABLES
-# ---------------------------------------------------------------------------
 variables:
   NODE_IMAGE: node:20-alpine
   DOCKER_TLS_CERTDIR: '/certs'
-  # BuildKit: layer cache + yarn cache mount in Dockerfile (no host yarn install)
   DOCKER_BUILDKIT: '1'
 
 default:
   interruptible: true
 
-# ===========================================================================
-# STAGE 1: VALIDATE -- Lint code
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Job: lint
-# ---------------------------------------------------------------------------
-# Chay ESLint de kiem tra code style, best practices, potential bugs.
-# Chay tren MOI branch (khong gioi han).
 # lint:
 #   stage: validate
 #   image: $NODE_IMAGE
@@ -77,14 +30,6 @@ default:
 #   tags:
 #     - travel-staging
 
-# ===========================================================================
-# STAGE 2: TEST -- Unit tests
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Job: test
-# ---------------------------------------------------------------------------
-# Chay Jest unit tests voi coverage report.
 # test:
 #   stage: test
 #   image: $NODE_IMAGE
@@ -102,13 +47,6 @@ default:
 #   tags:
 #     - travel-staging
 
-# ===========================================================================
-# STAGE 3: BUILD -- Docker build + push to registry
-# ===========================================================================
-#
-# Yarn cache: chi trong Dockerfile (YARN_CACHE_FOLDER + BuildKit cache mount).
-# Khong dung GitLab cache .yarn-cache/ tren runner — job build khong chay yarn tren host.
-#
 .docker_build:
   stage: build
   image: docker:27
@@ -129,12 +67,6 @@ default:
       -t "$IMAGE_SHA"
       .
 
-# ---------------------------------------------------------------------------
-# Job: build:staging
-# ---------------------------------------------------------------------------
-# Build Docker image cho STAGING environment.
-# Chi chay khi push/merge vao branch "staging".
-# APP_VERSION = git short SHA (structured logs / Loki). Local build: omit arg → package.json version.
 build:staging:
   extends: .docker_build
   variables:
@@ -160,11 +92,6 @@ build:staging:
   tags:
     - travel-staging
 
-# ---------------------------------------------------------------------------
-# Job: build:production
-# ---------------------------------------------------------------------------
-# Build Docker image cho PRODUCTION environment.
-# Chi chay khi push/merge vao branch "production".
 build:production:
   extends: .docker_build
   variables:
@@ -190,28 +117,9 @@ build:production:
   tags:
     - travel-production
 
-# ===========================================================================
-# STAGE 4: DEPLOY -- Pull image moi, restart container tren VPS
-# ===========================================================================
-# Runner la shell executor chay truc tiep tren VPS (giong FE).
-# Flow:
-#   1. cd vao thu muc deploy tren VPS
-#   2. Login vao GitLab Registry
-#   3. Set IMAGE_TAG
-#   4. Pull image moi
-#   5. Restart container (force-recreate de dung image moi)
-#   6. Retry curl GET /health (Swagger /api chi khi NODE_ENV != production)
-# ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Job: deploy:staging
-# ---------------------------------------------------------------------------
-# Deploy image staging len VPS (127.0.0.1:3001 -> container :9001).
-# Domain: staging.travel-vn.site/api (Host Nginx proxy vao 127.0.0.1:3001)
 deploy:staging:
   stage: deploy
   script:
-    # Keep compose in sync with repo (VPS path is not the Git checkout)
     - cp "$CI_PROJECT_DIR/docker-compose.staging.yml" /opt/travel-be/staging/docker-compose.staging.yml
     - cd /opt/travel-be/staging
     - echo "Login registry..."
@@ -227,7 +135,6 @@ deploy:staging:
     - docker compose -f docker-compose.staging.yml up -d mongo redis
     - docker compose -f docker-compose.staging.yml up -d --no-deps --force-recreate backend-staging
 
-    # Nest + BullMQ + Mongo can exceed 3 min on a small VPS — allow up to ~6 min
     - |
       for _ in $(seq 1 180); do
         if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:3001/health >/dev/null 2>&1; then
@@ -257,10 +164,6 @@ deploy:staging:
   tags:
     - travel-staging
 
-# ---------------------------------------------------------------------------
-# Job: deploy:production
-# ---------------------------------------------------------------------------
-# Deploy image production len VPS (127.0.0.1:3002 -> container :9001).
 deploy:production:
   stage: deploy
   script:

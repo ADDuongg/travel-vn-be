@@ -1,4 +1,3 @@
-// zod-validation.pipe.ts
 import { ArgumentMetadata, Injectable, PipeTransform } from '@nestjs/common';
 import { DomainException } from 'src/common/exceptions';
 import { ZodSchema } from 'zod';

@@ -70,7 +70,6 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
 
 @Module({
   imports: [
-    // Load .env + validate before Redis/JWT/Bull so EnvService reads real values (not Docker-only defaults).
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -103,7 +102,7 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
           host: env.get('REDIS_HOST', 'localhost'),
           port: env.get('REDIS_PORT', 6379),
           password: env.get('REDIS_PASSWORD') || undefined,
-          // Required for BullMQ + ioredis (see BullMQ connection docs)
+
           maxRetriesPerRequest: null,
         },
       }),
@@ -118,8 +117,7 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
         const isProduction = env.isProduction();
         const logLevel =
           env.get('LOG_LEVEL') || (isProduction ? 'info' : 'debug');
-        // pino-pretty is devDependency — only use for local NODE_ENV=development.
-        // Docker/production images must not load it (would crash: "unable to determine transport target").
+
         const usePinoPretty = env.get('NODE_ENV') === 'development';
         const mixin = (): Record<string, unknown> => {
           const store = correlationContext.getStore();
@@ -135,7 +133,6 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
 
         return {
           pinoHttp: {
-            // Completion + duration are logged by HttpDurationObservabilityInterceptor (route pattern + durationMs).
             autoLogging: false,
             level: logLevel,
             base: {
@@ -155,7 +152,7 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
               'req.headers.cookie',
               'req.headers["x-api-key"]',
             ],
-            // Trim log payload: chỉ giữ fields cần thiết, bỏ security headers của helmet
+
             serializers: {
               req(req: any) {
                 return {
@@ -268,12 +265,12 @@ import { EmailVerifiedGuard } from './guards/email-verified.guard';
     EmailVerifiedGuard,
     ...httpMetricsProviders,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    /** Outermost: wall-clock HTTP duration + Prometheus histogram on response finish. */
+
     {
       provide: APP_INTERCEPTOR,
       useClass: HttpDurationObservabilityInterceptor,
     },
-    /** Runs after JWT guard on protected routes — fills ALS fields for Pino mixin. */
+
     { provide: APP_INTERCEPTOR, useClass: AuthContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: ResponseTransformInterceptor },
   ],

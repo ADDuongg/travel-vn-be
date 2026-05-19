@@ -13,16 +13,12 @@ export type TocItem = {
   level: number;
 };
 
-/** Words per minute for reading time — Vietnamese slightly slower. */
 const WPM: Record<string, number> = {
   vi: 200,
   en: 250,
   default: 220,
 };
 
-/**
- * Coerce any value into Editor.js blocks (best-effort).
- */
 export function normalizeEditorBlocks(raw: unknown): EditorJsBlock[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
@@ -49,9 +45,6 @@ export function normalizeEditorBlocks(raw: unknown): EditorJsBlock[] {
   return [];
 }
 
-/**
- * Extract plain text from a single block for length / reading time.
- */
 function blockToPlainText(block: EditorJsBlock): string {
   const d = block.data || {};
   switch (block.type) {
@@ -103,9 +96,6 @@ export function countWordsInBlocks(blocks: EditorJsBlock[]): number {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
-/**
- * Returns estimated reading time in minutes (minimum 1 if there is any content).
- */
 export function readingTimeMinutesFromBlocks(
   blocks: EditorJsBlock[],
   lang: string,
@@ -116,9 +106,6 @@ export function readingTimeMinutesFromBlocks(
   return Math.max(1, Math.round(wordCount / wpm) || 1);
 }
 
-/**
- * Build TOC from header blocks.
- */
 export function buildTableOfContents(blocks: EditorJsBlock[]): TocItem[] {
   const out: TocItem[] = [];
   for (const b of blocks) {
@@ -133,9 +120,6 @@ export function buildTableOfContents(blocks: EditorJsBlock[]): TocItem[] {
   return out;
 }
 
-/**
- * Enrich all translation blocks with readingTime and tableOfContents.
- */
 export function enrichTranslationBlocks(
   translations: Record<
     string,
@@ -173,9 +157,6 @@ export function pickTitleForSlug(
   return 'post';
 }
 
-/**
- * Generate unique slug for blog post (and categories/tags reuse `withUniqueSuffix` + `toSlug` alone).
- */
 export async function uniqueBlogPostSlug(
   baseTitle: string,
 

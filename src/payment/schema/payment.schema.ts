@@ -1,4 +1,3 @@
-// payment.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
@@ -21,12 +20,11 @@ export enum PaymentStatus {
 })
 export class Payment {
   @Prop({ required: true })
-  provider: string; // STRIPE
+  provider: string;
 
   @Prop({ required: true, unique: true })
   intentId: string;
 
-  /** Id tham chiếu từ provider (Stripe intentId, etc.). Index unique + partial ở cuối schema. */
   @Prop()
   providerRef?: string;
 

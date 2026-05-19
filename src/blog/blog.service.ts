@@ -260,7 +260,6 @@ export class BlogService {
     const activeLangs = await this.getActiveLangCodes();
     for (const lang of Object.keys(translations)) {
       if (!activeLangs.includes(lang)) {
-        // still allow: admin may add future lang; only warn? Allow all keys for flexibility.
       }
     }
 
@@ -419,7 +418,11 @@ export class BlogService {
 
   async findBySlugPublic(slug: string) {
     if (RESERVED_SLUGS.has(slug)) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const post = await this.blogPostModel
       .findOneAndUpdate(
@@ -433,7 +436,12 @@ export class BlogService {
       )
       .populate(this.populate())
       .lean();
-    if (!post) throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+    if (!post)
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     return post;
   }
 
@@ -446,7 +454,11 @@ export class BlogService {
       })
       .lean();
     if (!current) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const or: FilterQuery<BlogPostDocument>[] = [];
     if (current.category) {
@@ -525,7 +537,12 @@ export class BlogService {
       .findOne({ _id: id, isDeleted: { $ne: true } })
       .populate(this.populate())
       .lean();
-    if (!post) throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+    if (!post)
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     return post;
   }
 
@@ -535,7 +552,11 @@ export class BlogService {
     }
     const post = await this.blogPostModel.findById(id);
     if (!post || post.isDeleted) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const prevSnap = this.toSnapshot(post);
 
@@ -659,7 +680,11 @@ export class BlogService {
     }
     const post = await this.blogPostModel.findById(id);
     if (!post || post.isDeleted) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const prev = this.toSnapshot(post);
     post.status = BLOG_POST_STATUS.PUBLISHED;
@@ -675,7 +700,11 @@ export class BlogService {
     }
     const post = await this.blogPostModel.findById(id);
     if (!post || post.isDeleted) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const prev = this.toSnapshot(post);
     post.status = BLOG_POST_STATUS.DRAFT;
@@ -690,7 +719,11 @@ export class BlogService {
     }
     const post = await this.blogPostModel.findById(id);
     if (!post || post.isDeleted) {
-      throw new NotFoundDomainException('Blog post not found', 'BLOG_NOT_FOUND', 'blog.not_found');
+      throw new NotFoundDomainException(
+        'Blog post not found',
+        'BLOG_NOT_FOUND',
+        'blog.not_found',
+      );
     }
     const prev = this.toSnapshot(post);
     post.isDeleted = true;

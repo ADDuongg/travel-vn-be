@@ -5,7 +5,6 @@ export type TourGuideDocument = TourGuide & Document;
 
 @Schema({ collection: 'tour_guides', timestamps: true })
 export class TourGuide {
-  // === Link to User (1-1) ===
   @Prop({
     type: Types.ObjectId,
     ref: 'User',
@@ -14,18 +13,16 @@ export class TourGuide {
   })
   userId: Types.ObjectId;
 
-  // === Multi-language (bio + chuyên môn) — giống Room ===
   @Prop({ type: Object, default: {} })
   translations: {
     [langCode: string]: {
       bio?: string;
       shortBio?: string;
       specialties?: string;
-      specialtyItems?: string[]; // mảng chuỗi chuyên môn theo ngôn ngữ (cùng thứ tự giữa các lang)
+      specialtyItems?: string[];
     };
   };
 
-  // === Professional Info ===
   @Prop({ type: [String], default: [] })
   languages: string[];
 
@@ -41,7 +38,6 @@ export class TourGuide {
   @Prop()
   yearsOfExperience?: number;
 
-  // === Media ===
   @Prop({
     type: [{ url: String, publicId: String, alt: String, order: Number }],
     default: [],
@@ -63,46 +59,41 @@ export class TourGuide {
     format?: string;
   };
 
-  // === Rating (auto-update từ Review) ===
   @Prop({
     type: { average: Number, total: Number },
     default: { average: 0, total: 0 },
   })
   ratingSummary: { average: number; total: number };
 
-  // === Thống kê hoạt động ===
   @Prop({ default: 0 })
-  responseRate?: number; // 0-100, tỷ lệ phản hồi
+  responseRate?: number;
 
   @Prop({ default: 0 })
-  completedTripsCount?: number; // chuyến đi hoàn tất
+  completedTripsCount?: number;
 
   @Prop({ default: 0 })
-  returningCustomerRate?: number; // 0-100, tỷ lệ khách quay lại
+  returningCustomerRate?: number;
 
-  // === Status ===
   @Prop({ default: true })
   isAvailable: boolean;
 
   @Prop({ default: true })
-  isActive: boolean; // Soft delete
+  isActive: boolean;
 
   @Prop({ default: false })
-  isVerified: boolean; // Admin đã xác minh
+  isVerified: boolean;
 
   @Prop()
   verifiedAt?: Date;
 
-  // === Pricing ===
   @Prop()
   dailyRate?: number;
 
   @Prop({ default: 'VND' })
   currency: string;
 
-  // === Contact preference ===
   @Prop({ type: [String], default: [] })
-  contactMethods: string[]; // ['phone', 'zalo', 'email']
+  contactMethods: string[];
 }
 
 export const TourGuideSchema = SchemaFactory.createForClass(TourGuide);

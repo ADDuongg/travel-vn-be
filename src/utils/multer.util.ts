@@ -1,4 +1,3 @@
-/** True when multer received a non-empty upload (skip empty multipart file fields). */
 export function hasMulterFileContent(
   file?: Express.Multer.File | null,
 ): file is Express.Multer.File {

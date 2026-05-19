@@ -4,7 +4,6 @@ import { DomainException } from 'src/common/exceptions';
 import { IdempotencyService } from './idempotency.service';
 import { Idempotency, IdempotencyStatus } from './schema/idempotency.schema';
 
-/* ────────── mocks ────────── */
 const mockIdempotencyModel = {
   findOne: jest.fn(),
   create: jest.fn(),
@@ -30,9 +29,6 @@ describe('IdempotencyService', () => {
     service = module.get<IdempotencyService>(IdempotencyService);
   });
 
-  /* ═══════════════════════════════════════════════
-     execute
-  ═══════════════════════════════════════════════ */
   describe('execute', () => {
     const key = 'idem-key-001';
     const userId = 'user-001';
@@ -98,7 +94,6 @@ describe('IdempotencyService', () => {
     });
 
     it('creates separate records for different keys (not conflicting)', async () => {
-      // First key: no existing record
       mockIdempotencyModel.findOne.mockResolvedValue(null);
       mockIdempotencyModel.create.mockResolvedValue({});
       mockIdempotencyModel.updateOne.mockResolvedValue({});

@@ -1,10 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { HttpExceptionFilter } from './http-fail.interceptor.filter';
 import { REQUEST_ID_HEADER } from 'src/common/middleware/correlation-id.middleware';
-import {
-  AppException,
-  NotFoundDomainException,
-} from 'src/common/exceptions';
+import { AppException, NotFoundDomainException } from 'src/common/exceptions';
 
 describe('HttpExceptionFilter (error contract)', () => {
   const filter = new HttpExceptionFilter();
@@ -29,7 +26,10 @@ describe('HttpExceptionFilter (error contract)', () => {
       headers: { [REQUEST_ID_HEADER]: 'req-abc' },
     } as any);
 
-    filter.catch(new NotFoundDomainException('Tour not found', 'TOUR_NOT_FOUND'), host as any);
+    filter.catch(
+      new NotFoundDomainException('Tour not found', 'TOUR_NOT_FOUND'),
+      host as any,
+    );
 
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -47,7 +47,11 @@ describe('HttpExceptionFilter (error contract)', () => {
 
   it('maps HttpException validation-style errors', () => {
     const json = jest.fn();
-    const host = mockHost(json, { method: 'POST', url: '/x', headers: {} } as any);
+    const host = mockHost(json, {
+      method: 'POST',
+      url: '/x',
+      headers: {},
+    } as any);
 
     filter.catch(new BadRequestException(['a', 'b']), host as any);
 
@@ -63,7 +67,11 @@ describe('HttpExceptionFilter (error contract)', () => {
 
   it('does not leak internal message for unknown errors (500)', () => {
     const json = jest.fn();
-    const host = mockHost(json, { method: 'GET', url: '/x', headers: {} } as any);
+    const host = mockHost(json, {
+      method: 'GET',
+      url: '/x',
+      headers: {},
+    } as any);
 
     filter.catch(new Error('secret db failure'), host as any);
 
@@ -79,7 +87,11 @@ describe('HttpExceptionFilter (error contract)', () => {
 
   it('maps Infrastructure-style AppException without leaking detail in body message', () => {
     const json = jest.fn();
-    const host = mockHost(json, { method: 'GET', url: '/x', headers: {} } as any);
+    const host = mockHost(json, {
+      method: 'GET',
+      url: '/x',
+      headers: {},
+    } as any);
 
     class Infra extends AppException {
       constructor() {

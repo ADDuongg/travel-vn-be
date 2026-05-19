@@ -1,6 +1,3 @@
-/**
- * Base application exception. Handled by {@link HttpExceptionFilter} with a stable JSON shape.
- */
 export class AppException extends Error {
   readonly statusCode: number;
   readonly errorCode?: string;

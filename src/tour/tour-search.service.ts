@@ -16,7 +16,6 @@ function esTextField(value: unknown): string {
 
 const TOUR_INDEX_MAPPINGS = {
   properties: {
-    /** Mongo _id as hex — used for stable sort (ES 8+ disallows sorting on meta _id). */
     tourId: { type: 'keyword' as const },
     isActive: { type: 'boolean' as const },
     slug: { type: 'keyword' as const },
@@ -55,7 +54,6 @@ export class TourSearchService implements OnApplicationBootstrap {
     return this.esConn.isEnabled() && this.esConn.getClientOrNull() !== null;
   }
 
-  /** True when ES is connected and the tours index has been ensured (ready for list/search). */
   canServeSearch(): boolean {
     return this.isUsable() && this.indexReady;
   }
@@ -97,7 +95,7 @@ export class TourSearchService implements OnApplicationBootstrap {
           },
         });
       } catch {
-        // Field may already exist or mapping conflict — safe to ignore
+        void 0;
       }
       return;
     }
@@ -176,7 +174,7 @@ export class TourSearchService implements OnApplicationBootstrap {
       try {
         await client.delete({ index, id: tourId, refresh: true });
       } catch {
-        // ignore missing document
+        void 0;
       }
       return;
     }

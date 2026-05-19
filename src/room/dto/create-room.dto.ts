@@ -13,8 +13,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/* ===== Media reference DTOs (FE upload ảnh qua /admin/media trước, rồi gửi reference) ===== */
-
 export class ThumbnailRefDto {
   @IsString()
   url: string;
@@ -47,8 +45,6 @@ export class GalleryItemDto {
   @IsNumber()
   order?: number;
 }
-
-/* ===== Nested object DTOs ===== */
 
 export class RoomCapacityDto {
   @Type(() => Number)
@@ -130,11 +126,7 @@ export class RoomTranslationDto {
   shortDescription?: string;
 }
 
-/* ===== Main DTO ===== */
-
 export class CreateRoomDto {
-  /* ========= CORE ========= */
-
   @IsString()
   @IsNotEmpty()
   code: string;
@@ -150,19 +142,13 @@ export class CreateRoomDto {
   @IsBoolean()
   isActive: boolean;
 
-  /* ========= RELATION ========= */
-
   @IsString()
   @IsNotEmpty()
   hotelId: string;
 
-  /* ========= CAPACITY ========= */
-
   @ValidateNested()
   @Type(() => RoomCapacityDto)
   capacity: RoomCapacityDto;
-
-  /* ========= PRICING ========= */
 
   @Type(() => Number)
   @IsNumber()
@@ -173,38 +159,26 @@ export class CreateRoomDto {
   @IsString()
   currency?: string;
 
-  /* ========= INVENTORY ========= */
-
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   totalRooms: number;
 
-  /* ========= TRANSLATIONS ========= */
-
   @IsObject()
   translations: Record<string, RoomTranslationDto>;
-
-  /* ========= BOOKING CONFIG ========= */
 
   @ValidateNested()
   @Type(() => RoomBookingConfigDto)
   bookingConfig: RoomBookingConfigDto;
 
-  /* ========= AMENITIES ========= */
-  // Giữ kiểu mở giống behavior cũ: FE có thể gửi mảng ObjectId string hoặc {code, icon}.
   @IsOptional()
   @IsArray()
   amenities?: Array<string | { code: string; icon?: string }>;
-
-  /* ========= SALE ========= */
 
   @IsOptional()
   @ValidateNested()
   @Type(() => RoomSaleDto)
   sale?: RoomSaleDto;
-
-  /* ========= MEDIA (reference đã upload qua /admin/media) ========= */
 
   @IsOptional()
   @ValidateNested()

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { toSlug, withUniqueSuffix } from 'src/utils/slug.util';
@@ -30,7 +34,12 @@ export class BlogCategoryService {
 
   async create(dto: CreateBlogCategoryDto) {
     if (!dto.name || !Object.keys(dto.name).length) {
-      throw new DomainException('name must include at least one language', 400, 'BAD_REQUEST', 'blog.category.bad_request');
+      throw new DomainException(
+        'name must include at least one language',
+        400,
+        'BAD_REQUEST',
+        'blog.category.bad_request',
+      );
     }
     const baseSlug = dto.slug?.trim()
       ? toSlug(dto.slug)
@@ -98,7 +107,6 @@ export class BlogCategoryService {
     };
   }
 
-  /** Public: active, not deleted. */
   async findAllPublic(query: BlogCategoryQueryDto) {
     return this.findAll({ ...query, isActive: true }, { admin: false });
   }
@@ -107,14 +115,23 @@ export class BlogCategoryService {
     const doc = await this.blogCategoryModel
       .findOne({ slug, isDeleted: { $ne: true } })
       .lean();
-    if (!doc) throw new NotFoundDomainException('Blog category not found', 'NOT_FOUND', 'blog.category.not_found');
+    if (!doc)
+      throw new NotFoundDomainException(
+        'Blog category not found',
+        'NOT_FOUND',
+        'blog.category.not_found',
+      );
     return doc;
   }
 
   async findById(id: string) {
     const doc = await this.blogCategoryModel.findById(id).lean();
     if (!doc || doc.isDeleted) {
-      throw new NotFoundDomainException('Blog category not found', 'NOT_FOUND', 'blog.category.not_found');
+      throw new NotFoundDomainException(
+        'Blog category not found',
+        'NOT_FOUND',
+        'blog.category.not_found',
+      );
     }
     return doc;
   }
@@ -122,7 +139,11 @@ export class BlogCategoryService {
   async update(id: string, dto: UpdateBlogCategoryDto) {
     const doc = await this.blogCategoryModel.findById(id);
     if (!doc || doc.isDeleted) {
-      throw new NotFoundDomainException('Blog category not found', 'NOT_FOUND', 'blog.category.not_found');
+      throw new NotFoundDomainException(
+        'Blog category not found',
+        'NOT_FOUND',
+        'blog.category.not_found',
+      );
     }
     if (dto.name !== undefined) doc.name = dto.name;
     if (dto.description !== undefined) doc.description = dto.description;
@@ -140,7 +161,13 @@ export class BlogCategoryService {
           isDeleted: { $ne: true },
           _id: { $ne: doc._id },
         });
-        if (exists) throw new DomainException('Category slug already exists', 409, 'CONFLICT', 'blog.category.conflict');
+        if (exists)
+          throw new DomainException(
+            'Category slug already exists',
+            409,
+            'CONFLICT',
+            'blog.category.conflict',
+          );
         doc.slug = newSlug;
       }
     }
@@ -148,9 +175,6 @@ export class BlogCategoryService {
     return doc.save().then((d) => d.toObject());
   }
 
-  /**
-   * Adjust denormalized post count (published posts). Used by blog post service.
-   */
   async incPostCount(categoryId: string | undefined, delta: number) {
     if (!categoryId || !Types.ObjectId.isValid(categoryId) || !delta) {
       return;
@@ -164,7 +188,11 @@ export class BlogCategoryService {
   async softDelete(id: string) {
     const doc = await this.blogCategoryModel.findById(id);
     if (!doc || doc.isDeleted) {
-      throw new NotFoundDomainException('Blog category not found', 'NOT_FOUND', 'blog.category.not_found');
+      throw new NotFoundDomainException(
+        'Blog category not found',
+        'NOT_FOUND',
+        'blog.category.not_found',
+      );
     }
     doc.isDeleted = true;
     doc.deletedAt = new Date();

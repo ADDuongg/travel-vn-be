@@ -15,10 +15,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/* =======================
-   MEDIA REF DTOs (upload via /admin/media first)
-======================= */
-
 export class ThumbnailRefDto {
   @IsString()
   url: string;
@@ -51,10 +47,6 @@ export class GalleryItemDto {
   @IsNumber()
   order?: number;
 }
-
-/* =======================
-   SALE & SCHEDULE
-======================= */
 
 export class TourSaleDto {
   @IsBoolean()
@@ -102,10 +94,6 @@ export class TourScheduleDto {
   @Type(() => TourFixedDepartureDto)
   fixedDepartures?: TourFixedDepartureDto[];
 }
-
-/* =======================
-   SUB DTOs
-======================= */
 
 export class TourItineraryDayTranslationDto {
   @IsString()
@@ -294,10 +282,6 @@ export class TourTranslationDto {
   @Type(() => TourSeoDto)
   seo?: TourSeoDto;
 }
-
-/* =======================
-   MAIN DTO
-======================= */
 
 export class CreateTourDto {
   @IsString()

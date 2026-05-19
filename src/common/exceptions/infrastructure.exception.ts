@@ -1,9 +1,6 @@
 import { COMMON_I18N_KEYS } from '../i18n/keys';
 import { AppException } from './app.exception';
 
-/**
- * Dependency / internal failure. Response body uses a generic message; details stay server-side.
- */
 export class InfrastructureException extends AppException {
   readonly infraCause?: unknown;
 

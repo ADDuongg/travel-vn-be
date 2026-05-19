@@ -1,4 +1,3 @@
-/** FE i18n message keys (dot notation) — auth module */
 export const AuthI18nKeys = {
   userNotFound: 'auth.reset.user_not_found',
   userNoEmail: 'auth.reset.user_no_email',

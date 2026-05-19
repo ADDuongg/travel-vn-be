@@ -1,9 +1,7 @@
-# docker-compose.local.yml
 services:
   mongo:
     image: mongo:7.0
     container_name: backend-local-mongo
-    # Keyfile → chmod 400 for mongod; use exec-form command (YAML `>` folds newlines and breaks `\` continuations).
     command:
       [
         'bash',
@@ -17,8 +15,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: duongnv
       MONGO_INITDB_ROOT_PASSWORD: Duong@88999
     ports:
-      # If Compass auth fails: Homebrew `mongod` often binds 127.0.0.1:27017 — clients hit that DB, not this container. Stop it (`brew services stop mongodb-community`) or map e.g. 27018:27017 and point URI at 27018.
-      - '27017:27017' # Compass / host apps
+      - '27017:27017'
     volumes:
       - mongo_data:/data/db
       - ./docker/mongo-local/rs0-dev.keyfile:/etc/mongo-rs/rs0-dev.keyfile:ro
@@ -59,7 +56,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
-      - '6379:6379' # expose để debug nếu cần
+      - '6379:6379'
     volumes:
       - redis_data:/data
     networks:

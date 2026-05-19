@@ -3,7 +3,6 @@ import { Document } from 'mongoose';
 
 export type ProvinceDocument = Province & Document;
 
-/** Mã ngôn ngữ (lowercase) -> chuỗi hiển thị. */
 export type DynamicLocalized = Record<string, string>;
 
 @Schema({ _id: false })
@@ -75,8 +74,6 @@ export class Province {
 
   @Prop({ type: [ProvinceHighlightSchema], default: [] })
   highlights?: ProvinceHighlight[];
-
-  /* ================= NEW FIELDS ================= */
 
   @Prop({
     type: { url: String, publicId: String, alt: String },

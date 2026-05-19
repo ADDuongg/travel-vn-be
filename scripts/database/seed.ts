@@ -24,14 +24,12 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 1: Reset
   log.step('Dropping local database...');
   await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   await mongoose.connection.db!.dropDatabase();
   log.success(`Database "${config.dbLocal}" dropped.`);
   await mongoose.disconnect();
 
-  // Step 2: Run migrations
   log.step('Running migrations...');
   try {
     execSync('yarn run migrate-mongo up', {
@@ -45,7 +43,6 @@ async function main() {
     );
   }
 
-  // Step 3: Seed data
   const realisticDir = PATHS.seedsRealistic;
   const baseDir = PATHS.seedsBase;
 
@@ -67,7 +64,6 @@ async function main() {
     log.info('or add base seed data to seeds/base/.');
   }
 
-  // Step 4: Summary
   log.step('Collecting summary...');
   await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   const collections = await mongoose.connection.db!.listCollections().toArray();

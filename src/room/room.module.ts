@@ -14,13 +14,7 @@ import { Room, RoomSchema } from './schema/room.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Room.name, schema: RoomSchema },
-      /* {
-        name: Hotel.name,
-        schema: HotelSchema,
-      }, */
-    ]),
+    MongooseModule.forFeature([{ name: Room.name, schema: RoomSchema }]),
     CloudinaryModule,
     AmenitiesModule,
     HotelModule,

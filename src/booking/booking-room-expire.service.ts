@@ -1,4 +1,3 @@
-// booking-room-expire.service.ts — expire unpaid room bookings and release inventory
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';

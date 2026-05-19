@@ -20,5 +20,4 @@ export class RefreshToken {
 }
 export const RefreshTokenSchema = SchemaFactory.createForClass(RefreshToken);
 
-// TTL index
 RefreshTokenSchema.index({ keepUntil: 1 }, { expireAfterSeconds: 0 });

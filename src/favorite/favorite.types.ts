@@ -20,4 +20,3 @@ export type FavoriteEntityPair = {
   entityType: FavoriteEntityType;
   entityId: Types.ObjectId;
 };
-

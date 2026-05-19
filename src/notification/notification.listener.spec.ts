@@ -4,7 +4,10 @@ import { Test } from '@nestjs/testing';
 import { createDomainEventEnvelope } from 'src/common/events/domain-event';
 import { EnvService } from 'src/env/env.service';
 import { User } from 'src/user/schema/user.schema';
-import { NotificationEvent, NOTIFICATION_QUEUE } from './notification.constants';
+import {
+  NotificationEvent,
+  NOTIFICATION_QUEUE,
+} from './notification.constants';
 import { NotificationListener } from './notification.listener';
 
 describe('NotificationListener', () => {
@@ -50,6 +53,8 @@ describe('NotificationListener', () => {
     expect(jobData.requestId).toBe('req-otp-1');
     expect(jobData.eventId).toBe('evt-otp-1');
     expect(jobData.payload.target).toBe('a@example.com');
-    expect(jobOpts.jobId).toBe('auth-otp-issued:a@example.com:VERIFY_EMAIL:evt-otp-1');
+    expect(jobOpts.jobId).toBe(
+      'auth-otp-issued:a@example.com:VERIFY_EMAIL:evt-otp-1',
+    );
   });
 });

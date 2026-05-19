@@ -40,7 +40,6 @@ export class RoomService {
     private readonly favoriteService: FavoriteService,
   ) {}
 
-  // ===== CREATE =====
   async create(dto: CreateRoomDto) {
     const existed = await this.roomModel.findOne({
       $or: [{ code: dto.code }, { slug: dto.slug }],
@@ -114,10 +113,6 @@ export class RoomService {
     const filter: any = {
       isActive: true,
     };
-
-    /* if (adults) {
-      filter['capacity.maxAdults'] = { $gte: adults };
-    } */
 
     if (adults || children) {
       filter.$expr = {
@@ -259,7 +254,12 @@ export class RoomService {
         populate: { path: 'provinceId', select: 'name code slug fullName' },
       })
       .populate('amenities');
-    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
+    if (!room)
+      throw new NotFoundDomainException(
+        'Room not found',
+        'ROOM_NOT_FOUND',
+        'room.not_found',
+      );
     const obj = room.toObject();
     if (!userId) return obj;
     const isFavorited = await this.favoriteService.isFavorited({
@@ -272,7 +272,12 @@ export class RoomService {
 
   async update(id: string, dto: UpdateRoomDto) {
     const room = await this.roomModel.findById(id);
-    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
+    if (!room)
+      throw new NotFoundDomainException(
+        'Room not found',
+        'ROOM_NOT_FOUND',
+        'room.not_found',
+      );
     const inventoryCount =
       await this.roomInventoryService.countFutureInventories(id);
 
@@ -350,7 +355,12 @@ export class RoomService {
 
   async remove(id: string) {
     const room = await this.roomModel.findById(id);
-    if (!room) throw new NotFoundDomainException('Room not found', 'ROOM_NOT_FOUND', 'room.not_found');
+    if (!room)
+      throw new NotFoundDomainException(
+        'Room not found',
+        'ROOM_NOT_FOUND',
+        'room.not_found',
+      );
 
     await this.cleanupOrphanMedia({
       prevGallery: (room.gallery ?? []) as StoredGalleryItem[],
@@ -362,8 +372,6 @@ export class RoomService {
     await room.deleteOne();
     return true;
   }
-
-  /* ===== Media helpers (JSON-only pattern) ===== */
 
   private pickThumbnail(input: ThumbnailRefDto): StoredThumbnail {
     return {
@@ -399,10 +407,6 @@ export class RoomService {
     };
   }
 
-  /**
-   * So sánh tập publicId trước/sau và xoá những file Cloudinary không còn được tham chiếu.
-   * Lỗi xoá Cloudinary chỉ log, không fail request (best-effort cleanup).
-   */
   private async cleanupOrphanMedia(args: {
     prevGallery: StoredGalleryItem[];
     prevThumbnail?: StoredThumbnail;

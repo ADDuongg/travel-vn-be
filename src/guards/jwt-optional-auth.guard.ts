@@ -8,7 +8,6 @@ export class JwtOptionalAuthGuard extends AuthGuard('jwt') {
       const res = (await super.canActivate(context)) as boolean;
       return res;
     } catch {
-      // No/invalid token → treat as anonymous request.
       return true;
     }
   }
@@ -18,4 +17,3 @@ export class JwtOptionalAuthGuard extends AuthGuard('jwt') {
     return user ?? null;
   }
 }
-

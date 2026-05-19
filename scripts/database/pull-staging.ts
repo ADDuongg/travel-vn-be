@@ -33,21 +33,17 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 1: Dump from staging (read-only)
   log.step('Dumping data from staging (read-only)...');
   mongodump(config.mongoUriStaging, DUMP_DIR);
 
-  // Step 2: Build a local URI pointing to the debug DB
   const debugUri = config.mongoUriLocal.replace(
     `/${config.dbLocal}`,
     `/${config.dbDebug}`,
   );
 
-  // Step 3: Restore to debug DB
   log.step(`Restoring to debug database "${config.dbDebug}"...`);
   mongorestore(debugUri, DUMP_DIR, config.dbDebug, { drop: true });
 
-  // Step 4: Run migrations against debug DB
   log.step('Running migrations against debug DB...');
   try {
     const migrationEnv = {
@@ -67,7 +63,6 @@ async function main() {
     );
   }
 
-  // Step 5: Print summary
   log.step('Collecting summary...');
   await mongoose.connect(debugUri, mongooseLocalConnectOptions);
   const collections = await mongoose.connection.db!.listCollections().toArray();

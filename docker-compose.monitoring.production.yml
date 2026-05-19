@@ -1,10 +1,4 @@
-# Prometheus + Grafana + exporters — chạy cùng stack production backend.
-#
-# Prometheus chỉ reachable trong Compose network — vào Grafana tại localhost (SSH tunnel như các service khác).
-#
 # Usage:
-#   docker compose -f docker-compose.production.yml -f docker-compose.monitoring.production.yml up -d
-#
 services:
   prometheus:
     image: prom/prometheus:v2.55.1

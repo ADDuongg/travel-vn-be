@@ -53,6 +53,4 @@ export class CreateTourBookingDto {
   @IsNumber()
   @Min(0)
   infants?: number;
-
-  /* userId lấy từ JWT (req.user), không gửi từ payload */
 }

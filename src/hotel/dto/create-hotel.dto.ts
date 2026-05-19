@@ -13,10 +13,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/* =======================
-   MEDIA REF (upload qua /admin/media trước)
-======================= */
-
 export class ThumbnailRefDto {
   @IsString()
   url: string;
@@ -49,10 +45,6 @@ export class GalleryItemDto {
   @IsNumber()
   order?: number;
 }
-
-/* =======================
-   SUB DTO
-======================= */
 
 export class HotelContactDto {
   @IsOptional()
@@ -107,10 +99,6 @@ export class TranslationItemDto {
     description?: string;
   };
 }
-
-/* =======================
-   MAIN DTO
-======================= */
 
 export class CreateHotelDto {
   @IsString()

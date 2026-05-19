@@ -35,7 +35,6 @@ export class BookingService {
     private readonly transactionService: DatabaseTransactionService,
   ) {}
 
-  /* ===== Helpers: pricing ===== */
   private applySale(basePrice: number, sale?: Room['sale']) {
     if (!sale?.isActive) return basePrice;
 
@@ -90,8 +89,6 @@ export class BookingService {
       extraChildren * extraChildPrice
     );
   }
-
-  /* ================= ROOM BOOKING ================= */
 
   async createRoomBooking(dto: CreateRoomBookingDto, userId: string) {
     const room = await this.roomService.findOne(dto.roomId);
@@ -270,7 +267,6 @@ export class BookingService {
     );
   }
 
-  /* ================= ADMIN LIST ================= */
   async getAllBookings(query: BookingQueryDto) {
     const {
       pageIndex = 0,
@@ -440,7 +436,6 @@ export class BookingService {
     return formatted;
   }
 
-  /* ================= ADMIN DETAIL ================= */
   async getBookingByIdForAdmin(bookingId: string) {
     const booking = await this.bookingRepository.findByIdForAdmin(bookingId);
 
@@ -465,8 +460,6 @@ export class BookingService {
       user: bookingUser,
     };
   }
-
-  /* ================= UPDATE ================= */
 
   async update(id: string, dto: UpdateBookingDto) {
     const booking = await this.bookingRepository.findById(id);
@@ -517,8 +510,6 @@ export class BookingService {
   async findOne(id: string) {
     return this.bookingRepository.findById(id);
   }
-
-  /* ================= CANCEL ================= */
 
   async cancel(
     id: string,

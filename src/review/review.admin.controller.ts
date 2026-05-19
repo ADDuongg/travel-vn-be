@@ -1,5 +1,19 @@
-import { Body, Controller, Get, Param, Patch, Query, Req, UseGuards, UseInterceptors } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiCode } from 'src/common/decorators/api-code.decorator';
 import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
@@ -49,7 +63,12 @@ export class ReviewAdminController {
   approve(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
     const adminId = req.user?.userId;
     if (!adminId) {
-      throw new DomainException('Admin user id missing', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Admin user id missing',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
     return this.reviewService.approveReview(id, adminId);
   }
@@ -65,7 +84,12 @@ export class ReviewAdminController {
   ) {
     const adminId = req.user?.userId;
     if (!adminId) {
-      throw new DomainException('Admin user id missing', 400, 'BAD_REQUEST', 'review.bad_request');
+      throw new DomainException(
+        'Admin user id missing',
+        400,
+        'BAD_REQUEST',
+        'review.bad_request',
+      );
     }
     return this.reviewService.setReviewStatusByAdmin(id, adminId, body);
   }

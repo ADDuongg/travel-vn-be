@@ -12,12 +12,10 @@ export class DashboardQueryDto {
   @IsEnum(DashboardRange)
   range?: DashboardRange;
 
-  /** ISO date string, chỉ dùng khi range=custom */
   @IsOptional()
   @IsString()
   from?: string;
 
-  /** ISO date string, chỉ dùng khi range=custom */
   @IsOptional()
   @IsString()
   to?: string;

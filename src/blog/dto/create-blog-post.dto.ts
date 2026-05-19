@@ -94,10 +94,6 @@ export class CreateBlogPostDto {
   @Type(() => GalleryItemDto)
   gallery?: GalleryItemDto[];
 
-  /**
-   * Per language: { title, excerpt, content: Editor.js blocks[], seo? }.
-   * Nội dung chi tiết được validate trong `BlogService`.
-   */
   @IsObject()
   translations: Record<
     string,

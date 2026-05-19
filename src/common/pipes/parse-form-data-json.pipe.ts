@@ -13,11 +13,9 @@ export class ParseFormDataJsonPipe implements PipeTransform {
 
         if (firstChar === '{' || firstChar === '[') {
           try {
-            // Chỉ parse JSON nếu là object/array string
-            // Các field primitive (slug, code, ...) sẽ giữ nguyên
             value[key] = JSON.parse(field);
           } catch {
-            // Ignore invalid JSON, giữ nguyên giá trị
+            void 0;
           }
         }
       }

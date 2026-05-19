@@ -22,10 +22,6 @@ export class RedisModule {
       },
     };
 
-    /**
-     * Ensure singleton client is closed on shutdown.
-     * Nest will call `onApplicationShutdown` for any provider that implements it.
-     */
     const redisShutdownProvider = {
       provide: 'REDIS_SHUTDOWN',
       inject: [REDIS_CLIENT],
@@ -34,7 +30,7 @@ export class RedisModule {
           try {
             await client.quit();
           } catch {
-            // best-effort shutdown
+            void 0;
           }
         },
       }),

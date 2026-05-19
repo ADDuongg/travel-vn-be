@@ -1,15 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Hotel, HotelDocument } from 'src/hotel/schema/hotel.schema';
 import { Room, RoomDocument } from 'src/room/schema/room.schema';
-import { TourGuide, TourGuideDocument } from 'src/tour-guide/schema/tour-guide.schema';
-import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
 import {
-  FavoriteEntitySummary,
-  FavoriteEntityType,
-} from './favorite.types';
+  TourGuide,
+  TourGuideDocument,
+} from 'src/tour-guide/schema/tour-guide.schema';
+import { Tour, TourDocument } from 'src/tour/schema/tour.schema';
+import { FavoriteEntitySummary, FavoriteEntityType } from './favorite.types';
 import { FavoriteRepository } from './favorite.repository';
 
 @Injectable()
@@ -36,10 +40,20 @@ export class FavoriteService {
     entityId: string;
   }) {
     if (!params.userId) {
-      throw new DomainException('Unauthorized', 400, 'BAD_REQUEST', 'favorite.bad_request');
+      throw new DomainException(
+        'Unauthorized',
+        400,
+        'BAD_REQUEST',
+        'favorite.bad_request',
+      );
     }
     if (!Types.ObjectId.isValid(params.entityId)) {
-      throw new DomainException('Invalid entityId', 400, 'BAD_REQUEST', 'favorite.bad_request');
+      throw new DomainException(
+        'Invalid entityId',
+        400,
+        'BAD_REQUEST',
+        'favorite.bad_request',
+      );
     }
     const userId = new Types.ObjectId(params.userId);
     const entityId = new Types.ObjectId(params.entityId);
@@ -56,10 +70,20 @@ export class FavoriteService {
     entityId: string;
   }): Promise<{ isFavorited: boolean }> {
     if (!params.userId) {
-      throw new DomainException('Unauthorized', 400, 'BAD_REQUEST', 'favorite.bad_request');
+      throw new DomainException(
+        'Unauthorized',
+        400,
+        'BAD_REQUEST',
+        'favorite.bad_request',
+      );
     }
     if (!Types.ObjectId.isValid(params.entityId)) {
-      throw new DomainException('Invalid entityId', 400, 'BAD_REQUEST', 'favorite.bad_request');
+      throw new DomainException(
+        'Invalid entityId',
+        400,
+        'BAD_REQUEST',
+        'favorite.bad_request',
+      );
     }
     const userId = new Types.ObjectId(params.userId);
     const entityId = new Types.ObjectId(params.entityId);
@@ -89,12 +113,14 @@ export class FavoriteService {
     const limit = Math.min(100, Math.max(1, params.limit ?? 20));
     const lang = (params.lang || 'vi').trim() || 'vi';
 
-    const { data: favorites, total } = await this.favoriteRepository.findByUser({
-      userId: new Types.ObjectId(userIdStr),
-      entityType: params.entityType,
-      page,
-      limit,
-    });
+    const { data: favorites, total } = await this.favoriteRepository.findByUser(
+      {
+        userId: new Types.ObjectId(userIdStr),
+        entityType: params.entityType,
+        page,
+        limit,
+      },
+    );
 
     const summaryMap = await this.buildEntitySummaryMap(
       favorites as Array<{
@@ -202,7 +228,10 @@ export class FavoriteService {
   }
 
   private uniqueEntityIds(
-    favorites: Array<{ entityType: FavoriteEntityType; entityId: Types.ObjectId }>,
+    favorites: Array<{
+      entityType: FavoriteEntityType;
+      entityId: Types.ObjectId;
+    }>,
     entityType: FavoriteEntityType,
   ): Types.ObjectId[] {
     const seen = new Set<string>();
@@ -218,7 +247,10 @@ export class FavoriteService {
   }
 
   private async buildEntitySummaryMap(
-    favorites: Array<{ entityType: FavoriteEntityType; entityId: Types.ObjectId }>,
+    favorites: Array<{
+      entityType: FavoriteEntityType;
+      entityId: Types.ObjectId;
+    }>,
     lang: string,
   ): Promise<Map<string, FavoriteEntitySummary>> {
     const map = new Map<string, FavoriteEntitySummary>();
@@ -315,4 +347,3 @@ export class FavoriteService {
     return map;
   }
 }
-

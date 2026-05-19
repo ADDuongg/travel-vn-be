@@ -374,7 +374,10 @@ describe('BookingService', () => {
 
       expect(booking.status).toBe(BookingStatus.CONFIRMED);
       expect(booking.paymentStatus).toBe(BookingPaymentStatus.PAID);
-      expect(mockBookingRepository.save).toHaveBeenCalledWith(booking, undefined);
+      expect(mockBookingRepository.save).toHaveBeenCalledWith(
+        booking,
+        undefined,
+      );
     });
   });
 

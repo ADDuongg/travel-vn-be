@@ -20,9 +20,6 @@ function resolveBootstrapLogLevel(
   return 'info';
 }
 
-/**
- * Pino logger used before Nest/Config bootstrap (stdout JSON, survives bufferLogs quirks).
- */
 export const bootstrapLogger = pino({
   level: resolveBootstrapLogLevel(process.env.LOG_LEVEL),
   base: {

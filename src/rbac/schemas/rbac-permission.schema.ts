@@ -3,7 +3,6 @@ import { Document } from 'mongoose';
 
 export type RbacPermissionDocument = RbacPermission & Document;
 
-/** Fine-grained keys: `{resource}.{action}` — seeded from RBAC_PLANS §3 (+ extensions). */
 @Schema({ timestamps: false, collection: 'permissions' })
 export class RbacPermission {
   @Prop({ required: true, trim: true, index: true })
@@ -12,9 +11,6 @@ export class RbacPermission {
   @Prop({ required: true, trim: true })
   action: string;
 
-  /**
-   * Denormalised key for lookups and JWT — must match `${resource}.${action}`.
-   */
   @Prop({ required: true, unique: true, trim: true, index: true })
   key: string;
 

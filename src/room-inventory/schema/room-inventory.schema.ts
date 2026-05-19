@@ -4,8 +4,6 @@ import { Room } from '../../room/schema/room.schema';
 
 export type RoomInventoryDocument = RoomInventory & Document;
 
-/* nhớ rằng RoomInventory là snapshot trong ngày  */
-
 @Schema({
   timestamps: true,
   collection: 'room_inventories',
@@ -26,7 +24,6 @@ export class RoomInventory {
   })
   date: Date;
 
-  /* total này là số phòng cho thuê trong ngày */
   @Prop({
     type: Number,
     required: true,

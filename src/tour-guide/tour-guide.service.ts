@@ -1,5 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -62,7 +66,6 @@ export class TourGuideService {
     private readonly favoriteService: FavoriteService,
   ) {}
 
-  /** Public + admin: list guides (mặc định chỉ isActive: true). */
   async findAll(query: TourGuideQueryDto, userId?: string) {
     const {
       page = 1,
@@ -158,15 +161,24 @@ export class TourGuideService {
     };
   }
 
-  /** Public: chi tiết 1 guide (populate user + provinces). */
   async findOne(id: string, userId?: string) {
     const guide = await this.tourGuideModel
       .findById(id)
       .populate(USER_POPULATE)
       .populate(PROVINCE_POPULATE)
       .lean();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
-    if (!guide.isActive) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
+    if (!guide.isActive)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     if (!userId) return guide;
     const isFavorited = await this.favoriteService.isFavorited({
       userId,
@@ -176,17 +188,26 @@ export class TourGuideService {
     return { ...guide, isFavorited: isFavorited.isFavorited };
   }
 
-  /** Admin: tạo guide cho user (truyền userId trong body) + media refs đã upload trước. */
   async create(dto: CreateTourGuideDto) {
     const userId = dto.userId;
     if (!userId || !Types.ObjectId.isValid(userId)) {
-      throw new DomainException('userId is required', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
+      throw new DomainException(
+        'userId is required',
+        400,
+        'BAD_REQUEST',
+        'tour.guide.bad_request',
+      );
     }
     const existing = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .exec();
     if (existing) {
-      throw new DomainException('User already has a tour guide profile', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
+      throw new DomainException(
+        'User already has a tour guide profile',
+        400,
+        'BAD_REQUEST',
+        'tour.guide.bad_request',
+      );
     }
     const gallery = this.normalizeGallery(dto.gallery);
     const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
@@ -196,13 +217,17 @@ export class TourGuideService {
     return created.toObject();
   }
 
-  /** User đăng ký làm guide (userId từ JWT, isVerified: false) + media refs đã upload trước. */
   async register(userId: string, dto: CreateTourGuideDto) {
     const existing = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId) })
       .exec();
     if (existing) {
-      throw new DomainException('You already have a tour guide profile. Wait for admin verification.', 400, 'BAD_REQUEST', 'tour.guide.bad_request');
+      throw new DomainException(
+        'You already have a tour guide profile. Wait for admin verification.',
+        400,
+        'BAD_REQUEST',
+        'tour.guide.bad_request',
+      );
     }
     const gallery = this.normalizeGallery(dto.gallery);
     const cv = dto.cv ? this.pickCv(dto.cv) : undefined;
@@ -229,12 +254,16 @@ export class TourGuideService {
     return created.toObject();
   }
 
-  /** Guide cập nhật profile của mình bằng JSON refs. */
   async updateMyProfile(userId: string, dto: UpdateTourGuideDto) {
     const guide = await this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId), isActive: true })
       .exec();
-    if (!guide) throw new NotFoundDomainException('Tour guide profile not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide profile not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     await this.applyUpdate(guide, dto);
     const orphanPublicIds = this.applyMediaUpdate(guide, dto);
     const saved = await guide.save();
@@ -242,10 +271,14 @@ export class TourGuideService {
     return saved.toObject();
   }
 
-  /** Admin: cập nhật bất kỳ guide nào bằng JSON refs. */
   async update(id: string, dto: UpdateTourGuideDto) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     await this.applyUpdate(guide, dto);
     const orphanPublicIds = this.applyMediaUpdate(guide, dto);
     const saved = await guide.save();
@@ -253,10 +286,14 @@ export class TourGuideService {
     return saved.toObject();
   }
 
-  /** Admin: verify / unverify guide. */
   async verify(id: string, isVerified: boolean) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     guide.isVerified = isVerified;
     guide.verifiedAt = isVerified ? new Date() : undefined;
     const saved = await guide.save();
@@ -281,15 +318,17 @@ export class TourGuideService {
     return saved.toObject();
   }
 
-  /** Admin toggle availability cho bất kỳ guide nào. */
   async toggleAvailability(id: string) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     guide.isAvailable = !guide.isAvailable;
     return guide.save().then((g) => g.toObject());
   }
-
-  /* ===== Media helpers (JSON-only pattern) ===== */
 
   private normalizeGallery(input?: GalleryItemDto[]): StoredGalleryItem[] {
     if (!input?.length) return [];
@@ -379,20 +418,28 @@ export class TourGuideService {
     }
   }
 
-  /** Admin: soft delete + bỏ role guide khỏi User. */
   async softDelete(id: string) {
     const guide = await this.tourGuideModel.findById(id).exec();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
     guide.isActive = false;
     await guide.save();
     await this.userService.removeRole(String(guide.userId), 'guide');
     return { message: 'Tour guide deactivated successfully' };
   }
 
-  /** GET /:id/reviews — lấy review public cho guide (entityType = GUIDE). */
   async getReviews(id: string, page = 1, limit = 10) {
     const guide = await this.tourGuideModel.findById(id).select('_id').lean();
-    if (!guide) throw new NotFoundDomainException('Tour guide not found', 'NOT_FOUND', 'tour.guide.not_found');
+    if (!guide)
+      throw new NotFoundDomainException(
+        'Tour guide not found',
+        'NOT_FOUND',
+        'tour.guide.not_found',
+      );
 
     const items = await this.reviewService.findPublicReviews({
       entityType: ReviewEntityType.GUIDE,
@@ -412,7 +459,6 @@ export class TourGuideService {
     };
   }
 
-  /** Tìm guide theo userId (dùng cho controller my-profile). */
   async findByUserId(userId: string) {
     return this.tourGuideModel
       .findOne({ userId: new Types.ObjectId(userId), isActive: true })

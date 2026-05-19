@@ -1,7 +1,3 @@
-/**
- * Frontend types for Tour module
- */
-
 export interface TourTranslation {
   name: string;
   description?: string;

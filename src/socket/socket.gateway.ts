@@ -1,5 +1,3 @@
-// src/events/events.gateway.ts
-
 import {
   SubscribeMessage,
   WebSocketGateway,
@@ -35,13 +33,6 @@ export class EventsGateway
     this.logger.log(`Client disconnected: ${client.id}`);
     console.log('Client disconnected:', client.id);
   }
-
-  /* @SubscribeMessage('message')
-  handleMessage(client: Socket, payload: any): void {
-    this.logger.log(`Received message from ${client.id}: ${payload}`);
-    this.server.emit('message', payload);
-    console.log('Received message from', client.id, ':', payload);
-  } */
 
   @SubscribeMessage('join-room')
   handleJoinRoom(

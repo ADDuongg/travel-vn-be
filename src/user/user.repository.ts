@@ -34,7 +34,9 @@ export class UserRepository {
   async create(userDto: CreateUserDto, hashedPassword: string): Promise<User> {
     const { password: _p, ...rest } = userDto;
     const email =
-      typeof rest.email === 'string' ? rest.email.trim().toLowerCase() : rest.email;
+      typeof rest.email === 'string'
+        ? rest.email.trim().toLowerCase()
+        : rest.email;
     const createdUser = new this.userModel({
       ...rest,
       email,

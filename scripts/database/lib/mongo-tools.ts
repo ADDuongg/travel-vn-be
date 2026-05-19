@@ -89,10 +89,6 @@ export function mongorestore(
   log.success(`Restored to "${targetDb}"`);
 }
 
-/**
- * mongodump creates: outputDir/<dbName>/
- * This finds the first subdirectory containing .bson files.
- */
 function findDumpDbDir(outputDir: string): string {
   const entries = fs.readdirSync(outputDir, { withFileTypes: true });
   const subDir = entries.find((e) => e.isDirectory());

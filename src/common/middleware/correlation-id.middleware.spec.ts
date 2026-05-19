@@ -1,4 +1,7 @@
-import { CorrelationIdMiddleware, REQUEST_ID_HEADER } from './correlation-id.middleware';
+import {
+  CorrelationIdMiddleware,
+  REQUEST_ID_HEADER,
+} from './correlation-id.middleware';
 import { CorrelationContextService } from '../correlation/correlation-context.service';
 
 describe('CorrelationIdMiddleware', () => {

@@ -10,15 +10,15 @@ import { HttpMethod } from 'src/enum/api-permission.enum';
 export class CreateApiPermissionDto {
   @IsString()
   @IsNotEmpty()
-  code: string; // ROOM_DELETE
+  code: string;
 
   @IsString()
   @IsNotEmpty()
-  name: string; // Delete Room
+  name: string;
 
   @IsString()
   @IsNotEmpty()
-  path: string; // /api/rooms/:id
+  path: string;
 
   @IsEnum(HttpMethod)
   method: HttpMethod;

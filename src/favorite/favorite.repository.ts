@@ -29,7 +29,6 @@ export class FavoriteRepository {
       await this.favoriteModel.create({ userId, entityType, entityId });
       return { isFavorited: true };
     } catch (err: any) {
-      // Duplicate key race: treat as favorited.
       if (err?.code === 11000) return { isFavorited: true };
       throw err;
     }
@@ -105,11 +104,16 @@ export class FavoriteRepository {
   async findByUserAndEntities(params: {
     userId: Types.ObjectId;
     pairs: Array<{ entityType: FavoriteEntityType; entityId: Types.ObjectId }>;
-  }): Promise<Array<{ entityType: FavoriteEntityType; entityId: Types.ObjectId }>> {
+  }): Promise<
+    Array<{ entityType: FavoriteEntityType; entityId: Types.ObjectId }>
+  > {
     const { userId, pairs } = params;
     if (!pairs.length) return [];
 
-    const or = pairs.map((p) => ({ entityType: p.entityType, entityId: p.entityId }));
+    const or = pairs.map((p) => ({
+      entityType: p.entityType,
+      entityId: p.entityId,
+    }));
     const docs = await this.favoriteModel
       .find({ userId, $or: or })
       .select('entityType entityId')
@@ -117,9 +121,8 @@ export class FavoriteRepository {
       .exec();
 
     return docs.map((d) => ({
-      entityType: d.entityType as FavoriteEntityType,
-      entityId: d.entityId as Types.ObjectId,
+      entityType: d.entityType,
+      entityId: d.entityId,
     }));
   }
 }
-

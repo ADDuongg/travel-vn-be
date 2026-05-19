@@ -9,19 +9,19 @@ import {
 export class CreateRouterDto {
   @IsString()
   @IsNotEmpty()
-  code: string; // ROOM_LIST
+  code: string;
 
   @IsString()
   @IsNotEmpty()
-  name: string; // Room List
+  name: string;
 
   @IsString()
   @IsNotEmpty()
-  path: string; // /dashboard/room
+  path: string;
 
   @IsOptional()
   @IsString()
-  parentCode?: string; // DASHBOARD
+  parentCode?: string;
 
   @IsOptional()
   @IsNumber()

@@ -25,10 +25,6 @@ function normalizePathSegments(meta: unknown): string[] {
   return parts;
 }
 
-/**
- * Nest route pattern (controller + handler PATH_METADATA), prefixed with the global API prefix.
- * Example: `api/v1/admin/tours/:id`
- */
 export function resolveHttpRoutePattern(context: ExecutionContext): string {
   const controller = context.getClass();
   const handler = context.getHandler();

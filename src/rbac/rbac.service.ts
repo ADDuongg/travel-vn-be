@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import {
   DomainException,
   ForbiddenDomainException,
@@ -51,7 +47,6 @@ export class RbacService {
     private readonly redis: Redis,
   ) {}
 
-  /** Catalog for FE matrix / tooling (sorted by key). */
   async listPermissions(): Promise<RbacPermissionRow[]> {
     const docs = await this.permModel
       .find()
@@ -63,7 +58,6 @@ export class RbacService {
     );
   }
 
-  /** Flat permission keys assigned to role (Mongo `roles` document id). */
   async getPermissionKeysForRole(roleId: string): Promise<string[]> {
     const oid = this.parseRoleOid(roleId);
     const role = await this.roleModel.findById(oid).lean().exec();
@@ -81,9 +75,6 @@ export class RbacService {
     return this.loadKeysForRoleId(oid);
   }
 
-  /**
-   * Replace all permissions for a role. Super_admin uses `User.isSuperAdmin` only — junction not used.
-   */
   async setPermissionsForRole(
     roleId: string,
     permissionKeys: string[],
@@ -200,9 +191,6 @@ export class RbacService {
     return [...new Set(perms.map((p) => p.key))].sort();
   }
 
-  /**
-   * Flat permission keys for JWT + HTTP guards. Super-admin returns all keys from DB.
-   */
   async resolveFlatPermissions(
     roleCodes: string[],
     isSuperAdmin: boolean,
@@ -226,7 +214,7 @@ export class RbacService {
         return JSON.parse(hit) as string[];
       }
     } catch {
-      // best-effort cache
+      void 0;
     }
 
     const roleDocs = await this.roleModel
@@ -261,7 +249,7 @@ export class RbacService {
     try {
       await this.redis.set(cacheKey, JSON.stringify(keys), 'EX', CACHE_TTL_SEC);
     } catch {
-      // best-effort cache
+      void 0;
     }
     return keys;
   }
@@ -274,7 +262,7 @@ export class RbacService {
         return JSON.parse(hit) as string[];
       }
     } catch {
-      // ignore
+      void 0;
     }
 
     const all = await this.permModel.find().select('key').lean().exec();
@@ -282,12 +270,11 @@ export class RbacService {
     try {
       await this.redis.set(cacheKey, JSON.stringify(keys), 'EX', CACHE_TTL_SEC);
     } catch {
-      // ignore
+      void 0;
     }
     return keys;
   }
 
-  /** Clears composite `rbac:flat:*` entries (any role combo). Prefer after role_permission changes. */
   async invalidateAllFlatPermissionCaches(): Promise<void> {
     try {
       const keys = await this.redis.keys('rbac:flat:*');
@@ -295,11 +282,10 @@ export class RbacService {
         await this.redis.del(...keys);
       }
     } catch {
-      // ignore
+      void 0;
     }
   }
 
-  /** Narrow invalidation — does not clear other role combos; use invalidateAllFlatPermissionCaches after matrix edits. */
   async invalidateCachesForRoles(roleCodes: string[]): Promise<void> {
     const normalized = [...(roleCodes || [])]
       .map((r) => r.toLowerCase())
@@ -311,7 +297,7 @@ export class RbacService {
     try {
       await this.redis.del(...keys);
     } catch {
-      // ignore
+      void 0;
     }
   }
 }

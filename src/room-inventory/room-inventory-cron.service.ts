@@ -16,12 +16,6 @@ export class RoomInventoryCronService {
     private readonly roomInventoryService: RoomInventoryService,
   ) {}
 
-  /**
-   * Cron đảm bảo mỗi ngày luôn có RoomInventory cho các phòng đang active
-   * trong một rolling window (ví dụ 12 tháng tới).
-   *
-   * Chạy lúc 03:00 hàng ngày (giờ server).
-   */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async ensureRollingInventoryForActiveRooms() {
     try {

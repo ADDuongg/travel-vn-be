@@ -10,8 +10,6 @@ import {
 } from 'class-validator';
 
 export class CreateRoomBookingDto {
-  /* ===== ROOM ===== */
-
   @IsString()
   @IsNotEmpty()
   roomId: string;
@@ -25,10 +23,6 @@ export class CreateRoomBookingDto {
   @ValidateNested({ each: true })
   @Type(() => RoomGuestDto)
   rooms: RoomGuestDto[];
-
-  /* userId lấy từ JWT (req.user), không gửi từ payload */
-  /* @Validate(MaxStayValidator)
-  _maxStayCheck: boolean; */
 }
 
 class RoomGuestDto {

@@ -66,7 +66,6 @@ export class ChatService {
     conversationId: string | undefined,
     res: Response,
   ) {
-    // TanStack AI SSE Protocol (text/event-stream)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -79,7 +78,6 @@ export class ChatService {
 
       await this.processWithToolLoop(res, openaiMessages, messageId);
 
-      // Final done event for TanStack SSE protocol
       this.writeChunk(res, {
         type: 'done',
         id: messageId,
@@ -87,7 +85,7 @@ export class ChatService {
         timestamp: Date.now(),
         finishReason: 'stop',
       });
-      // [DONE] marker so fetchServerSentEvents() knows to stop
+
       res.write('data: [DONE]\n\n');
       res.end();
     } catch (error) {
@@ -136,7 +134,6 @@ export class ChatService {
         };
 
       if (this.provider === 'openai') {
-        // Ollama hiện chưa hỗ trợ tools theo lỗi 400, nên chỉ OpenAI mới truyền tools
         params.tools = chatTools;
       }
 
@@ -156,7 +153,6 @@ export class ChatService {
           const textDelta = String(delta.content);
           fullText += textDelta;
 
-          // Stream text chunks in TanStack AI SSE format
           this.writeChunk(res, {
             type: 'content',
             id: messageId,

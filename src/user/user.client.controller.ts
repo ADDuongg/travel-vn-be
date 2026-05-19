@@ -1,5 +1,17 @@
-import { Body, Controller, Patch, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  Body,
+  Controller,
+  Patch,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/guards/jwt-auth.guard';
@@ -25,7 +37,13 @@ export class UserClientController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     const userId = req.user?.userId;
-    if (!userId) throw new DomainException('Unauthorized', 401, 'UNAUTHORIZED', 'user.unauthorized');
+    if (!userId)
+      throw new DomainException(
+        'Unauthorized',
+        401,
+        'UNAUTHORIZED',
+        'user.unauthorized',
+      );
     return this.userService.updateProfile(userId, updateUserDto, file);
   }
 }

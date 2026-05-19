@@ -7,12 +7,9 @@ export function confirm(message: string): Promise<boolean> {
   });
 
   return new Promise((resolve) => {
-    rl.question(
-      `\x1b[33m[CONFIRM]\x1b[0m ${message} (y/N): `,
-      (answer) => {
-        rl.close();
-        resolve(answer.trim().toLowerCase() === 'y');
-      },
-    );
+    rl.question(`\x1b[33m[CONFIRM]\x1b[0m ${message} (y/N): `, (answer) => {
+      rl.close();
+      resolve(answer.trim().toLowerCase() === 'y');
+    });
   });
 }

@@ -1,14 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-/** Fields merged into every Pino log line while inside an HTTP request (ALS scope). */
 export interface CorrelationStore {
   requestId: string;
   userId?: string;
   username?: string;
-  /** JWT `role` claim when present. */
+
   userRole?: string;
-  /** JWT `roles` array. */
+
   userRoles?: string[];
   isSuperAdmin?: boolean;
 }
@@ -23,10 +22,6 @@ export class CorrelationContextService {
     return this.als.run({ requestId }, callback);
   }
 
-  /**
-   * Returns the current ALS store if any (middleware-bound request scope).
-   * Intended for Pino mixin and tests.
-   */
   getStore(): CorrelationStore | undefined {
     return this.als.getStore();
   }
@@ -35,9 +30,6 @@ export class CorrelationContextService {
     return this.als.getStore()?.requestId;
   }
 
-  /**
-   * Attach safe identity fields for logging (never tokens, rbac arrays, etc.).
-   */
   setSafeUserContext(fields: SafeUserLogContext): void {
     const store = this.als.getStore();
     if (!store) return;

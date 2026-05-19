@@ -459,7 +459,6 @@ export class NotificationProcessor extends WorkerHost {
     });
   }
 
-  /** FE Client — cron hết hạn thanh toán tour. */
   private async handleTourBookingPaymentExpiredUser(data: {
     recipientId: string;
     bookingId: string;
@@ -482,7 +481,6 @@ export class NotificationProcessor extends WorkerHost {
     });
   }
 
-  /** FE Client — cron hết hạn thanh toán phòng. */
   private async handleRoomBookingPaymentExpiredUser(data: {
     recipientId: string;
     bookingId: string;

@@ -1,8 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import {
-  PaymentStatus,
-} from './schema/payment.schema';
+import { PaymentStatus } from './schema/payment.schema';
 import { AuditLogService } from 'src/audit-log/audit-log.service';
 import {
   AuditCategory,
@@ -24,9 +22,8 @@ export class PaymentExpireService {
   async expirePendingPayments() {
     const expireBefore = new Date(Date.now() - 15 * 60 * 1000);
 
-    const expiredPayments = await this.paymentRepository.findPendingOlderThan(
-      expireBefore,
-    );
+    const expiredPayments =
+      await this.paymentRepository.findPendingOlderThan(expireBefore);
 
     if (!expiredPayments.length) return;
 

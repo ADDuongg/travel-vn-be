@@ -102,7 +102,6 @@ export class TourRepository {
     return this.tourModel.findById(tourId).lean().exec();
   }
 
-  /** Cursor for bulk ES reindex */
   streamAllLean() {
     return this.tourModel.find({}).lean().cursor();
   }

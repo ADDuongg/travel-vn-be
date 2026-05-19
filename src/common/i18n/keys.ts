@@ -1,4 +1,3 @@
-/** Default message keys for HTTP responses (FE i18n). Dot-notation. */
 export const COMMON_I18N_KEYS = {
   SUCCESS: 'common.success',
   CREATED: 'common.created',

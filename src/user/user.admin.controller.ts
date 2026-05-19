@@ -1,5 +1,19 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, UseInterceptors } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { ApiCode } from 'src/common/decorators/api-code.decorator';
 import { RequirePermissions } from 'src/common/decorators/require-permissions.decorator';
@@ -30,7 +44,11 @@ export class UserAdminController {
     try {
       return this.userService.create(createUserDto);
     } catch {
-      throw new ForbiddenDomainException('Forbidden', 'FORBIDDEN', 'user.forbidden');
+      throw new ForbiddenDomainException(
+        'Forbidden',
+        'FORBIDDEN',
+        'user.forbidden',
+      );
     }
   }
 

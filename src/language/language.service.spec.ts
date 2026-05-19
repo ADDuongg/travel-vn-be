@@ -26,7 +26,8 @@ describe('LanguageService', () => {
     save.mockClear();
     cloudinaryService = {
       uploadFile: jest.fn().mockResolvedValue({
-        secure_url: 'https://res.cloudinary.com/demo/image/upload/v1/new-flag.jpg',
+        secure_url:
+          'https://res.cloudinary.com/demo/image/upload/v1/new-flag.jpg',
         public_id: 'languages/flags/new-flag',
       }),
       deleteFile: jest.fn().mockResolvedValue(undefined),
@@ -80,7 +81,9 @@ describe('LanguageService', () => {
   it('keeps flagUrl when dto sends empty flagUrl after upload', async () => {
     await service.update(
       'en',
-      { name: 'English', flagUrl: '' } as UpdateLanguageDto & { flagUrl: string },
+      { name: 'English', flagUrl: '' } as UpdateLanguageDto & {
+        flagUrl: string;
+      },
       {
         fieldname: 'flag',
         originalname: 'flag.jpg',

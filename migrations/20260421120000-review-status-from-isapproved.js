@@ -1,9 +1,4 @@
 module.exports = {
-  /**
-   * Backfill `status` from legacy `isApproved` boolean.
-   * @param db {import('mongodb').Db}
-   * @param client {import('mongodb').MongoClient}
-   */
   async up(db, client) {
     const reviews = db.collection('reviews');
 
@@ -25,9 +20,6 @@ module.exports = {
     );
   },
 
-  /**
-   * Best-effort rollback (lossy for REJECTED/HIDDEN).
-   */
   async down(db, client) {
     const reviews = db.collection('reviews');
 

@@ -14,15 +14,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-/** Một block translation theo mã ngôn ngữ (giống Room). */
 export interface TourGuideTranslationDto {
   bio?: string;
   shortBio?: string;
   specialties?: string;
   specialtyItems?: string[];
 }
-
-/* ===== Media reference DTOs (upload qua MediaModule trước, CRUD chỉ nhận JSON refs) ===== */
 
 export class GalleryItemDto {
   @IsString()
@@ -64,12 +61,10 @@ export class CvRefDto {
 }
 
 export class CreateTourGuideDto {
-  /** Bắt buộc khi admin tạo; không gửi khi user register (dùng userId từ JWT). */
   @IsOptional()
   @IsMongoId()
   userId?: string;
 
-  /** Theo langCode (vi, en, ...): bio, shortBio, specialties, shortDescription, description, specialtyItems — giống Room */
   @IsOptional()
   @IsObject()
   translations?: Record<string, TourGuideTranslationDto>;
@@ -110,7 +105,6 @@ export class CreateTourGuideDto {
   @Type(() => CvRefDto)
   cv?: CvRefDto | null;
 
-  /** Thống kê: tỷ lệ phản hồi (0–100). */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -118,14 +112,12 @@ export class CreateTourGuideDto {
   @Max(100)
   responseRate?: number;
 
-  /** Thống kê: số chuyến đi hoàn tất. */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   completedTripsCount?: number;
 
-  /** Thống kê: tỷ lệ khách quay lại (0–100). */
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

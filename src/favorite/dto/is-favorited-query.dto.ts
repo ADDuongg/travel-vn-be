@@ -11,4 +11,3 @@ export class IsFavoritedQueryDto {
   @IsMongoId()
   entityId: string;
 }
-

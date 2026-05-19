@@ -5,7 +5,6 @@ export class SendOtpDto {
   @IsEnum(OtpPurpose)
   purpose!: OtpPurpose;
 
-  /** Email hoặc số điện thoại nhận OTP. */
   @IsString()
   target!: string;
 

@@ -1,4 +1,3 @@
-// users/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
@@ -19,7 +18,6 @@ export class User {
   })
   roles: string[];
 
-  /** Bypass RBAC PermissionGuard checks; use sparingly — see RBAC seed / plans. */
   @Prop({ default: false })
   isSuperAdmin: boolean;
 
@@ -29,7 +27,6 @@ export class User {
   @Prop({ unique: true, sparse: true })
   email?: string;
 
-  /** `false` = registered, not yet verified. Omitted/undefined = legacy users (treated as verified in JWT/guard). */
   @Prop({ type: Boolean })
   isEmailVerified?: boolean;
 
@@ -59,7 +56,6 @@ export class User {
   @Prop({ enum: ['male', 'female', 'other'] })
   gender?: string;
 
-  /** Địa chỉ: reference collection provinces (tỉnh → quận/huyện → phường/xã) */
   @Prop({
     type: {
       provinceId: { type: MongooseSchema.Types.ObjectId, ref: 'Province' },
@@ -78,11 +74,9 @@ export class User {
   @Prop({ default: true })
   isActive: boolean;
 
-  /** Soft-delete: thời điểm xóa (null/undefined = còn hiệu lực) */
   @Prop({ type: Date })
   deletedAt?: Date;
 
-  /** User thực hiện xóa (admin / hệ thống) */
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'User',

@@ -1,10 +1,4 @@
 module.exports = {
-  /**
-   * Backfill `isEmailVerified` / `emailVerifiedAt` for legacy users and any row not explicitly `true`.
-   * Rollback is intentionally a no-op (prior states are not reconstructable).
-   * @param db {import('mongodb').Db}
-   * @param client {import('mongodb').MongoClient}
-   */
   async up(db, client) {
     const users = db.collection('user');
 
@@ -21,10 +15,7 @@ module.exports = {
         $set: {
           isEmailVerified: true,
           emailVerifiedAt: {
-            $ifNull: [
-              '$emailVerifiedAt',
-              { $ifNull: ['$createdAt', '$$NOW'] },
-            ],
+            $ifNull: ['$emailVerifiedAt', { $ifNull: ['$createdAt', '$$NOW'] }],
           },
         },
       },
@@ -37,11 +28,6 @@ module.exports = {
     );
   },
 
-  /**
-   * Lossy: cannot distinguish "missing field" vs `false` after up. Intentional no-op.
-   * @param db {import('mongodb').Db}
-   * @param client {import('mongodb').MongoClient}
-   */
   async down(db, client) {
     console.warn(
       '[migration user isEmailVerified] down skipped — rollback would be lossy (cannot restore missing vs false).',

@@ -23,7 +23,9 @@ describe('PermissionGuard', () => {
     return {
       getHandler: () => jest.fn(),
       getClass: () =>
-        function TestController() {} as unknown as new (...args: unknown[]) => object,
+        function TestController() {} as unknown as new (
+          ...args: unknown[]
+        ) => object,
       switchToHttp: () => ({
         getRequest: () => ({
           originalUrl: opts.path,

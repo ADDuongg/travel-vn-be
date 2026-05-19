@@ -9,7 +9,6 @@ import { Observable } from 'rxjs';
 import { Request } from 'express';
 import { CorrelationContextService } from '../correlation/correlation-context.service';
 
-/** Shape of `req.user` from [`JwtStrategy`](/src/jwt/jwt.strategy.ts) after JWT guard runs. */
 export interface JwtAuthenticatedUser {
   userId?: string | unknown;
   username?: unknown;

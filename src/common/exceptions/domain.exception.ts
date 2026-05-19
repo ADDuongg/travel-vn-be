@@ -1,7 +1,6 @@
 import { COMMON_I18N_KEYS } from '../i18n/keys';
 import { AppException } from './app.exception';
 
-/** Business / domain rule violation (client-safe message). */
 export class DomainException extends AppException {
   constructor(
     message: string,

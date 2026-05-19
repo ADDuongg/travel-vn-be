@@ -1,5 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException, ForbiddenDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+  ForbiddenDomainException,
+} from 'src/common/exceptions';
 import { Reflector } from '@nestjs/core';
 
 import { RBAC_PERMISSIONS_METADATA_KEY } from 'src/rbac/constants';
@@ -38,7 +42,11 @@ export class PermissionGuard implements CanActivate {
     }
 
     if (!required || required.length === 0) {
-      throw new ForbiddenDomainException('Missing required permissions metadata', 'FORBIDDEN', 'guards.forbidden');
+      throw new ForbiddenDomainException(
+        'Missing required permissions metadata',
+        'FORBIDDEN',
+        'guards.forbidden',
+      );
     }
 
     const user = req.user;
@@ -52,7 +60,11 @@ export class PermissionGuard implements CanActivate {
 
     const ok = required.every((p) => flat.includes(p));
     if (!ok) {
-      throw new ForbiddenDomainException('Insufficient permissions', 'FORBIDDEN', 'guards.forbidden');
+      throw new ForbiddenDomainException(
+        'Insufficient permissions',
+        'FORBIDDEN',
+        'guards.forbidden',
+      );
     }
     return true;
   }

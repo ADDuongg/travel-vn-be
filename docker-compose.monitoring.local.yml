@@ -1,10 +1,4 @@
-# Monitoring stack overlay cho local stack (mongo/redis/es).
-#
-# Backend Nest thường chạy ngoài Docker (yarn start:dev) — Prometheus scrape host qua host.docker.internal:9001.
-#
 # Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.monitoring.local.yml up -d
-#
 services:
   prometheus:
     image: prom/prometheus:v2.55.1

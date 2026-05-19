@@ -111,10 +111,6 @@ export class CreateUserDto {
   @Type(() => AddressDto)
   address?: AddressDto;
 
-  /**
-   * Internal: `false` on self-registration for verify-email flow.
-   * Omit for admin-created users (undefined = legacy verified in JWT).
-   */
   @IsOptional()
   @IsBoolean()
   isEmailVerified?: boolean;

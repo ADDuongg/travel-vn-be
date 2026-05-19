@@ -1,10 +1,4 @@
-# Prometheus + Grafana + exporters — chạy cùng stack staging backend.
-#
-# Prometheus scrape trong network Docker: backend-staging:9001/metrics — không bind host cho Prometheus để tránh xung đột cổng nếu cùng VPS với prod.
-#
 # Usage:
-#   docker compose -f docker-compose.staging.yml -f docker-compose.monitoring.staging.yml up -d
-#
 services:
   prometheus:
     image: prom/prometheus:v2.55.1
@@ -39,7 +33,6 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: ${MONITORING_GRAFANA_ADMIN_USER:-admin}
-      # Trên VPS: đặt mật khẩu mạnh trong .env (đừng dùng mặc định trong production).
       GF_SECURITY_ADMIN_PASSWORD: ${MONITORING_GRAFANA_ADMIN_PASSWORD:-changeme-monitor-grafana}
       GF_SERVER_HTTP_PORT: ${MONITORING_GRAFANA_PORT_STAGING:-3031}
       GF_AUTH_ANONYMOUS_ENABLED: 'false'

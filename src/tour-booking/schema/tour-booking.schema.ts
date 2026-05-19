@@ -14,7 +14,6 @@ export enum TourBookingStatus {
   COMPLETED = 'COMPLETED',
 }
 
-/** Trạng thái thanh toán của đơn tour (dùng cho filter, hiển thị, expire). */
 export enum TourPaymentStatus {
   UNPAID = 'UNPAID',
   PAID = 'PAID',
@@ -131,7 +130,6 @@ export class TourBooking {
     paidAt?: Date;
   };
 
-  /** Ảnh chuyển khoản (upload bởi user, admin verify) */
   @Prop({
     type: {
       url: String,

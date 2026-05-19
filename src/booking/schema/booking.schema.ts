@@ -69,7 +69,6 @@ export type BookingDocument = Booking & Document;
   timestamps: true,
 })
 export class Booking {
-  /* ---- type ---- */
   @Prop({
     type: String,
     enum: BookingType,
@@ -77,7 +76,6 @@ export class Booking {
   })
   bookingType: BookingType;
 
-  /* ---- status ---- */
   @Prop({
     type: String,
     enum: BookingStatus,
@@ -92,14 +90,12 @@ export class Booking {
   })
   paymentStatus: BookingPaymentStatus;
 
-  /* ---- pricing ---- */
   @Prop({ required: true })
   amount: number;
 
   @Prop({ required: true })
   currency: string;
 
-  /* ---- relations ---- */
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId?: Types.ObjectId;
 
@@ -116,7 +112,6 @@ export class Booking {
     verified: boolean;
   };
 
-  /* ---- specific info ---- */
   @Prop({
     type: [BookedRoomSchema],
     required: true,

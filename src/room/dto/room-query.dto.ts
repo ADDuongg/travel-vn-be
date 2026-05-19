@@ -1,4 +1,3 @@
-// rooms/dto/room-query.dto.ts
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -57,32 +56,26 @@ export class RoomQueryDto {
   @IsOptional()
   keyword?: string;
 
-  /** Language for keyword search (en, vi). Defaults to 'en' */
   @IsString()
   @IsOptional()
   lang?: string;
 
-  /** Check-in date YYYY-MM-DD – only rooms with availability in this range */
   @IsString()
   @IsOptional()
   checkIn?: string;
 
-  /** Check-out date YYYY-MM-DD */
   @IsString()
   @IsOptional()
   checkOut?: string;
 
-  /** Minimum rating (ratingSummary.average >= minRating) */
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   @IsOptional()
   minRating?: number;
 
-  /** Amenity codes (e.g. wifi, air_condition) – room must have at least one */
   @IsOptional()
   @Transform(({ value, obj }) => {
-    // Hỗ trợ cả amenities và amenities[] từ query string
     const raw =
       (obj && (obj.amenities ?? obj['amenities[]'])) !== undefined
         ? (obj.amenities ?? obj['amenities[]'])
@@ -102,7 +95,6 @@ export class RoomQueryDto {
   @IsString({ each: true })
   amenities?: string[];
 
-  /** Room sizes in m² – room must match one of these */
   @IsOptional()
   @Transform(({ value }) => {
     if (value == null) return undefined;
@@ -117,12 +109,10 @@ export class RoomQueryDto {
   @IsNumber({}, { each: true })
   roomSize?: number[];
 
-  /** Filter by province – rooms in hotels belonging to this province */
   @IsOptional()
   @IsString()
   provinceId?: string;
 
-  /** Filter by hotel IDs (destinations) */
   @IsOptional()
   @Transform(({ value }) => {
     if (value == null) return undefined;

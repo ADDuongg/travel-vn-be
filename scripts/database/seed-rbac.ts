@@ -1,7 +1,3 @@
-/**
- * Idempotent RBAC seed: collections `permissions`, `role_permissions`; upserts Role docs (`roles`).
- * Requires DB_URI — same Mongo as the NestJS app (.env).
- */
 import mongoose from 'mongoose';
 
 import {
@@ -11,7 +7,6 @@ import {
 import { RBAC_ROLE_CODES } from '../../src/rbac/constants';
 import { mongooseLocalConnectOptions, resolveAppMongoUri } from './lib/config';
 
-/** Rebuild `role_permissions` from rbac-seed.data (overwrites custom admin assignments). */
 const syncDefaultMatrix =
   process.argv.includes('--sync-default-matrix') ||
   process.env.RBAC_SEED_SYNC_MATRIX === 'true';
@@ -30,7 +25,6 @@ async function seed() {
 
   const permColl = db.collection('permissions');
 
-  // 1) Permissions
   for (const row of RBAC_PERMISSION_SEED) {
     await permColl.updateOne(
       { key: row.key },
@@ -49,7 +43,6 @@ async function seed() {
     `[seed-rbac] permissions OK (${RBAC_PERMISSION_SEED.length} keys)`,
   );
 
-  // 2) Role documents (reuse `roles` collection — align with RolesModule schema)
   const rolesColl = db.collection('roles');
 
   const roleMeta: Record<
@@ -92,8 +85,6 @@ async function seed() {
     console.log('[seed-rbac] done.');
     return;
   }
-
-  // 3) Junction — skip super_admin (uses User.isSuperAdmin only)
 
   const permByKey = new Map<string, { _id: unknown }>();
   const allPerms = await permColl.find({}).toArray();

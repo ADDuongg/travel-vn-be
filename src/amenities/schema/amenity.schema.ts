@@ -1,4 +1,3 @@
-// amenity.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -9,7 +8,6 @@ export class Amenity {
   @Prop({ default: true })
   isActive: boolean;
 
-  /** Optional code for filtering (e.g. wifi, air_condition, pool) */
   @Prop({ sparse: true, unique: true })
   code?: string;
 

@@ -7,9 +7,7 @@ export enum OtpPurpose {
 
 export interface OtpRecord {
   purpose: OtpPurpose;
-  /**
-   * Email hoặc số điện thoại dùng để gửi OTP.
-   */
+
   target: string;
   code: string;
   issuedAt: string;

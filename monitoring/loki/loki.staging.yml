@@ -1,9 +1,3 @@
-# Loki single-binary config — STAGING.
-#
-# - Retention 14d, hợp lý để debug regression sau release staging.
-# - Ingestion limits trung bình; tăng nếu app bursty.
-# - Không expose Loki ra host.
-
 auth_enabled: false
 
 server:

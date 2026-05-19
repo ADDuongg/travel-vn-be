@@ -98,7 +98,6 @@ export class OtpService {
 
     await this.repo.save(record, this.ttlMinutes * 60);
 
-    // Bắn event để Notification module xử lý gửi email/SMS.
     this.eventEmitter.emit(
       String(NotificationEvent.OTP_ISSUED),
       createDomainEventEnvelope({

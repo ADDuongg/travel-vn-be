@@ -7,7 +7,5 @@ import { AuthModule } from 'src/auth/auth.module';
   imports: [AuthModule],
   controllers: [ProductController],
   providers: [ProductService],
-  // exports: [ProductService],
-  // imports: [TypeOrmModule.forFeature([Product])],
 })
 export class ProductModule {}

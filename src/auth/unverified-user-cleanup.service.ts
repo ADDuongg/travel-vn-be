@@ -13,9 +13,6 @@ import {
   AuthAuditAction,
 } from 'src/audit-log/enums/audit-log.enum';
 
-/**
- * Soft-delete accounts that never completed email verification (self-registration).
- */
 @Injectable()
 export class UnverifiedUserCleanupService {
   private readonly logger = new Logger(UnverifiedUserCleanupService.name);

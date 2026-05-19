@@ -1,9 +1,3 @@
-# Loki single-binary config — PRODUCTION.
-#
-# - Retention 30d (720h) cho compliance/incident review.
-# - Ingestion limits cao hơn staging.
-# - Filesystem storage trong volume `loki_production_data` — đảm bảo backup volume cùng mongo/redis.
-
 auth_enabled: false
 
 server:

@@ -54,9 +54,6 @@ export class AuthService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  // =========================
-  // Validate user
-  // =========================
   async validateUser(
     username: string,
     pass: string,
@@ -131,9 +128,6 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // Sign access token
-  // =========================
   private signAccessToken(user: AuthUser): string {
     const expiresIn = this.env.isProduction() ? '10m' : '1h';
 
@@ -156,9 +150,6 @@ export class AuthService {
     });
   }
 
-  // =========================
-  // Sign refresh token
-  // =========================
   private signRefreshToken(user: AuthUser): { token: string; jti: string } {
     const jti = uuidv4();
 
@@ -190,9 +181,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Login
-  // =========================
   async login(user: AuthUser, meta: { ip?: string; userAgent?: string } = {}) {
     await this.attemptLimiter.reset(
       this.loginLimiterOptions(user.username, meta.ip),
@@ -242,9 +230,6 @@ export class AuthService {
     };
   }
 
-  // =========================
-  // Quên mật khẩu (OTP)
-  // =========================
   private async findUserForPasswordReset(identifier: string): Promise<{
     _id: Types.ObjectId;
     username: string;
@@ -381,9 +366,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Verify email (OTP)
-  // =========================
   async verifyEmail(emailRaw: string, code: string) {
     const email = emailRaw.trim().toLowerCase();
     if (!email) {
@@ -568,9 +550,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Register
-  // =========================
   async register(
     dto: RegisterDto,
     meta: { ip?: string; userAgent?: string } = {},
@@ -701,9 +680,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Refresh token (rotation)
-  // =========================
   async refresh(
     oldRefreshToken: string,
     meta: { ip?: string; userAgent?: string } = {},
@@ -806,7 +782,6 @@ export class AuthService {
         );
       }
 
-      // revoke old token
       existing.isRevoked = true;
       (existing as any).keepUntil = addDays(new Date(), 1);
       await existing.save();
@@ -852,10 +827,6 @@ export class AuthService {
       const permissions = await this.permissionService.resolvePermissions(
         user.roles || [],
       );
-
-      // Intentionally not logging successful token refresh: it fires on every
-      // page reload / background refresh and would flood audit logs without
-      // security signal. TOKEN_REUSE_DETECTED still logged on suspicious reuse.
 
       return {
         access_token: newAccessToken,
@@ -993,9 +964,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Logout all sessions
-  // =========================
   async logoutAll(userId: string) {
     const result = await this.refreshTokenModel.updateMany(
       {
@@ -1029,9 +997,6 @@ export class AuthService {
     );
   }
 
-  // =========================
-  // Save refresh token
-  // =========================
   private async saveRefreshToken(
     user: AuthUser,
     token: string,

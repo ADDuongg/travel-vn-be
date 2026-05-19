@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
 import { Injectable } from '@nestjs/common';
-import { DomainException, NotFoundDomainException } from 'src/common/exceptions';
+import {
+  DomainException,
+  NotFoundDomainException,
+} from 'src/common/exceptions';
 import { Types } from 'mongoose';
 import Stripe from 'stripe';
 import { BookingService } from '../booking/booking.service';
@@ -33,7 +36,12 @@ export class PaymentService {
 
   async createPaymentIntent(bookingId: string) {
     if (!Types.ObjectId.isValid(bookingId)) {
-      throw new DomainException('Invalid bookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid bookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const booking = await this.bookingService.findOne(bookingId);
@@ -46,10 +54,20 @@ export class PaymentService {
     }
 
     if (booking.paymentStatus === BookingPaymentStatus.EXPIRED) {
-      throw new DomainException('Booking has expired', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Booking has expired',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
     if (booking.paymentStatus !== BookingPaymentStatus.UNPAID) {
-      throw new DomainException('Booking already paid', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Booking already paid',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     let intent: Stripe.PaymentIntent;
@@ -105,13 +123,14 @@ export class PaymentService {
     };
   }
 
-  /**
-   * Tạo Stripe Payment Intent cho đơn tour.
-   * Số tiền charge: depositAmount (nếu có) hoặc totalAmount.
-   */
   async createPaymentIntentForTour(tourBookingId: string) {
     if (!Types.ObjectId.isValid(tourBookingId)) {
-      throw new DomainException('Invalid tourBookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid tourBookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const tourBooking = await this.tourBookingService.getById(tourBookingId);
@@ -133,13 +152,28 @@ export class PaymentService {
     };
 
     if (doc.status === TourBookingStatus.PAID) {
-      throw new DomainException('Tour booking already paid', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Tour booking already paid',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
     if (doc.status === TourBookingStatus.CANCELLED) {
-      throw new DomainException('Cannot pay a cancelled tour booking', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Cannot pay a cancelled tour booking',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
     if (doc.paymentStatus === TourPaymentStatus.EXPIRED) {
-      throw new DomainException('Tour booking has expired', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Tour booking has expired',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const amountToCharge =
@@ -198,8 +232,6 @@ export class PaymentService {
       paymentId: payment._id,
     };
   }
-
-  /* ================= STRIPE WEBHOOK ================= */
 
   async handleStripeWebhook(signature: string, payload: Buffer) {
     const event = stripe.webhooks.constructEvent(
@@ -313,7 +345,12 @@ export class PaymentService {
 
   async getPaymentByBookingId(bookingId: string) {
     if (!Types.ObjectId.isValid(bookingId)) {
-      throw new DomainException('Invalid bookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid bookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const payment = await this.paymentRepository.findOneByBookingId(
@@ -333,7 +370,12 @@ export class PaymentService {
 
   async getPaymentByTourBookingId(tourBookingId: string) {
     if (!Types.ObjectId.isValid(tourBookingId)) {
-      throw new DomainException('Invalid tourBookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid tourBookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const payment = await this.paymentRepository.findLatestByTourBookingId(
@@ -353,7 +395,12 @@ export class PaymentService {
 
   async getPaymentById(paymentId: string) {
     if (!Types.ObjectId.isValid(paymentId)) {
-      throw new DomainException('Invalid paymentId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid paymentId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const payment = await this.paymentRepository.findByIdLean(
@@ -373,7 +420,12 @@ export class PaymentService {
 
   async getPaymentStatus(bookingId: string) {
     if (!Types.ObjectId.isValid(bookingId)) {
-      throw new DomainException('Invalid bookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid bookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const payment = await this.paymentRepository.findStatusByBookingId(
@@ -403,7 +455,12 @@ export class PaymentService {
 
   async getPaymentStatusByTourBookingId(tourBookingId: string) {
     if (!Types.ObjectId.isValid(tourBookingId)) {
-      throw new DomainException('Invalid tourBookingId', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Invalid tourBookingId',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const payment = await this.paymentRepository.findStatusByTourBookingId(
@@ -437,20 +494,35 @@ export class PaymentService {
     );
 
     if (!payment) {
-      throw new DomainException('No refundable payment found', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'No refundable payment found',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const alreadyRefunded = payment.refundedAmount ?? 0;
     const remaining = payment.amount - alreadyRefunded;
 
     if (remaining <= 0) {
-      throw new DomainException('Payment already fully refunded', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Payment already fully refunded',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const refundAmount = amount ?? remaining;
 
     if (refundAmount > remaining) {
-      throw new DomainException('Refund amount exceeds remaining balance', 400, 'BAD_REQUEST', 'payment.bad_request');
+      throw new DomainException(
+        'Refund amount exceeds remaining balance',
+        400,
+        'BAD_REQUEST',
+        'payment.bad_request',
+      );
     }
 
     const refund = await stripe.refunds.create({

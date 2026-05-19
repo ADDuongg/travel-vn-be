@@ -8,7 +8,6 @@ import {
 import { TransformValue } from 'src/utils/transform.util';
 
 export class UpdateAmenityDto {
-  /** Unique code for filtering (e.g. wifi, air_condition, pool). Lowercase, underscore allowed. */
   @IsOptional()
   @IsString()
   @Matches(/^[a-z][a-z0-9_]*$/, {

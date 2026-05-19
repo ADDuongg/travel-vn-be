@@ -33,22 +33,18 @@ async function main() {
     process.exit(0);
   }
 
-  // Step 1: Dump from staging (read-only)
   log.step('Dumping data from staging (read-only)...');
   mongodump(config.mongoUriStaging, SNAPSHOT_DIR);
 
-  // Step 2: Restore to local DB
   log.step('Restoring dump to local database...');
   mongorestore(config.mongoUriLocal, SNAPSHOT_DIR, config.dbLocal, {
     drop: true,
   });
 
-  // Step 3: Sanitize
   log.step('Connecting to local DB for sanitization...');
   await mongoose.connect(config.mongoUriLocal, mongooseLocalConnectOptions);
   await sanitizeDatabase(mongoose.connection);
 
-  // Step 4: Run migrations
   log.step('Running migrations...');
   try {
     execSync('yarn run migrate-mongo up', {
@@ -62,7 +58,6 @@ async function main() {
     );
   }
 
-  // Step 5: Print summary
   log.step('Collecting summary...');
   const collections = await mongoose.connection.db!.listCollections().toArray();
   const counts: Record<string, string | number> = {};

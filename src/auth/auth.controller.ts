@@ -55,13 +55,11 @@ export class AuthController {
       sameSite,
     };
 
-    // Clear legacy/global cookie to avoid duplicated cookie name in requests.
     res.clearCookie('refresh_token', {
       ...baseCookieOptions,
       path: '/',
     });
 
-    // Clear scoped auth cookie before setting rotated/new value.
     res.clearCookie('refresh_token', {
       ...baseCookieOptions,
       path: '/api/v1/auth',
