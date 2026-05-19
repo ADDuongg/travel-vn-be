@@ -44,25 +44,10 @@ stages:
 variables:
   NODE_IMAGE: node:20-alpine
   DOCKER_TLS_CERTDIR: '/certs'
-
-# ---------------------------------------------------------------------------
-# GLOBAL CACHE -- Cache Yarn cache (avoid caching node_modules)
-# Why: caching node_modules can become inconsistent/corrupted across jobs,
-# causing "Cannot find module" at runtime while yarn install still says "up-to-date".
-# ---------------------------------------------------------------------------
-cache:
-  key:
-    files:
-      - yarn.lock
-  paths:
-    - .yarn-cache/
-  policy: pull-push
+  # BuildKit: layer cache + yarn cache mount in Dockerfile (no host yarn install)
+  DOCKER_BUILDKIT: '1'
 
 default:
-  before_script:
-    - rm -rf node_modules
-  after_script:
-    - rm -rf node_modules dist build .vite || true
   interruptible: true
 
 # ===========================================================================
@@ -84,8 +69,9 @@ default:
 #     paths:
 #       - .yarn-cache/
 #     policy: pull-push
+#   before_script:
+#     - yarn config set cache-folder "$CI_PROJECT_DIR/.yarn-cache"
 #   script:
-#     - yarn config set cache-folder .yarn-cache
 #     - yarn install --frozen-lockfile --check-files --non-interactive
 #     - yarn lint
 #   tags:
@@ -102,8 +88,9 @@ default:
 # test:
 #   stage: test
 #   image: $NODE_IMAGE
+#   before_script:
+#     - yarn config set cache-folder "$CI_PROJECT_DIR/.yarn-cache"
 #   script:
-#     - yarn config set cache-folder .yarn-cache
 #     - yarn install --frozen-lockfile --check-files --non-interactive
 #     - yarn test --coverage --passWithNoTests
 #   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
@@ -118,14 +105,11 @@ default:
 # ===========================================================================
 # STAGE 3: BUILD -- Docker build + push to registry
 # ===========================================================================
-
-# ---------------------------------------------------------------------------
-# Job: build:staging
-# ---------------------------------------------------------------------------
-# Build Docker image cho STAGING environment.
-# Chi chay khi push/merge vao branch "staging".
-# APP_VERSION = git short SHA (structured logs / Loki). Local build: omit arg → package.json version.
-build:staging:
+#
+# Yarn cache: chi trong Dockerfile (YARN_CACHE_FOLDER + BuildKit cache mount).
+# Khong dung GitLab cache .yarn-cache/ tren runner — job build khong chay yarn tren host.
+#
+.docker_build:
   stage: build
   image: docker:27
   services:
@@ -135,12 +119,30 @@ build:staging:
   before_script:
     - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
   script:
+    - docker pull "$CACHE_FROM_IMAGE" || true
     - >
       docker build
+      --build-arg BUILDKIT_INLINE_CACHE=1
       --build-arg APP_VERSION=$CI_COMMIT_SHORT_SHA
-      -t $CI_REGISTRY_IMAGE:staging-latest
-      -t $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+      --cache-from "$CACHE_FROM_IMAGE"
+      -t "$IMAGE_LATEST"
+      -t "$IMAGE_SHA"
       .
+
+# ---------------------------------------------------------------------------
+# Job: build:staging
+# ---------------------------------------------------------------------------
+# Build Docker image cho STAGING environment.
+# Chi chay khi push/merge vao branch "staging".
+# APP_VERSION = git short SHA (structured logs / Loki). Local build: omit arg → package.json version.
+build:staging:
+  extends: .docker_build
+  variables:
+    CACHE_FROM_IMAGE: $CI_REGISTRY_IMAGE:staging-latest
+    IMAGE_LATEST: $CI_REGISTRY_IMAGE:staging-latest
+    IMAGE_SHA: $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA
+  script:
+    - !reference [.docker_build, script]
     - |
       for i in 1 2 3; do
         docker push $CI_REGISTRY_IMAGE:staging-$CI_COMMIT_SHORT_SHA && break
@@ -164,21 +166,13 @@ build:staging:
 # Build Docker image cho PRODUCTION environment.
 # Chi chay khi push/merge vao branch "production".
 build:production:
-  stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
+  extends: .docker_build
   variables:
-    DOCKER_TLS_CERTDIR: '/certs'
-  before_script:
-    - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+    CACHE_FROM_IMAGE: $CI_REGISTRY_IMAGE:production-latest
+    IMAGE_LATEST: $CI_REGISTRY_IMAGE:production-latest
+    IMAGE_SHA: $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
   script:
-    - >
-      docker build
-      --build-arg APP_VERSION=$CI_COMMIT_SHORT_SHA
-      -t $CI_REGISTRY_IMAGE:production-latest
-      -t $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA
-      .
+    - !reference [.docker_build, script]
     - |
       for i in 1 2 3; do
         docker push $CI_REGISTRY_IMAGE:production-$CI_COMMIT_SHORT_SHA && break

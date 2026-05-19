@@ -25,13 +25,21 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Yarn cache (BuildKit mount — persisted across CI docker builds, not in final image)
+ENV YARN_CACHE_FOLDER=/root/.cache/yarn
+
 # Chi copy file lien quan den dependencies truoc (Docker layer cache strategy)
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile
 
 # Copy toan bo source code va build
 COPY . .
 RUN yarn build
+
+# Prune devDependencies (reuses YARN_CACHE_FOLDER mount; runner copies node_modules)
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile --production
 
 
 # -----------------------------------------------------------------------------
@@ -54,11 +62,9 @@ ENV NODE_ENV=production
 # wget: dung cho HEALTHCHECK va docker-compose healthcheck (image alpine mac dinh khong co)
 RUN apk add --no-cache wget
 
-# Chi cai production dependencies (khong co devDeps)
+# Production node_modules da prune o builder; chi copy, khong yarn install lai
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --production && yarn cache clean
-
-# Copy compiled JS tu builder stage
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
 # NestJS API listen port 9001 ben trong container.
